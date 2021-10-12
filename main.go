@@ -41,13 +41,13 @@ func main() {
 		Cur: 4096,
 		Max: 4096,
 	}); err != nil {
-		log.Fatalf("failed to set temporary rlimit: %w", err)
+		log.Fatalf("failed to set temporary rlimit: %s", err)
 	}
 	if err := unix.Setrlimit(unix.RLIMIT_MEMLOCK, &unix.Rlimit{
 		Cur: unix.RLIM_INFINITY,
 		Max: unix.RLIM_INFINITY,
 	}); err != nil {
-		log.Fatalf("Failed to set temporary rlimit: %w", err)
+		log.Fatalf("Failed to set temporary rlimit: %s", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -59,11 +59,11 @@ func main() {
 
 	funcs, err := pwru.GetFuncs()
 	if err != nil {
-		log.Fatalf("Failed to get skb-accepting functions: %w", err)
+		log.Fatalf("Failed to get skb-accepting functions: %s", err)
 	}
 	addr2name, err := pwru.GetAddrs(funcs)
 	if err != nil {
-		log.Fatalf("Failed to get function addrs: %w", err)
+		log.Fatalf("Failed to get function addrs: %s", err)
 	}
 
 	objs := KProbePWRUObjects{}
@@ -104,7 +104,7 @@ func main() {
 		bar.Increment()
 		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
-				log.Fatalf("Opening kprobe %s: %w\n", name, err)
+				log.Fatalf("Opening kprobe %s: %s\n", name, err)
 			} else {
 				ignored += 1
 			}
@@ -117,7 +117,7 @@ func main() {
 
 	rd, err := perf.NewReader(objs.Events, os.Getpagesize())
 	if err != nil {
-		log.Fatalf("Creating perf event reader: %w", err)
+		log.Fatalf("Creating perf event reader: %s", err)
 	}
 	defer rd.Close()
 
@@ -125,7 +125,7 @@ func main() {
 		<-ctx.Done()
 
 		if err := rd.Close(); err != nil {
-			log.Fatalf("Closing perf event reader: %w", err)
+			log.Fatalf("Closing perf event reader: %s", err)
 		}
 	}()
 
@@ -140,7 +140,7 @@ func main() {
 			if perf.IsClosed(err) {
 				return
 			}
-			log.Printf("Reading from perf event reader: %w", err)
+			log.Printf("Reading from perf event reader: %s", err)
 		}
 
 		if record.LostSamples != 0 {
@@ -149,7 +149,7 @@ func main() {
 		}
 
 		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			log.Printf("Parsing perf event: %w", err)
+			log.Printf("Parsing perf event: %s", err)
 			continue
 		}
 
