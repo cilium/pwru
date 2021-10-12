@@ -17,6 +17,7 @@ import (
 	"syscall"
 
 	pb "github.com/cheggaaa/pb/v3"
+	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"golang.org/x/sys/unix"
@@ -24,9 +25,19 @@ import (
 	"github.com/cilium/pwru/internal/pwru"
 )
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang KProbePWRU ./bpf/kprobe_pwru.c -- -I./bpf/headers
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang KProbePWRU ./bpf/kprobe_pwru.c -- -DOUTPUT_SKB -I./bpf/headers
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang KProbePWRUWithoutOutputSKB ./bpf/kprobe_pwru.c -- -I./bpf/headers
+
+type Foo interface {
+	Close() error
+}
 
 func main() {
+	var (
+		kprobe1, kprobe2, kprobe3, kprobe4, kprobe5 *ebpf.Program
+		cfgMap, events, printSkbMap                 *ebpf.Map
+	)
+
 	flags := pwru.Flags{
 		FilterMark:       flag.Int("filter-mark", 0, "filter skb mark"),
 		FilterProto:      flag.String("filter-proto", "", "filter L4 protocol (tcp, udp, icmp)"),
@@ -70,30 +81,53 @@ func main() {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}
 
-	objs := KProbePWRUObjects{}
-	if err := LoadKProbePWRUObjects(&objs, nil); err != nil {
-		log.Fatalf("Loading objects: %v", err)
+	if *flags.OutputSkb {
+		objs := KProbePWRUObjects{}
+		if err := LoadKProbePWRUObjects(&objs, nil); err != nil {
+			log.Fatalf("Loading objects: %v", err)
+		}
+		defer objs.Close()
+		kprobe1 = objs.KprobeSkb1
+		kprobe2 = objs.KprobeSkb2
+		kprobe3 = objs.KprobeSkb3
+		kprobe4 = objs.KprobeSkb4
+		kprobe5 = objs.KprobeSkb5
+		cfgMap = objs.CfgMap
+		events = objs.Events
+		printSkbMap = objs.PrintSkbMap
+	} else {
+		objs := KProbePWRUWithoutOutputSKBObjects{}
+		if err := LoadKProbePWRUWithoutOutputSKBObjects(&objs, nil); err != nil {
+			log.Fatalf("Loading objects: %v", err)
+		}
+		defer objs.Close()
+		kprobe1 = objs.KprobeSkb1
+		kprobe2 = objs.KprobeSkb2
+		kprobe3 = objs.KprobeSkb3
+		kprobe4 = objs.KprobeSkb4
+		kprobe5 = objs.KprobeSkb5
+		cfgMap = objs.CfgMap
+		events = objs.Events
 	}
-	defer objs.Close()
 
-	pwru.ConfigBPFMap(&flags, objs.CfgMap)
+	pwru.ConfigBPFMap(&flags, cfgMap)
 
 	log.Println("Attaching kprobes...")
 	ignored := 0
 	bar := pb.StartNew(len(funcs))
 	for name, pos := range funcs {
-		fn := objs.KprobeSkb1
+		fn := kprobe1
 		switch pos {
 		case 1:
-			fn = objs.KprobeSkb1
+			fn = kprobe1
 		case 2:
-			fn = objs.KprobeSkb2
+			fn = kprobe2
 		case 3:
-			fn = objs.KprobeSkb3
+			fn = kprobe3
 		case 4:
-			fn = objs.KprobeSkb4
+			fn = kprobe4
 		case 5:
-			fn = objs.KprobeSkb5
+			fn = kprobe5
 		default:
 			ignored += 1
 			continue
@@ -119,7 +153,7 @@ func main() {
 	bar.Finish()
 	fmt.Printf("Attached (ignored %d)\n", ignored)
 
-	rd, err := perf.NewReader(objs.Events, os.Getpagesize())
+	rd, err := perf.NewReader(events, os.Getpagesize())
 	if err != nil {
 		log.Fatalf("Creating perf event reader: %s", err)
 	}
@@ -135,7 +169,7 @@ func main() {
 
 	log.Println("Listening for events..")
 
-	output := pwru.NewOutput(&flags, objs.PrintSkbMap, addr2name)
+	output := pwru.NewOutput(&flags, printSkbMap, addr2name)
 
 	var event pwru.Event
 	for {

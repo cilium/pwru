@@ -73,12 +73,14 @@ struct {
 	__type(value, u32);
 } cfg_map SEC(".maps");
 
+#ifdef OUTPUT_SKB
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
 	__uint(max_entries, 256);
 	__type(key, u32);
 	__type(value, char[PRINT_SKB_STR_SIZE]);
 } print_skb_map SEC(".maps");
+#endif
 
 static __always_inline bool
 filter_mark(struct sk_buff *skb) {
@@ -226,6 +228,7 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 
 static __always_inline void
 set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
+#ifdef OUTPUT_SKB
 	static struct btf_ptr p = {};
 	typeof(print_skb_id) id;
 	char *str;
@@ -242,6 +245,7 @@ set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
 		return;
 
 	*event_id = id;
+#endif
 }
 
 static __always_inline void
