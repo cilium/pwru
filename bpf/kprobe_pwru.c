@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/* Copyright (C) 2020-2021 Martynas Pumputis */
+/* Copyright (C) 2021 Authors of Cilium */
+
 #include "vmlinux.h"
 #include "bpf_helpers.h"
 #include "bpf_core_read.h"
