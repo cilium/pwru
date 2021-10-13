@@ -1,2 +1,7 @@
+# Build
 go generate .
 go build .
+
+# Dependencies
+Kernel >= 5.10
+Clang/LLVM >= 12.0.0
