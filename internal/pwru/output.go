@@ -31,6 +31,10 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, addr2Name Addr2Name) *output
 	}
 }
 
+func (o *output) PrintHeader() {
+	fmt.Printf("%18s %15s %24s %16s\n", "SKB", "PROCESS", "FUNC", "TIMESTAMP")
+}
+
 func (o *output) Print(event *Event) {
 	p, err := ps.FindProcess(int(event.PID))
 	execName := "<empty>"
@@ -45,11 +49,11 @@ func (o *output) Print(event *Event) {
 			ts = 0
 		}
 	}
-	fmt.Printf("0x%x [%s] %s %-10d", event.SAddr, execName, o.addr2name[event.Addr-1], ts)
+	fmt.Printf("%18s %15s %24s %16d", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("[%s]", execName), o.addr2name[event.Addr-1], ts)
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
 	if *o.flags.OutputMeta {
-		fmt.Printf(" mark=0x%x ifindex=%d proto=%x mtu=%d, len=%d", event.Meta.Mark, event.Meta.Ifindex, event.Meta.Proto, event.Meta.MTU, event.Meta.Len)
+		fmt.Printf(" mark=0x%x ifindex=%d proto=%x mtu=%d len=%d", event.Meta.Mark, event.Meta.Ifindex, event.Meta.Proto, event.Meta.MTU, event.Meta.Len)
 	}
 
 	if *o.flags.OutputTuple {

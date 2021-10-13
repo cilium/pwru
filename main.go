@@ -170,6 +170,7 @@ func main() {
 	log.Println("Listening for events..")
 
 	output := pwru.NewOutput(&flags, printSkbMap, addr2name)
+	output.PrintHeader()
 
 	var event pwru.Event
 	for {
