@@ -143,7 +143,9 @@ filter_l3_and_l4(struct sk_buff *skb) {
 	if (ip_vsn == 4 && val_dst_ip && ip4.daddr != *val_dst_ip)
 		return false;
 
-	if (val_src_port != 0 && val_dst_port != 0)
+	volatile bool clang = !val_src_port;
+	volatile bool huh = !val_dst_port;
+	if (clang && huh)
 		return true;
 
 	if (ip4.protocol == IPPROTO_TCP) {
@@ -161,7 +163,7 @@ filter_l3_and_l4(struct sk_buff *skb) {
 		sport = udp.source;
 		dport = udp.dest;
 	} else {
-		return true;
+		return false;
 	}
 
 	if (val_src_port && sport != *val_src_port)
