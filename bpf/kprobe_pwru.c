@@ -84,12 +84,12 @@ struct {
 
 static __always_inline bool
 filter_mark(struct sk_buff *skb) {
+	u32 mark;
 	u32 key_mark = CFG_FILTER_KEY_MARK;
 	u32 *val_mark = bpf_map_lookup_elem(&cfg_map, &key_mark);
-	if (val_mark) {
-		u32 mark;
-		bpf_probe_read(&mark, sizeof(mark), &skb->mark);
 
+	if (val_mark) {
+		mark = BPF_CORE_READ(skb, mark);
 		return mark == *val_mark;
 	}
 
@@ -123,9 +123,9 @@ filter_l3_and_l4(struct sk_buff *skb) {
 	if (!val_proto && !val_src_ip && !val_dst_ip && !val_src_port && !val_dst_port)
 		return true;
 
-	bpf_probe_read(&skb_head, sizeof(skb_head), &skb->head);
-	bpf_probe_read(&l3_off, sizeof(l3_off), &skb->network_header);
-	bpf_probe_read(&l4_off, sizeof(l4_off), &skb->transport_header);
+	skb_head = BPF_CORE_READ(skb, head);
+	l3_off = BPF_CORE_READ(skb, network_header);
+	l4_off = BPF_CORE_READ(skb, transport_header);
 
 	struct iphdr *tmp = (struct iphdr *)(skb_head + l3_off);
 	struct iphdr ip4;
@@ -182,16 +182,11 @@ filter(struct sk_buff *skb) {
 
 static __always_inline void
 set_meta(struct sk_buff *skb, struct skb_meta *meta) {
-	struct net_device *dev = 0;
-
-	bpf_probe_read(&meta->mark, sizeof(meta->mark), &skb->mark);
-	bpf_probe_read(&meta->len, sizeof(meta->len), &skb->len);
-	bpf_probe_read(&meta->protocol, sizeof(meta->protocol), &skb->protocol);
-
-	if (!bpf_probe_read(&dev, sizeof(dev), &skb->dev)) {
-		bpf_probe_read(&meta->ifindex, sizeof(dev->ifindex), &dev->ifindex);
-		bpf_probe_read(&meta->mtu, sizeof(dev->mtu), &dev->mtu);
-	}
+	meta->mark = BPF_CORE_READ(skb, mark);
+	meta->len = BPF_CORE_READ(skb, len);
+	meta->protocol = BPF_CORE_READ(skb, protocol);
+	meta->ifindex = BPF_CORE_READ(skb, dev, ifindex);
+	meta->mtu = BPF_CORE_READ(skb, dev, mtu);
 }
 
 static __always_inline void
@@ -203,8 +198,9 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 	u8 iphdr_first_byte;
 	u8 ip_vsn;
 
-	bpf_probe_read(&skb_head, sizeof(skb_head), &skb->head);
-	bpf_probe_read(&l3_off, sizeof(l3_off), &skb->network_header);
+	skb_head = BPF_CORE_READ(skb, head);
+	l3_off = BPF_CORE_READ(skb, network_header);
+	l4_off = BPF_CORE_READ(skb, transport_header);
 
 	ip = (struct iphdr *)(skb_head + l3_off);
 	bpf_probe_read(&tpl->proto, 1, &ip->protocol);
@@ -216,7 +212,6 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 		bpf_probe_read(&tpl->daddr, sizeof(tpl->daddr), &ip->daddr);
 	}
 
-	bpf_probe_read(&l4_off, sizeof(l4_off), &skb->transport_header);
 	if (tpl->proto == IPPROTO_TCP) {
 		struct tcphdr *tcp = (struct tcphdr *)(skb_head + l4_off);
 		bpf_probe_read(&tpl->sport, sizeof(tpl->sport), &tcp->source);
