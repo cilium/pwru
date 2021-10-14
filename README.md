@@ -1,6 +1,7 @@
 # pwru (packet, where are you?)
 
-`pwru` is a tool for tracing network packets in the Linux kernel.
+`pwru` is a [eBPF](https://ebpf.io)-based tool for tracing network packets in
+the Linux kernel.
 
 The following example shows where the packets of a `curl` request are dropped
 after installing an IP tables rule:
