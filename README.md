@@ -2,6 +2,9 @@
 
 `pwru` is a tool for tracing network packets in the Linux kernel.
 
+The following example shows where the packets of a `curl` request are dropped
+after installing an IP tables rule:
+
 ![demo](demo.gif)
 
 ## Running
@@ -48,6 +51,9 @@ Usage of ./pwru:
         print L4 tuple
 ```
 
+If multiple filters are specified, all of them have to match in order for a
+packet to be traced.
+
 ## Developing
 
 ### Dependencies
@@ -61,3 +67,11 @@ Usage of ./pwru:
 go generate .
 go build .
 ```
+
+### Contributing
+
+*pwru* is an open source project licensed under [GPLv2](LICENSE). Everybody is
+welcome to contribute. Contributors are required to follow the
+[Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/1/4/code-of-conduct/)
+and must adhere to the [Developer Certificate of Origin](https://developercertificate.org/)
+by adding a Signed-off-by line to their commit messages.
