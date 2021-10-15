@@ -2,7 +2,7 @@
 
 ![logo](logo.png "Detective Gopher is looking for packet traces left by eBPF bee")
 
-`pwru` is a [eBPF](https://ebpf.io)-based tool for tracing network packets in
+`pwru` is an [eBPF](https://ebpf.io)-based tool for tracing network packets in
 the Linux kernel.
 
 The following example shows where the packets of a `curl` request are dropped
@@ -56,6 +56,10 @@ Usage of ./pwru:
 
 If multiple filters are specified, all of them have to match in order for a
 packet to be traced.
+
+### Run in a container
+docker build -t pwru .
+docker run --privileged -it pwru <filter1> ... <filtern>
 
 ## Developing
 
