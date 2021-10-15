@@ -28,6 +28,16 @@ The following kernel configuration is required.
 
 You can use `zgrep $OPTION /proc/config.gz` to validate whether option is enabled.
 
+### Permissions 
+
+Running `pwru` as root, or with ``--privileged`` if running as a Docker container
+is a straight forward way to get started.
+
+Alternatively, `pwru` requires sufficient capabilities to implement the eBPF based 
+tracing functionalities.
+
+`CAP_BPF`,`CAP_TRACING` (>=5.7) and `CAP_SYS_RESOURCE`
+
 ### Usage
 
 ```
