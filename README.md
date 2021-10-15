@@ -29,16 +29,6 @@ The following kernel configuration is required.
 
 You can use `zgrep $OPTION /proc/config.gz` to validate whether option is enabled.
 
-### Permissions 
-
-Running `pwru` as root, or with ``--privileged`` if running as a Docker container
-is a straight forward way to get started.
-
-Alternatively, `pwru` requires sufficient capabilities to implement the eBPF based 
-tracing functionalities.
-
-`CAP_BPF`,`CAP_TRACING` (>=5.7) and `CAP_SYS_RESOURCE`
-
 ### Usage
 
 ```
@@ -68,11 +58,6 @@ Usage of ./pwru:
 If multiple filters are specified, all of them have to match in order for a
 packet to be traced.
 
-### Run in a container
-docker build -t pwru .
-
-docker run --privileged -it pwru [filter1] [filtern]
-
 ## Developing
 
 ### Dependencies
@@ -87,9 +72,16 @@ go generate .
 go build .
 ```
 
+Alternatively, you can build and run in the Docker container:
+
+```
+docker build -t pwru .
+docker run --privileged -it pwru [filter1] [filtern]
+```
+
 ### Contributing
 
-*pwru* is an open source project licensed under [GPLv2](LICENSE). Everybody is
+`pwru` is an open source project licensed under [GPLv2](LICENSE). Everybody is
 welcome to contribute. Contributors are required to follow the
 [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/1/4/code-of-conduct/)
 and must adhere to the [Developer Certificate of Origin](https://developercertificate.org/)
