@@ -29,6 +29,11 @@ The following kernel configuration is required.
 
 You can use `zgrep $OPTION /proc/config.gz` to validate whether option is enabled.
 
+### Downloading
+
+You can download the statically linked executable for x86\_64 arch which includes
+the eBPF bytecode from the [release page](https://github.com/cilium/pwru/releases).
+
 ### Usage
 
 ```
