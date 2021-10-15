@@ -84,10 +84,14 @@ docker build -t pwru .
 docker run --privileged -it pwru [filter1] [filtern]
 ```
 
-### Contributing
+## Contributing
 
 `pwru` is an open source project licensed under [GPLv2](LICENSE). Everybody is
 welcome to contribute. Contributors are required to follow the
 [Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/1/4/code-of-conduct/)
 and must adhere to the [Developer Certificate of Origin](https://developercertificate.org/)
 by adding a Signed-off-by line to their commit messages.
+
+## Logo Credits
+
+The detective gopher  is based on the Go gopher designed by Renee French.
