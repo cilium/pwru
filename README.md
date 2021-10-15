@@ -59,7 +59,8 @@ packet to be traced.
 
 ### Run in a container
 docker build -t pwru .
-docker run --privileged -it pwru <filter1> ... <filtern>
+
+docker run --privileged -it pwru [filter1] [filtern]
 
 ## Developing
 
