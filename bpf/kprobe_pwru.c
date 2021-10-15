@@ -137,15 +137,20 @@ filter_l3_and_l4(struct sk_buff *skb) {
 	bpf_probe_read(&iphdr_first_byte, 1, tmp);
 	ip_vsn = iphdr_first_byte >> 4;
 
-	if (ip_vsn == 4 && val_src_ip && ip4.saddr != *val_src_ip)
+	volatile bool src_ip_is_set = val_src_ip;
+	volatile bool dst_ip_is_set = val_dst_ip;
+	if (ip_vsn != 4 && (src_ip_is_set || dst_ip_is_set))
 		return false;
 
-	if (ip_vsn == 4 && val_dst_ip && ip4.daddr != *val_dst_ip)
+	if (val_src_ip && ip4.saddr != *val_src_ip)
 		return false;
 
-	volatile bool clang = !val_src_port;
-	volatile bool huh = !val_dst_port;
-	if (clang && huh)
+	if (val_dst_ip && ip4.daddr != *val_dst_ip)
+		return false;
+
+	volatile bool src_port_not_set = !val_src_port;
+	volatile bool dst_port_not_set = !val_dst_port;
+	if (src_port_not_set && dst_port_not_set)
 		return true;
 
 	if (ip4.protocol == IPPROTO_TCP) {
