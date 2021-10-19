@@ -24,7 +24,7 @@ The following kernel configuration is required.
 | CONFIG_DEBUG_INFO_BTF=y | Available since >= 5.3 |
 | CONFIG_KPROBES=y        |                        |
 | CONFIG_PERF_EVENTS=y    |                        |
-| CONFIG_BPF=y			  |                        |
+| CONFIG_BPF=y            |                        |
 | CONFIG_BPF_SYSCALLS=y   |                        |
 
 You can use `zgrep $OPTION /proc/config.gz` to validate whether option is enabled.
@@ -94,4 +94,4 @@ by adding a Signed-off-by line to their commit messages.
 
 ## Logo Credits
 
-The detective gopher  is based on the Go gopher designed by Renee French.
+The detective gopher is based on the Go gopher designed by Renee French.
