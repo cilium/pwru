@@ -112,7 +112,7 @@ func main() {
 	ignored := 0
 	bar := pb.StartNew(len(funcs))
 	for name, pos := range funcs {
-		fn := kprobe1
+		var fn *ebpf.Program
 		switch pos {
 		case 1:
 			fn = kprobe1
