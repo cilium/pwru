@@ -17,9 +17,6 @@
 #define PT_REGS_SP(x) ((x)->sp)
 #define PT_REGS_IP(x) ((x)->ip)
 
-#define CFG_FILTER_KEY_DEFAULT    0
-#define CFG_MAX            1
-
 #define PRINT_SKB_STR_SIZE    2048
 
 struct skb_meta {
@@ -58,25 +55,20 @@ struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 } events SEC(".maps");
 
-union v6addr {
-	struct {
-		u32 p1;
-		u32 p2;
-		u32 p3;
-		u32 p4;
-	};
+union addr {
+	u32 v4addr;
 	struct {
 		u64 d1;
 		u64 d2;
-	};
-	__u8 addr[16];
+	} v6addr;
+	u64 pad[2];
 } __attribute__((packed));
 
-struct filter_cfg {
+struct config {
 	u32 mark;
 	u8 ipv6;
-	union v6addr saddr;
-	union v6addr daddr;
+	union addr saddr;
+	union addr daddr;
 	u8 l4_proto;
 	u16 sport;
 	u16 dport;
@@ -90,9 +82,9 @@ struct filter_cfg {
 
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(max_entries, CFG_MAX);
+	__uint(max_entries, 1);
 	__type(key, u32);
-	__type(value, struct filter_cfg);
+	__type(value, struct config);
 } cfg_map SEC(".maps");
 
 #ifdef OUTPUT_SKB
@@ -105,7 +97,7 @@ struct {
 #endif
 
 static __always_inline bool
-filter_mark(struct sk_buff *skb, struct filter_cfg *cfg) {
+filter_mark(struct sk_buff *skb, struct config *cfg) {
 	u32 mark;
 
 	if (cfg->mark) {
@@ -121,7 +113,7 @@ filter_mark(struct sk_buff *skb, struct filter_cfg *cfg) {
  * if one of the other fields does not match.
  */
 static __always_inline bool
-filter_l3_and_l4(struct sk_buff *skb, struct filter_cfg *cfg) {
+filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
 	unsigned char *skb_head = 0;
 	u16 l3_off, l4_off;
 	u16 dport;
@@ -130,8 +122,8 @@ filter_l3_and_l4(struct sk_buff *skb, struct filter_cfg *cfg) {
 	u8 ip_vsn;
 
 	if (!cfg->l4_proto && \
-        cfg->saddr.d1 == 0 && cfg->saddr.d2 == 0 && \
-        cfg->daddr.d1 == 0 && cfg->daddr.d2 == 0 && \
+        cfg->saddr.pad[0] == 0 && cfg->saddr.pad[1] == 0 && \
+        cfg->daddr.pad[0] == 0 && cfg->daddr.pad[1] == 0 && \
         !cfg->sport && !cfg->dport)
 		return true;
 
@@ -151,10 +143,10 @@ filter_l3_and_l4(struct sk_buff *skb, struct filter_cfg *cfg) {
 	struct iphdr ip4;
 	bpf_probe_read(&ip4, sizeof(ip4), tmp);
 
-	if (cfg->saddr.p1 != 0 && ip4.saddr != cfg->saddr.p1)
+	if (cfg->saddr.v4addr != 0 && ip4.saddr != cfg->saddr.v4addr)
 		return false;
 
-	if (cfg->daddr.p1 != 0 && ip4.daddr != cfg->daddr.p1)
+	if (cfg->daddr.v4addr != 0 && ip4.daddr != cfg->daddr.v4addr)
 		return false;
 
 	if (cfg->l4_proto && ip4.protocol != cfg->l4_proto)
@@ -190,7 +182,7 @@ filter_l3_and_l4(struct sk_buff *skb, struct filter_cfg *cfg) {
 }
 
 static __always_inline bool
-filter(struct sk_buff *skb, struct filter_cfg *cfg) {
+filter(struct sk_buff *skb, struct config *cfg) {
 	return filter_mark(skb, cfg) && filter_l3_and_l4(skb, cfg);
 }
 
@@ -261,7 +253,7 @@ set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
 }
 
 static __always_inline void
-set_output(struct sk_buff *skb, struct event_t *event, struct filter_cfg *cfg) {
+set_output(struct sk_buff *skb, struct event_t *event, struct config *cfg) {
 	if (cfg->output_meta)
 		set_meta(skb, &event->meta);
 
@@ -276,8 +268,8 @@ static __always_inline int
 handle_everything(struct sk_buff *skb, struct pt_regs *ctx) {
 	struct event_t event = {};
 
-	u32 index = CFG_FILTER_KEY_DEFAULT;
-	struct filter_cfg *cfg = bpf_map_lookup_elem(&cfg_map, &index);
+	u32 index = 0;
+	struct config *cfg = bpf_map_lookup_elem(&cfg_map, &index);
 
 	if (cfg) {
 		if (!filter(skb, cfg))
