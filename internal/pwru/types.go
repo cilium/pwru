@@ -4,30 +4,38 @@
 
 package pwru
 
+import flag "github.com/spf13/pflag"
+
 const (
-	CFG_FILTER_KEY_MARK     = 0x0
-	CFG_FILTER_KEY_PROTO    = 0x1
-	CFG_FILTER_KEY_SRC_IP   = 0x2
-	CFG_FILTER_KEY_DST_IP   = 0x3
-	CFG_FILTER_KEY_SRC_PORT = 0x4
-	CFG_FILTER_KEY_DST_PORT = 0x5
-	CFG_OUTPUT_META         = 0x6
-	CFG_OUTPUT_TUPLE        = 0x7
-	CFG_OUTPUT_SKB          = 0x8
+	CFG_FILTER_KEY_DEFAULT = 0x0
+	CFG_MAX                = 0x1
 )
 
 type Flags struct {
-	FilterMark    *int
-	FilterProto   *string
-	FilterSrcIP   *string
-	FilterDstIP   *string
-	FilterSrcPort *string
-	FilterDstPort *string
+	FilterMark    uint32
+	FilterProto   string
+	FilterSrcIP   string
+	FilterDstIP   string
+	FilterSrcPort uint16
+	FilterDstPort uint16
 
-	OutputRelativeTS *bool
-	OutputMeta       *bool
-	OutputTuple      *bool
-	OutputSkb        *bool
+	OutputRelativeTS bool
+	OutputMeta       bool
+	OutputTuple      bool
+	OutputSkb        bool
+}
+
+func (f *Flags) SetFlags() {
+	flag.StringVar(&f.FilterProto, "filter-proto", "", "filter L4 protocol (tcp, udp, icmp)")
+	flag.StringVar(&f.FilterSrcIP, "filter-src-ip", "", "filter source IP addr")
+	flag.StringVar(&f.FilterDstIP, "filter-dst-ip", "", "filter destination IP addr")
+	flag.Uint32Var(&f.FilterMark, "filter-mark", 0, "filter skb mark")
+	flag.Uint16Var(&f.FilterSrcPort, "filter-src-port", 0, "filter source port")
+	flag.Uint16Var(&f.FilterDstPort, "filter-dst-port", 0, "filter destination port")
+	flag.BoolVar(&f.OutputRelativeTS, "output-relative-timestamp", false, "print relative timestamp per skb")
+	flag.BoolVar(&f.OutputMeta, "output-meta", false, "print skb metadata")
+	flag.BoolVar(&f.OutputTuple, "output-tuple", false, "print L4 tuple")
+	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 }
 
 type Tuple struct {

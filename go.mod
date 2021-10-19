@@ -9,6 +9,7 @@ require (
 	github.com/cilium/cilium v1.10.0-rc0.0.20210813171629-c88b2b3ec713
 	github.com/cilium/ebpf v0.5.1-0.20210421150058-a4ee356536f3
 	github.com/mitchellh/go-ps v1.0.0
+	github.com/spf13/pflag v1.0.5
 	golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e
 )
 
