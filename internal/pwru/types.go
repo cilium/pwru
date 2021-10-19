@@ -6,11 +6,6 @@ package pwru
 
 import flag "github.com/spf13/pflag"
 
-const (
-	CFG_FILTER_KEY_DEFAULT = 0x0
-	CFG_MAX                = 0x1
-)
-
 type Flags struct {
 	FilterMark    uint32
 	FilterProto   string

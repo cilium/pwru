@@ -102,8 +102,7 @@ func ConfigBPFMap(flags *Flags, cfgMap *ebpf.Map) {
 		}
 	}
 
-	key := uint32(CFG_FILTER_KEY_DEFAULT)
-	if err := cfgMap.Update(key, cfg, 0); err != nil {
-		log.Fatalf("Failed to set filter map: %w", err)
+	if err := cfgMap.Update(uint32(0), cfg, 0); err != nil {
+		log.Fatalf("Failed to set filter map: %v", err)
 	}
 }
