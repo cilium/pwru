@@ -28,10 +28,6 @@ import (
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang KProbePWRU ./bpf/kprobe_pwru.c -- -DOUTPUT_SKB -I./bpf/headers
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang KProbePWRUWithoutOutputSKB ./bpf/kprobe_pwru.c -- -I./bpf/headers
 
-type Foo interface {
-	Close() error
-}
-
 func main() {
 	var (
 		kprobe1, kprobe2, kprobe3, kprobe4, kprobe5 *ebpf.Program
