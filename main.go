@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -20,6 +19,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
+	flag "github.com/spf13/pflag"
 	"golang.org/x/sys/unix"
 
 	"github.com/cilium/pwru/internal/pwru"
@@ -34,18 +34,8 @@ func main() {
 		cfgMap, events, printSkbMap                 *ebpf.Map
 	)
 
-	flags := pwru.Flags{
-		FilterMark:       flag.Int("filter-mark", 0, "filter skb mark"),
-		FilterProto:      flag.String("filter-proto", "", "filter L4 protocol (tcp, udp, icmp)"),
-		FilterSrcIP:      flag.String("filter-src-ip", "", "filter source IP addr"),
-		FilterDstIP:      flag.String("filter-dst-ip", "", "filter destination IP addr"),
-		FilterSrcPort:    flag.String("filter-src-port", "", "filter source port"),
-		FilterDstPort:    flag.String("filter-dst-port", "", "filter destination port"),
-		OutputRelativeTS: flag.Bool("output-relative-timestamp", false, "print relative timestamp per skb"),
-		OutputMeta:       flag.Bool("output-meta", false, "print skb metadata"),
-		OutputTuple:      flag.Bool("output-tuple", false, "print L4 tuple"),
-		OutputSkb:        flag.Bool("output-skb", false, "print skb"),
-	}
+	flags := pwru.Flags{}
+	flags.SetFlags()
 	flag.Parse()
 
 	if err := unix.Setrlimit(unix.RLIMIT_NOFILE, &unix.Rlimit{
@@ -77,7 +67,7 @@ func main() {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}
 
-	if *flags.OutputSkb {
+	if flags.OutputSkb {
 		objs := KProbePWRUObjects{}
 		if err := LoadKProbePWRUObjects(&objs, nil); err != nil {
 			log.Fatalf("Loading objects: %v", err)

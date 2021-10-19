@@ -17,18 +17,10 @@
 #define PT_REGS_SP(x) ((x)->sp)
 #define PT_REGS_IP(x) ((x)->ip)
 
-#define CFG_FILTER_KEY_MARK	0
-#define CFG_FILTER_KEY_PROTO	1
-#define CFG_FILTER_KEY_SRC_IP	2
-#define CFG_FILTER_KEY_DST_IP	3
-#define CFG_FILTER_KEY_SRC_PORT	4
-#define CFG_FILTER_KEY_DST_PORT	5
-#define CFG_OUTPUT_META		6
-#define CFG_OUTPUT_TUPLE	7
-#define CFG_OUTPUT_SKB		8
-#define CFG_MAX			9
+#define CFG_FILTER_KEY_DEFAULT    0
+#define CFG_MAX            1
 
-#define PRINT_SKB_STR_SIZE	2048
+#define PRINT_SKB_STR_SIZE    2048
 
 struct skb_meta {
 	u32 mark;
@@ -66,11 +58,41 @@ struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 } events SEC(".maps");
 
+union v6addr {
+	struct {
+		u32 p1;
+		u32 p2;
+		u32 p3;
+		u32 p4;
+	};
+	struct {
+		u64 d1;
+		u64 d2;
+	};
+	__u8 addr[16];
+} __attribute__((packed));
+
+struct filter_cfg {
+	u32 mark;
+	u8 ipv6;
+	union v6addr saddr;
+	union v6addr daddr;
+	u8 l4_proto;
+	u16 sport;
+	u16 dport;
+	u8 output_timestamp;
+	u8 output_meta;
+	u8 output_tuple;
+	u8 output_skb;
+	u8 pad[2];
+
+} __attribute__((packed));
+
 struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(type, BPF_MAP_TYPE_ARRAY);
 	__uint(max_entries, CFG_MAX);
 	__type(key, u32);
-	__type(value, u32);
+	__type(value, struct filter_cfg);
 } cfg_map SEC(".maps");
 
 #ifdef OUTPUT_SKB
@@ -83,21 +105,23 @@ struct {
 #endif
 
 static __always_inline bool
-filter_mark(struct sk_buff *skb) {
+filter_mark(struct sk_buff *skb, struct filter_cfg *cfg) {
 	u32 mark;
-	u32 key_mark = CFG_FILTER_KEY_MARK;
-	u32 *val_mark = bpf_map_lookup_elem(&cfg_map, &key_mark);
 
-	if (val_mark) {
+	if (cfg->mark) {
 		mark = BPF_CORE_READ(skb, mark);
-		return mark == *val_mark;
+		return mark == cfg->mark;
 	}
 
 	return true;
 }
 
+/*
+ * Filter by packet tuple, return true when the tuple is empty, return false
+ * if one of the other fields does not match.
+ */
 static __always_inline bool
-filter_l3_and_l4(struct sk_buff *skb) {
+filter_l3_and_l4(struct sk_buff *skb, struct filter_cfg *cfg) {
 	unsigned char *skb_head = 0;
 	u16 l3_off, l4_off;
 	u16 dport;
@@ -105,84 +129,69 @@ filter_l3_and_l4(struct sk_buff *skb) {
 	u8 iphdr_first_byte;
 	u8 ip_vsn;
 
-	u32 key_proto = CFG_FILTER_KEY_PROTO;
-	u32 *val_proto = bpf_map_lookup_elem(&cfg_map, &key_proto);
-
-	u32 key_src_ip = CFG_FILTER_KEY_SRC_IP;
-	u32 *val_src_ip = bpf_map_lookup_elem(&cfg_map, &key_src_ip);
-
-	u32 key_dst_ip = CFG_FILTER_KEY_DST_IP;
-	u32 *val_dst_ip = bpf_map_lookup_elem(&cfg_map, &key_dst_ip);
-
-	u32 key_src_port = CFG_FILTER_KEY_SRC_PORT;
-	u32 *val_src_port = bpf_map_lookup_elem(&cfg_map, &key_src_port);
-
-	u32 key_dst_port = CFG_FILTER_KEY_DST_PORT;
-	u32 *val_dst_port = bpf_map_lookup_elem(&cfg_map, &key_dst_port);
-
-	if (!val_proto && !val_src_ip && !val_dst_ip && !val_src_port && !val_dst_port)
+	if (!cfg->l4_proto && \
+        cfg->saddr.d1 == 0 && cfg->saddr.d2 == 0 && \
+        cfg->daddr.d1 == 0 && cfg->daddr.d2 == 0 && \
+        !cfg->sport && !cfg->dport)
 		return true;
 
 	skb_head = BPF_CORE_READ(skb, head);
 	l3_off = BPF_CORE_READ(skb, network_header);
 	l4_off = BPF_CORE_READ(skb, transport_header);
 
-	struct iphdr *tmp = (struct iphdr *)(skb_head + l3_off);
-	struct iphdr ip4;
-	bpf_probe_read(&ip4, sizeof(ip4), tmp);
-
-	if (val_proto && ip4.protocol != *val_proto)
-		return false;
-
+	struct iphdr *tmp = (struct iphdr *) (skb_head + l3_off);
 	bpf_probe_read(&iphdr_first_byte, 1, tmp);
 	ip_vsn = iphdr_first_byte >> 4;
 
-	volatile bool src_ip_is_set = val_src_ip;
-	volatile bool dst_ip_is_set = val_dst_ip;
-	if (ip_vsn != 4 && (src_ip_is_set || dst_ip_is_set))
-		return false;
-
-	if (val_src_ip && ip4.saddr != *val_src_ip)
-		return false;
-
-	if (val_dst_ip && ip4.daddr != *val_dst_ip)
-		return false;
-
-	volatile bool src_port_not_set = !val_src_port;
-	volatile bool dst_port_not_set = !val_dst_port;
-	if (src_port_not_set && dst_port_not_set)
-		return true;
-
-	if (ip4.protocol == IPPROTO_TCP) {
-		struct tcphdr *tmp = (struct tcphdr *)(skb_head + l4_off);
-		struct tcphdr tcp;
-
-		bpf_probe_read(&tcp, sizeof(tcp), tmp);
-		sport = tcp.source;
-		dport = tcp.dest;
-	} else if (ip4.protocol == IPPROTO_UDP) {
-		struct udphdr *tmp = (struct udphdr *)(skb_head + l4_off);
-		struct udphdr udp;
-
-		bpf_probe_read(&udp, sizeof(udp), tmp);
-		sport = udp.source;
-		dport = udp.dest;
-	} else {
+	//TODO: support ipv6
+	if (ip_vsn != 4) {
 		return false;
 	}
 
-	if (val_src_port && sport != *val_src_port)
-	    return false;
+	struct iphdr ip4;
+	bpf_probe_read(&ip4, sizeof(ip4), tmp);
 
-	if (val_dst_port && dport != *val_dst_port)
-	    return false;
+	if (cfg->saddr.p1 != 0 && ip4.saddr != cfg->saddr.p1)
+		return false;
+
+	if (cfg->daddr.p1 != 0 && ip4.daddr != cfg->daddr.p1)
+		return false;
+
+	if (cfg->l4_proto && ip4.protocol != cfg->l4_proto)
+		return false;
+
+	if (cfg->dport || cfg->sport) {
+		if (ip4.protocol == IPPROTO_TCP) {
+			struct tcphdr *tmp = (struct tcphdr *) (skb_head + l4_off);
+			struct tcphdr tcp;
+
+			bpf_probe_read(&tcp, sizeof(tcp), tmp);
+			sport = tcp.source;
+			dport = tcp.dest;
+		} else if (ip4.protocol == IPPROTO_UDP) {
+			struct udphdr *tmp = (struct udphdr *) (skb_head + l4_off);
+			struct udphdr udp;
+
+			bpf_probe_read(&udp, sizeof(udp), tmp);
+			sport = udp.source;
+			dport = udp.dest;
+		} else {
+			return false;
+		}
+
+		if (cfg->sport && sport != cfg->sport)
+			return false;
+
+		if (cfg->dport && dport != cfg->dport)
+			return false;
+	}
 
 	return true;
 }
 
 static __always_inline bool
-filter(struct sk_buff *skb) {
-	return filter_mark(skb) && filter_l3_and_l4(skb);
+filter(struct sk_buff *skb, struct filter_cfg *cfg) {
+	return filter_mark(skb, cfg) && filter_l3_and_l4(skb, cfg);
 }
 
 static __always_inline void
@@ -207,7 +216,7 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 	l3_off = BPF_CORE_READ(skb, network_header);
 	l4_off = BPF_CORE_READ(skb, transport_header);
 
-	ip = (struct iphdr *)(skb_head + l3_off);
+	ip = (struct iphdr *) (skb_head + l3_off);
 	bpf_probe_read(&tpl->proto, 1, &ip->protocol);
 
 	bpf_probe_read(&iphdr_first_byte, 1, ip);
@@ -215,14 +224,15 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 	if (ip_vsn == 4) {
 		bpf_probe_read(&tpl->saddr, sizeof(tpl->saddr), &ip->saddr);
 		bpf_probe_read(&tpl->daddr, sizeof(tpl->daddr), &ip->daddr);
+		bpf_probe_read(tpl->pad, sizeof(u32), &ip->daddr);
 	}
 
 	if (tpl->proto == IPPROTO_TCP) {
-		struct tcphdr *tcp = (struct tcphdr *)(skb_head + l4_off);
+		struct tcphdr *tcp = (struct tcphdr *) (skb_head + l4_off);
 		bpf_probe_read(&tpl->sport, sizeof(tpl->sport), &tcp->source);
 		bpf_probe_read(&tpl->dport, sizeof(tpl->dport), &tcp->dest);
 	} else if (tpl->proto == IPPROTO_UDP) {
-		struct udphdr *udp = (struct udphdr *)(skb_head + l4_off);
+		struct udphdr *udp = (struct udphdr *) (skb_head + l4_off);
 		bpf_probe_read(&tpl->sport, sizeof(tpl->sport), &udp->source);
 		bpf_probe_read(&tpl->dport, sizeof(tpl->dport), &udp->dest);
 	}
@@ -251,35 +261,34 @@ set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
 }
 
 static __always_inline void
-set_output(struct sk_buff *skb, struct event_t *event) {
-	u32 key;
-
-	key = CFG_OUTPUT_META;
-	if (bpf_map_lookup_elem(&cfg_map, &key))
+set_output(struct sk_buff *skb, struct event_t *event, struct filter_cfg *cfg) {
+	if (cfg->output_meta)
 		set_meta(skb, &event->meta);
 
-	key = CFG_OUTPUT_TUPLE;
-	if (bpf_map_lookup_elem(&cfg_map, &key))
+	if (cfg->output_tuple)
 		set_tuple(skb, &event->tuple);
 
-	key = CFG_OUTPUT_SKB;
-	if (bpf_map_lookup_elem(&cfg_map, &key))
+	if (cfg->output_skb)
 		set_skb_btf(skb, &event->print_skb_id);
 }
 
 static __always_inline int
-handle_everything(struct sk_buff *skb, struct pt_regs *ctx)
-{
+handle_everything(struct sk_buff *skb, struct pt_regs *ctx) {
 	struct event_t event = {};
 
-	if (!filter(skb))
-		return 0;
+	u32 index = CFG_FILTER_KEY_DEFAULT;
+	struct filter_cfg *cfg = bpf_map_lookup_elem(&cfg_map, &index);
 
-	set_output(skb, &event);
+	if (cfg) {
+		if (!filter(skb, cfg))
+			return 0;
+
+		set_output(skb, &event, cfg);
+	}
 
 	event.pid = bpf_get_current_pid_tgid();
 	event.addr = PT_REGS_IP(ctx);
-	event.skb_addr = (u64)skb;
+	event.skb_addr = (u64) skb;
 	event.ts = bpf_ktime_get_ns();
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 
@@ -288,35 +297,35 @@ handle_everything(struct sk_buff *skb, struct pt_regs *ctx)
 
 SEC("kprobe/skb-1")
 int kprobe_skb_1(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM1(ctx);
+	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM1(ctx);
 
 	return handle_everything(skb, ctx);
 }
 
 SEC("kprobe/skb-2")
 int kprobe_skb_2(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM2(ctx);
+	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM2(ctx);
 
 	return handle_everything(skb, ctx);
 }
 
 SEC("kprobe/skb-3")
 int kprobe_skb_3(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM3(ctx);
+	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM3(ctx);
 
 	return handle_everything(skb, ctx);
 }
 
 SEC("kprobe/skb-4")
 int kprobe_skb_4(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM4(ctx);
+	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM4(ctx);
 
 	return handle_everything(skb, ctx);
 }
 
 SEC("kprobe/skb-5")
 int kprobe_skb_5(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM5(ctx);
+	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM5(ctx);
 
 	return handle_everything(skb, ctx);
 }
