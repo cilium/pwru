@@ -65,10 +65,8 @@ func (o *output) Print(event *Event) {
 
 	if o.flags.OutputSkb {
 		id := uint32(event.PrintSkbId)
-		if event.PrintSkbId != 0 {
-			if str, err := o.printSkbMap.LookupBytes(&id); err == nil {
-				fmt.Printf("\n%s", string(str))
-			}
+		if str, err := o.printSkbMap.LookupBytes(&id); err == nil {
+			fmt.Printf("\n%s", string(str))
 		}
 	}
 
