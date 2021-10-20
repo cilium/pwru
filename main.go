@@ -31,7 +31,7 @@ import (
 func main() {
 	var (
 		kprobe1, kprobe2, kprobe3, kprobe4, kprobe5 *ebpf.Program
-		cfgMap, events, printSkbMap                 *ebpf.Map
+		cfgMap, events, printSkbMap, printStackMap  *ebpf.Map
 	)
 
 	flags := pwru.Flags{}
@@ -62,7 +62,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
 	}
-	addr2name, err := pwru.GetAddrs(funcs)
+	addr2name, err := pwru.GetAddrs(funcs, flags.OutputStack)
 	if err != nil {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}
@@ -81,6 +81,7 @@ func main() {
 		cfgMap = objs.CfgMap
 		events = objs.Events
 		printSkbMap = objs.PrintSkbMap
+		printStackMap = objs.PrintStackMap
 	} else {
 		objs := KProbePWRUWithoutOutputSKBObjects{}
 		if err := LoadKProbePWRUWithoutOutputSKBObjects(&objs, nil); err != nil {
@@ -94,6 +95,7 @@ func main() {
 		kprobe5 = objs.KprobeSkb5
 		cfgMap = objs.CfgMap
 		events = objs.Events
+		printStackMap = objs.PrintStackMap
 	}
 
 	pwru.ConfigBPFMap(&flags, cfgMap)
@@ -155,7 +157,7 @@ func main() {
 
 	log.Println("Listening for events..")
 
-	output := pwru.NewOutput(&flags, printSkbMap, addr2name)
+	output := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name)
 	output.PrintHeader()
 
 	var event pwru.Event

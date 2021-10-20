@@ -32,8 +32,9 @@ type FilterCfg struct {
 	OutputMeta       uint8
 	OutputTuple      uint8
 	OutputSkb        uint8
+	OutputStack      uint8
 
-	Pad [2]byte
+	Pad byte
 }
 
 func ConfigBPFMap(flags *Flags, cfgMap *ebpf.Map) {
@@ -55,6 +56,9 @@ func ConfigBPFMap(flags *Flags, cfgMap *ebpf.Map) {
 	}
 	if flags.OutputTuple {
 		cfg.OutputTuple = 1
+	}
+	if flags.OutputStack {
+		cfg.OutputStack = 1
 	}
 
 	switch strings.ToLower(flags.FilterProto) {
