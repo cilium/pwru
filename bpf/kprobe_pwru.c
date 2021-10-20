@@ -26,7 +26,7 @@ struct skb_meta {
 	u32 mtu;
 	u16 protocol;
 	u16 pad;
-} __attribute__((packed));;
+} __attribute__((packed));
 
 struct tuple {
 	u32 saddr;
@@ -35,7 +35,7 @@ struct tuple {
 	u16 dport;
 	u8 proto;
 	u8 pad[7];
-} __attribute__((packed));;
+} __attribute__((packed));
 
 u64 print_skb_id = 0;
 
@@ -48,7 +48,7 @@ struct event_t {
 	typeof(print_skb_id) print_skb_id;
 	struct skb_meta meta;
 	struct tuple tuple;
-	u16 pad;
+	s64 print_stack_id;
 } __attribute__((packed));
 
 struct {
@@ -76,9 +76,17 @@ struct config {
 	u8 output_meta;
 	u8 output_tuple;
 	u8 output_skb;
-	u8 pad[2];
-
+	u8 output_stack;
+	u8 pad;
 } __attribute__((packed));
+
+#define MAX_STACK_DEPTH 50
+struct {
+	__uint(type, BPF_MAP_TYPE_STACK_TRACE);
+	__uint(max_entries, 256);
+	__uint(key_size, sizeof(u32));
+	__uint(value_size, MAX_STACK_DEPTH * sizeof(u64));
+} print_stack_map SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
@@ -241,7 +249,7 @@ set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
 	p.ptr = skb;
 	id = __sync_fetch_and_add(&print_skb_id, 1) % 256;
 
-	str = bpf_map_lookup_elem(&print_skb_map, (u32 *)&id);
+	str = bpf_map_lookup_elem(&print_skb_map, (u32 *) &id);
 	if (!str)
 		return;
 
@@ -253,7 +261,7 @@ set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
 }
 
 static __always_inline void
-set_output(struct sk_buff *skb, struct event_t *event, struct config *cfg) {
+set_output(struct pt_regs *ctx, struct sk_buff *skb, struct event_t *event, struct config *cfg) {
 	if (cfg->output_meta)
 		set_meta(skb, &event->meta);
 
@@ -262,6 +270,10 @@ set_output(struct sk_buff *skb, struct event_t *event, struct config *cfg) {
 
 	if (cfg->output_skb)
 		set_skb_btf(skb, &event->print_skb_id);
+
+	if (cfg->output_stack) {
+		event->print_stack_id = bpf_get_stackid(ctx, &print_stack_map, BPF_F_REUSE_STACKID | BPF_F_FAST_STACK_CMP);
+	}
 }
 
 static __always_inline int
@@ -275,7 +287,7 @@ handle_everything(struct sk_buff *skb, struct pt_regs *ctx) {
 		if (!filter(skb, cfg))
 			return 0;
 
-		set_output(skb, &event, cfg);
+		set_output(ctx, skb, &event, cfg);
 	}
 
 	event.pid = bpf_get_current_pid_tgid();

@@ -16,18 +16,20 @@ import (
 )
 
 type output struct {
-	flags       *Flags
-	lastSeenSkb map[uint64]uint64 // skb addr => last seen TS
-	printSkbMap *ebpf.Map
-	addr2name   Addr2Name
+	flags         *Flags
+	lastSeenSkb   map[uint64]uint64 // skb addr => last seen TS
+	printSkbMap   *ebpf.Map
+	printStackMap *ebpf.Map
+	addr2name     Addr2Name
 }
 
-func NewOutput(flags *Flags, printSkbMap *ebpf.Map, addr2Name Addr2Name) *output {
+func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map, addr2Name Addr2Name) *output {
 	return &output{
-		flags:       flags,
-		lastSeenSkb: map[uint64]uint64{},
-		printSkbMap: printSkbMap,
-		addr2name:   addr2Name,
+		flags:         flags,
+		lastSeenSkb:   map[uint64]uint64{},
+		printSkbMap:   printSkbMap,
+		printStackMap: printStackMap,
+		addr2name:     addr2Name,
 	}
 }
 
@@ -49,7 +51,7 @@ func (o *output) Print(event *Event) {
 			ts = 0
 		}
 	}
-	fmt.Printf("%18s %15s %24s %16d", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("[%s]", execName), o.addr2name[event.Addr-1], ts)
+	fmt.Printf("%18s %15s %24s %16d", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("[%s]", execName), o.addr2name.Addr2NameMap[event.Addr-1].name, ts)
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
@@ -61,6 +63,18 @@ func (o *output) Print(event *Event) {
 			u32ToNetIPv4(event.Tuple.Saddr), byteorder.NetworkToHost16(event.Tuple.Sport),
 			u32ToNetIPv4(event.Tuple.Daddr), byteorder.NetworkToHost16(event.Tuple.Dport),
 			protoToStr(event.Tuple.Proto))
+	}
+
+	if o.flags.OutputStack && event.PrintStackId > 0 {
+		var stack StackData
+		id := uint32(event.PrintStackId)
+		if err := o.printStackMap.Lookup(&id, &stack); err == nil {
+			for _, ip := range stack.IPs {
+				if ip > 0 {
+					fmt.Printf("\n%s", o.addr2name.findNearestSym(ip))
+				}
+			}
+		}
 	}
 
 	if o.flags.OutputSkb {

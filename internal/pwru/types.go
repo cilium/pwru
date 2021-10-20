@@ -6,6 +6,10 @@ package pwru
 
 import flag "github.com/spf13/pflag"
 
+const (
+	MaxStackDepth = 50
+)
+
 type Flags struct {
 	FilterMark    uint32
 	FilterProto   string
@@ -18,6 +22,7 @@ type Flags struct {
 	OutputMeta       bool
 	OutputTuple      bool
 	OutputSkb        bool
+	OutputStack      bool
 }
 
 func (f *Flags) SetFlags() {
@@ -31,6 +36,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputMeta, "output-meta", false, "print skb metadata")
 	flag.BoolVar(&f.OutputTuple, "output-tuple", false, "print L4 tuple")
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
+	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
 }
 
 type Tuple struct {
@@ -51,13 +57,18 @@ type Meta struct {
 	Pad     uint16
 }
 
+type StackData struct {
+	IPs [MaxStackDepth]uint64
+}
+
 type Event struct {
-	PID        uint32
-	Type       uint32
-	Addr       uint64
-	SAddr      uint64
-	Timestamp  uint64
-	PrintSkbId uint64
-	Meta       Meta
-	Tuple      Tuple
+	PID          uint32
+	Type         uint32
+	Addr         uint64
+	SAddr        uint64
+	Timestamp    uint64
+	PrintSkbId   uint64
+	Meta         Meta
+	Tuple        Tuple
+	PrintStackId int64
 }
