@@ -75,6 +75,7 @@ func (o *output) Print(event *Event) {
 				}
 			}
 		}
+		_ = o.printStackMap.Delete(&id)
 	}
 
 	if o.flags.OutputSkb {
