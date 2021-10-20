@@ -272,7 +272,7 @@ set_output(struct pt_regs *ctx, struct sk_buff *skb, struct event_t *event, stru
 		set_skb_btf(skb, &event->print_skb_id);
 
 	if (cfg->output_stack) {
-		event->print_stack_id = bpf_get_stackid(ctx, &print_stack_map, BPF_F_REUSE_STACKID | BPF_F_FAST_STACK_CMP);
+		event->print_stack_id = bpf_get_stackid(ctx, &print_stack_map, BPF_F_FAST_STACK_CMP);
 	}
 }
 
