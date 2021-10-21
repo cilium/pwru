@@ -68,6 +68,8 @@ func ConfigBPFMap(flags *Flags, cfgMap *ebpf.Map) {
 		cfg.FilterProto = syscall.IPPROTO_UDP
 	case "icmp":
 		cfg.FilterProto = syscall.IPPROTO_ICMP
+	case "icmp6":
+		cfg.FilterProto = syscall.IPPROTO_ICMPV6
 	}
 
 	if flags.FilterDstIP != "" {

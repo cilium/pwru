@@ -5,7 +5,6 @@
 package pwru
 
 import (
-	"encoding/binary"
 	"fmt"
 	"net"
 	"syscall"
@@ -60,9 +59,9 @@ func (o *output) Print(event *Event) {
 
 	if o.flags.OutputTuple {
 		fmt.Printf(" %s:%d->%s:%d(%s)",
-			u32ToNetIPv4(event.Tuple.Saddr), byteorder.NetworkToHost16(event.Tuple.Sport),
-			u32ToNetIPv4(event.Tuple.Daddr), byteorder.NetworkToHost16(event.Tuple.Dport),
-			protoToStr(event.Tuple.Proto))
+			addrToStr(event.Tuple.L3Proto, event.Tuple.Saddr), byteorder.NetworkToHost16(event.Tuple.Sport),
+			addrToStr(event.Tuple.L3Proto, event.Tuple.Daddr), byteorder.NetworkToHost16(event.Tuple.Dport),
+			protoToStr(event.Tuple.L4Proto))
 	}
 
 	if o.flags.OutputStack && event.PrintStackId > 0 {
@@ -96,13 +95,20 @@ func protoToStr(proto uint8) string {
 		return "udp"
 	case syscall.IPPROTO_ICMP:
 		return "icmp"
+	case syscall.IPPROTO_ICMPV6:
+		return "icmp6"
 	default:
 		return ""
 	}
 }
 
-func u32ToNetIPv4(in uint32) net.IP {
-	ip := make(net.IP, 4)
-	binary.LittleEndian.PutUint32(ip, in)
-	return ip
+func addrToStr(proto uint16, addr [16]byte) string {
+	switch proto {
+	case syscall.ETH_P_IP:
+		return net.IP(addr[:4]).String()
+	case syscall.ETH_P_IPV6:
+		return fmt.Sprintf("[%s]", net.IP(addr[:]).String())
+	default:
+		return ""
+	}
 }
