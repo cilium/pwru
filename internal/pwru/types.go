@@ -4,7 +4,9 @@
 
 package pwru
 
-import flag "github.com/spf13/pflag"
+import (
+	flag "github.com/spf13/pflag"
+)
 
 const (
 	MaxStackDepth = 50
@@ -28,7 +30,7 @@ type Flags struct {
 
 func (f *Flags) SetFlags() {
 	flag.StringVar(&f.FilterFunc, "filter-func", "", "filter the kernel functions that can be probed; the filter can be a regular expression (RE2)")
-	flag.StringVar(&f.FilterProto, "filter-proto", "", "filter L4 protocol (tcp, udp, icmp)")
+	flag.StringVar(&f.FilterProto, "filter-proto", "", "filter L4 protocol (tcp, udp, icmp, icmp6)")
 	flag.StringVar(&f.FilterSrcIP, "filter-src-ip", "", "filter source IP addr")
 	flag.StringVar(&f.FilterDstIP, "filter-dst-ip", "", "filter destination IP addr")
 	flag.Uint32Var(&f.FilterMark, "filter-mark", 0, "filter skb mark")
@@ -42,12 +44,13 @@ func (f *Flags) SetFlags() {
 }
 
 type Tuple struct {
-	Saddr uint32
-	Daddr uint32
-	Sport uint16
-	Dport uint16
-	Proto uint8
-	Pad   [7]uint8
+	Saddr   [16]byte
+	Daddr   [16]byte
+	Sport   uint16
+	Dport   uint16
+	L3Proto uint16
+	L4Proto uint8
+	Pad     uint8
 }
 
 type Meta struct {
@@ -56,7 +59,7 @@ type Meta struct {
 	Len     uint32
 	MTU     uint32
 	Proto   uint16
-	Pad     uint16
+	Pad     [3]uint16
 }
 
 type StackData struct {

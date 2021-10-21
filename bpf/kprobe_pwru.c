@@ -19,22 +19,35 @@
 
 #define PRINT_SKB_STR_SIZE    2048
 
+#define ETH_P_IP              0x800
+#define ETH_P_IPV6            0x86dd
+
+union addr {
+	u32 v4addr;
+	struct {
+		u64 d1;
+		u64 d2;
+	} v6addr;
+	u64 pad[2];
+} __attribute__((packed));
+
 struct skb_meta {
 	u32 mark;
 	u32 ifindex;
 	u32 len;
 	u32 mtu;
 	u16 protocol;
-	u16 pad;
+	u16 pad[3];
 } __attribute__((packed));
 
 struct tuple {
-	u32 saddr;
-	u32 daddr;
+	union addr saddr;
+	union addr daddr;
 	u16 sport;
 	u16 dport;
-	u8 proto;
-	u8 pad[7];
+	u16 l3_proto;
+	u8 l4_proto;
+	u8 pad;
 } __attribute__((packed));
 
 u64 print_skb_id = 0;
@@ -54,15 +67,6 @@ struct event_t {
 struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 } events SEC(".maps");
-
-union addr {
-	u32 v4addr;
-	struct {
-		u64 d1;
-		u64 d2;
-	} v6addr;
-	u64 pad[2];
-} __attribute__((packed));
 
 struct config {
 	u32 mark;
@@ -105,7 +109,7 @@ struct {
 #endif
 
 static __always_inline bool
-filter_mark(struct sk_buff *skb, struct config *cfg) {
+filter_meta(struct sk_buff *skb, struct config *cfg) {
 	u32 mark;
 
 	if (cfg->mark) {
@@ -116,6 +120,34 @@ filter_mark(struct sk_buff *skb, struct config *cfg) {
 	return true;
 }
 
+static __always_inline bool
+addr_is_zero(union addr a) {
+	return a.pad[0] == 0 && a.pad[1] == 0;
+}
+
+static __always_inline bool
+addr_equal(union addr a, u8 b[16]) {
+	u64 *d1 = (u64 *)b;
+	if (a.pad[0] != *d1) {
+		return false;
+	}
+	if (a.pad[1] != *(d1 + 1)) {
+		return false;
+	}
+	return true;
+}
+
+static __always_inline bool
+config_tuple_empty(struct config *cfg) {
+	if (!cfg->l4_proto && \
+        addr_is_zero(cfg->saddr) && \
+        addr_is_zero(cfg->daddr) && \
+        !cfg->sport && !cfg->dport)
+		return true;
+
+	return false;
+}
+
 /*
  * Filter by packet tuple, return true when the tuple is empty, return false
  * if one of the other fields does not match.
@@ -124,16 +156,12 @@ static __always_inline bool
 filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
 	unsigned char *skb_head = 0;
 	u16 l3_off, l4_off;
-	u16 dport;
-	u16 sport;
-	u8 iphdr_first_byte;
-	u8 ip_vsn;
+	u16 sport, dport, l4_proto;
+	u8 iphdr_first_byte, ip_vsn;
 
-	if (!cfg->l4_proto && \
-        cfg->saddr.pad[0] == 0 && cfg->saddr.pad[1] == 0 && \
-        cfg->daddr.pad[0] == 0 && cfg->daddr.pad[1] == 0 && \
-        !cfg->sport && !cfg->dport)
+	if (config_tuple_empty(cfg)) {
 		return true;
+	}
 
 	skb_head = BPF_CORE_READ(skb, head);
 	l3_off = BPF_CORE_READ(skb, network_header);
@@ -143,32 +171,54 @@ filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
 	bpf_probe_read(&iphdr_first_byte, 1, tmp);
 	ip_vsn = iphdr_first_byte >> 4;
 
-	//TODO: support ipv6
-	if (ip_vsn != 4) {
+	if (ip_vsn == 4) {
+		struct iphdr ip4;
+		bpf_probe_read(&ip4, sizeof(ip4), tmp);
+
+		if (!addr_is_zero(cfg->saddr) && ip4.saddr != cfg->saddr.v4addr)
+			return false;
+
+		if (!addr_is_zero(cfg->daddr) && ip4.daddr != cfg->daddr.v4addr)
+			return false;
+
+		l4_proto = ip4.protocol;
+	} else if (ip_vsn == 6) {
+		struct ipv6hdr ip6;
+		bpf_probe_read(&ip6, sizeof(ip6), tmp);
+
+		if (!addr_is_zero(cfg->saddr) && !addr_equal(cfg->saddr, ip6.saddr.in6_u.u6_addr8)) {
+			return false;
+		}
+
+		if (!addr_is_zero(cfg->daddr) && !addr_equal(cfg->daddr, ip6.daddr.in6_u.u6_addr8)) {
+			return false;
+		}
+
+		/*
+		 * The transport layer protocol is represented in ipv6 by the next header type, but there are other
+		 * ipv6 extension headers in the next header, so if we want to parse out the transport layer
+		 * protocol, we have to identify all the extension headers, which is a bit troublesome, so let's just
+		 * assume that there are no other ipv6 extension headers and the default is to handle layer 4 protocols
+		 * directly.
+		 */
+		l4_proto = ip6.nexthdr;
+	} else {
+		// Network layer protocols other than ipv4,ipv6, ignore for now
 		return false;
 	}
 
-	struct iphdr ip4;
-	bpf_probe_read(&ip4, sizeof(ip4), tmp);
-
-	if (cfg->saddr.v4addr != 0 && ip4.saddr != cfg->saddr.v4addr)
-		return false;
-
-	if (cfg->daddr.v4addr != 0 && ip4.daddr != cfg->daddr.v4addr)
-		return false;
-
-	if (cfg->l4_proto && ip4.protocol != cfg->l4_proto)
+	if (cfg->l4_proto && l4_proto != cfg->l4_proto)
 		return false;
 
 	if (cfg->dport || cfg->sport) {
-		if (ip4.protocol == IPPROTO_TCP) {
+		if (l4_proto == IPPROTO_TCP) {
 			struct tcphdr *tmp = (struct tcphdr *) (skb_head + l4_off);
 			struct tcphdr tcp;
 
 			bpf_probe_read(&tcp, sizeof(tcp), tmp);
 			sport = tcp.source;
 			dport = tcp.dest;
-		} else if (ip4.protocol == IPPROTO_UDP) {
+		} else if (l4_proto == IPPROTO_UDP) {
 			struct udphdr *tmp = (struct udphdr *) (skb_head + l4_off);
 			struct udphdr udp;
 
@@ -186,12 +236,13 @@ filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
 			return false;
 	}
 
+
 	return true;
 }
 
 static __always_inline bool
 filter(struct sk_buff *skb, struct config *cfg) {
-	return filter_mark(skb, cfg) && filter_l3_and_l4(skb, cfg);
+	return filter_meta(skb, cfg) && filter_l3_and_l4(skb, cfg);
 }
 
 static __always_inline void
@@ -217,21 +268,27 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 	l4_off = BPF_CORE_READ(skb, transport_header);
 
 	ip = (struct iphdr *) (skb_head + l3_off);
-	bpf_probe_read(&tpl->proto, 1, &ip->protocol);
-
 	bpf_probe_read(&iphdr_first_byte, 1, ip);
 	ip_vsn = iphdr_first_byte >> 4;
+
 	if (ip_vsn == 4) {
-		bpf_probe_read(&tpl->saddr, sizeof(tpl->saddr), &ip->saddr);
-		bpf_probe_read(&tpl->daddr, sizeof(tpl->daddr), &ip->daddr);
-		bpf_probe_read(tpl->pad, sizeof(u32), &ip->daddr);
+		bpf_probe_read(&tpl->saddr, sizeof(tpl->saddr.v4addr), &ip->saddr);
+		bpf_probe_read(&tpl->daddr, sizeof(tpl->daddr.v4addr), &ip->daddr);
+		bpf_probe_read(&tpl->l4_proto, 1, &ip->protocol);
+		tpl->l3_proto = ETH_P_IP;
+	} else if (ip_vsn == 6) {
+		struct ipv6hdr *ip6 = (struct ipv6hdr *) ip;
+		bpf_probe_read(&tpl->saddr, sizeof(tpl->saddr), &ip6->saddr);
+		bpf_probe_read(&tpl->daddr, sizeof(tpl->daddr), &ip6->daddr);
+		bpf_probe_read(&tpl->l4_proto, 1, &ip6->nexthdr);
+		tpl->l3_proto = ETH_P_IPV6;
 	}
 
-	if (tpl->proto == IPPROTO_TCP) {
+	if (tpl->l4_proto == IPPROTO_TCP) {
 		struct tcphdr *tcp = (struct tcphdr *) (skb_head + l4_off);
 		bpf_probe_read(&tpl->sport, sizeof(tpl->sport), &tcp->source);
 		bpf_probe_read(&tpl->dport, sizeof(tpl->dport), &tcp->dest);
-	} else if (tpl->proto == IPPROTO_UDP) {
+	} else if (tpl->l4_proto == IPPROTO_UDP) {
 		struct udphdr *udp = (struct udphdr *) (skb_head + l4_off);
 		bpf_probe_read(&tpl->sport, sizeof(tpl->sport), &udp->source);
 		bpf_probe_read(&tpl->dport, sizeof(tpl->dport), &udp->dest);
