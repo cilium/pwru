@@ -58,9 +58,12 @@ func main() {
 	}()
 	defer stop()
 
-	funcs, err := pwru.GetFuncs()
+	funcs, err := pwru.GetFuncs(flags.FilterFunc)
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
+	}
+	if len(funcs) <= 0 {
+		log.Fatalf("Cannot find a matching kernel function")
 	}
 	addr2name, err := pwru.GetAddrs(funcs, flags.OutputStack)
 	if err != nil {
