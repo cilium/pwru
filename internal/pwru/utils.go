@@ -5,12 +5,14 @@
 package pwru
 
 import (
+	"fmt"
 	"github.com/cilium/ebpf/pkg/btf"
+	"regexp"
 )
 
 type Funcs map[string]int
 
-func GetFuncs() (Funcs, error) {
+func GetFuncs(pattern string) (Funcs, error) {
 	funcs := Funcs{}
 
 	spec, err := btf.LoadKernelSpec()
@@ -18,8 +20,17 @@ func GetFuncs() (Funcs, error) {
 		return nil, err
 	}
 
+	reg, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile regular expression %v", err)
+	}
 	callback := func(typ btf.Type) {
 		fn := typ.(*btf.Func)
+
+		if pattern != "" && !reg.Match([]byte(fn.Name)) {
+			return
+		}
+
 		fnProto := fn.Type.(*btf.FuncProto)
 		i := 1
 		for _, p := range fnProto.Params {

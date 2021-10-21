@@ -12,6 +12,7 @@ const (
 
 type Flags struct {
 	FilterMark    uint32
+	FilterFunc    string
 	FilterProto   string
 	FilterSrcIP   string
 	FilterDstIP   string
@@ -26,6 +27,7 @@ type Flags struct {
 }
 
 func (f *Flags) SetFlags() {
+	flag.StringVar(&f.FilterFunc, "filter-func", "", "filter the kernel functions that can be probed; the filter can be a regular expression (RE2)")
 	flag.StringVar(&f.FilterProto, "filter-proto", "", "filter L4 protocol (tcp, udp, icmp)")
 	flag.StringVar(&f.FilterSrcIP, "filter-src-ip", "", "filter source IP addr")
 	flag.StringVar(&f.FilterDstIP, "filter-dst-ip", "", "filter destination IP addr")
