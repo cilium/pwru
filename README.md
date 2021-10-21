@@ -71,7 +71,7 @@ above example with the following commands.
 
 ### Requirements
 
-`pwru` requires >= 5.3 kernel to run. For `--output-skb` >= 5.9 kernel is required.
+`pwru` requires >= 5.5 kernel to run. For `--output-skb` >= 5.9 kernel is required.
 
 The following kernel configuration is required.
 
@@ -94,26 +94,18 @@ the eBPF bytecode from the [release page](https://github.com/cilium/pwru/release
 
 ```
 Usage of ./pwru:
-  -filter-dst-ip string
-        filter destination IP addr
-  -filter-dst-port string
-        filter destination port
-  -filter-mark int
-        filter skb mark
-  -filter-proto string
-        filter L4 protocol (tcp, udp, icmp)
-  -filter-src-ip string
-        filter source IP addr
-  -filter-src-port string
-        filter source port
-  -output-meta
-        print skb metadata
-  -output-relative-timestamp
-        print relative timestamp per skb
-  -output-skb
-        print skb
-  -output-tuple
-        print L4 tuple
+      --filter-dst-ip string        filter destination IP addr
+      --filter-dst-port uint16      filter destination port
+      --filter-func string          filter the kernel functions that can be probed; the filter can be a regular expression (RE2)
+      --filter-mark uint32          filter skb mark
+      --filter-proto string         filter L4 protocol (tcp, udp, icmp)
+      --filter-src-ip string        filter source IP addr
+      --filter-src-port uint16      filter source port
+      --output-meta                 print skb metadata
+      --output-relative-timestamp   print relative timestamp per skb
+      --output-skb                  print skb
+      --output-stack                print stack
+      --output-tuple                print L4 tuple
 ```
 
 If multiple filters are specified, all of them have to match in order for a
