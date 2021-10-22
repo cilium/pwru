@@ -19,6 +19,8 @@
 
 #define PRINT_SKB_STR_SIZE    2048
 
+extern u32 LINUX_KERNEL_VERSION __kconfig;
+
 struct skb_meta {
 	u32 mark;
 	u32 ifindex;
@@ -109,7 +111,11 @@ filter_mark(struct sk_buff *skb, struct config *cfg) {
 	u32 mark;
 
 	if (cfg->mark) {
+#if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 5, 0))
 		mark = BPF_CORE_READ(skb, mark);
+#else
+		bpf_probe_read(&mark, sizeof(mark), &skb->mark);
+#endif
 		return mark == cfg->mark;
 	}
 
@@ -135,9 +141,15 @@ filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
         !cfg->sport && !cfg->dport)
 		return true;
 
+#if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 5, 0))
 	skb_head = BPF_CORE_READ(skb, head);
 	l3_off = BPF_CORE_READ(skb, network_header);
 	l4_off = BPF_CORE_READ(skb, transport_header);
+#else
+	bpf_probe_read(&skb_head, sizeof(skb_head), &skb->head);
+	bpf_probe_read(&l3_off, sizeof(l3_off), &skb->network_header);
+	bpf_probe_read(&l4_off, sizeof(l4_off), &skb->transport_header);
+#endif
 
 	struct iphdr *tmp = (struct iphdr *) (skb_head + l3_off);
 	bpf_probe_read(&iphdr_first_byte, 1, tmp);
@@ -196,11 +208,25 @@ filter(struct sk_buff *skb, struct config *cfg) {
 
 static __always_inline void
 set_meta(struct sk_buff *skb, struct skb_meta *meta) {
+#if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 5, 0))
 	meta->mark = BPF_CORE_READ(skb, mark);
 	meta->len = BPF_CORE_READ(skb, len);
 	meta->protocol = BPF_CORE_READ(skb, protocol);
 	meta->ifindex = BPF_CORE_READ(skb, dev, ifindex);
 	meta->mtu = BPF_CORE_READ(skb, dev, mtu);
+#else
+	struct net_device *dev = 0;
+
+	bpf_probe_read(&meta->mark, sizeof(meta->mark), &skb->mark);
+	bpf_probe_read(&meta->len, sizeof(meta->len), &skb->len);
+	bpf_probe_read(&meta->protocol, sizeof(meta->protocol), &skb->protocol);
+
+	if (!bpf_probe_read(&dev, sizeof(dev), &skb->dev)) {
+		bpf_probe_read(&meta->ifindex, sizeof(dev->ifindex),
+			       &dev->ifindex);
+		bpf_probe_read(&meta->mtu, sizeof(dev->mtu), &dev->mtu);
+	}
+#endif
 }
 
 static __always_inline void
@@ -212,10 +238,16 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 	u8 iphdr_first_byte;
 	u8 ip_vsn;
 
+#if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 5, 0))
 	skb_head = BPF_CORE_READ(skb, head);
 	l3_off = BPF_CORE_READ(skb, network_header);
 	l4_off = BPF_CORE_READ(skb, transport_header);
+#else
+	bpf_probe_read(&skb_head, sizeof(skb_head), &skb->head);
+	bpf_probe_read(&l3_off, sizeof(l3_off), &skb->network_header);
+	bpf_probe_read(&l4_off, sizeof(l4_off), &skb->transport_header);
 
+#endif
 	ip = (struct iphdr *) (skb_head + l3_off);
 	bpf_probe_read(&tpl->proto, 1, &ip->protocol);
 
