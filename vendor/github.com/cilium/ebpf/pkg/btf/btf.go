@@ -587,6 +587,15 @@ func HandleSpec(s *Handle) (*Spec, error) {
 	return info.BTF, nil
 }
 
+func SpecFromFD(fd uint32) (*Spec, error) {
+	info, err := newInfoFromFd(pkg.NewFD(fd))
+	if err != nil {
+		return nil, fmt.Errorf("get BTF spec for handle: %w", err)
+	}
+
+	return info.BTF, nil
+}
+
 // Close destroys the handle.
 //
 // Subsequent calls to FD will return an invalid value.

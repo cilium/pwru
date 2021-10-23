@@ -49,6 +49,7 @@ struct event_t {
 	struct skb_meta meta;
 	struct tuple tuple;
 	s64 print_stack_id;
+	u64 mntns;
 } __attribute__((packed));
 
 struct {
@@ -294,6 +295,9 @@ handle_everything(struct sk_buff *skb, struct pt_regs *ctx) {
 	event.addr = PT_REGS_IP(ctx);
 	event.skb_addr = (u64) skb;
 	event.ts = bpf_ktime_get_ns();
+        struct task_struct *current_task;
+        current_task = (struct task_struct *)bpf_get_current_task();
+	event.mntns = BPF_CORE_READ(current_task, nsproxy, mnt_ns, ns.inum);
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 
 	return 0;

@@ -24,6 +24,8 @@ type Flags struct {
 	OutputTuple      bool
 	OutputSkb        bool
 	OutputStack      bool
+
+	OutputMountNamespaceMetadata string
 }
 
 func (f *Flags) SetFlags() {
@@ -39,6 +41,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputTuple, "output-tuple", false, "print L4 tuple")
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
+	flag.StringVar(&f.OutputMountNamespaceMetadata, "mount-namespace-metadata", "", "print additional metadata from this map indexed by mount namespace")
 }
 
 type Tuple struct {
@@ -73,4 +76,5 @@ type Event struct {
 	Meta         Meta
 	Tuple        Tuple
 	PrintStackId int64
+	Mntns        uint64
 }

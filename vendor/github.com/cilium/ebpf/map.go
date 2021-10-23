@@ -1261,3 +1261,64 @@ func (m *Map) ID() (MapID, error) {
 	}
 	return MapID(info.id), nil
 }
+
+/*
+func (m *Map) BTFID() (btf.ID, uint32, uint32, error) {
+	info, err := bpfGetMapInfoByFD(m.fd)
+	if err != nil {
+		return btf.ID(0), 0, 0, err
+	}
+	return btf.ID(info.btf_id), info.btf_key_type_id, info.btf_value_type_id, nil
+}
+*/
+
+func (m *Map) LookupWithBTF(key interface{}) (string, error) {
+	info, err := bpfGetMapInfoByFD(m.fd)
+	if err != nil {
+		return "", err
+	}
+
+	/*
+		btfValueTypeIDIndex := info.btf_value_type_id - 1
+		fmt.Printf("spec #%d: Kind=%s Vlen=%v Size=%d\n",
+			btfValueTypeIDIndex,
+			spec.RawTypes[btfValueTypeIDIndex].Kind(),
+			spec.RawTypes[btfValueTypeIDIndex].Vlen(),
+			spec.RawTypes[btfValueTypeIDIndex].Size(),
+		)
+	*/
+
+	btfHandle, err := btf.NewHandleFromID(btf.ID(info.btf_id))
+	if err != nil {
+		return "", err
+	}
+	defer btfHandle.Close()
+
+	spec, err := btf.SpecFromFD(uint32(btfHandle.FD()))
+	if err != nil {
+		return "", err
+	}
+
+	ty := &btf.Struct{}
+	members := []btf.Member{}
+	// FIXME: no guarantee we have only one Struct in the BTF types
+	spec.Iterate(func(typ btf.Type) {
+		st := typ.(*btf.Struct)
+		members = st.Members
+	}, ty)
+
+	b, err := m.LookupBytes(key)
+	if err != nil {
+		return "", err
+	}
+	if len(b) == 0 {
+		return "", nil
+	}
+	ret := ""
+	for _, member := range members {
+		sz, _ := btf.Sizeof(member.Type)
+		off := member.Offset / 8
+		ret += fmt.Sprintf("%s=%s ", member.Name, string(b[off:off+uint32(sz)]))
+	}
+	return ret, nil
+}

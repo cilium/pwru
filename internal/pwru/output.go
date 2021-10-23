@@ -37,6 +37,21 @@ func (o *output) PrintHeader() {
 	fmt.Printf("%18s %15s %24s %16s\n", "SKB", "PROCESS", "FUNC", "TIMESTAMP")
 }
 
+func (o *output) PrintMountNamespaceMetadata(pinPath string, mntns uint64) error {
+	containersMap, err := ebpf.LoadPinnedMap(pinPath, &ebpf.LoadPinOptions{})
+	if err != nil {
+		return err
+	}
+
+	out, err := containersMap.LookupWithBTF(mntns)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("\n%s", out)
+
+	return nil
+}
+
 func (o *output) Print(event *Event) {
 	p, err := ps.FindProcess(int(event.PID))
 	execName := "<empty>"
@@ -63,6 +78,13 @@ func (o *output) Print(event *Event) {
 			u32ToNetIPv4(event.Tuple.Saddr), byteorder.NetworkToHost16(event.Tuple.Sport),
 			u32ToNetIPv4(event.Tuple.Daddr), byteorder.NetworkToHost16(event.Tuple.Dport),
 			protoToStr(event.Tuple.Proto))
+	}
+
+	if o.flags.OutputMountNamespaceMetadata != "" {
+		err := o.PrintMountNamespaceMetadata(o.flags.OutputMountNamespaceMetadata, event.Mntns)
+		if err != nil {
+			fmt.Printf("Error: %s\n", err)
+		}
 	}
 
 	if o.flags.OutputStack && event.PrintStackId > 0 {
