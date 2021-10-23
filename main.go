@@ -9,7 +9,6 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -142,7 +141,7 @@ func main() {
 		}
 	}
 	bar.Finish()
-	fmt.Printf("Attached (ignored %d)\n", ignored)
+	log.Printf("Attached (ignored %d)\n", ignored)
 
 	rd, err := perf.NewReader(events, os.Getpagesize())
 	if err != nil {
