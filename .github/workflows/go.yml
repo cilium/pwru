@@ -1,0 +1,40 @@
+name: Go
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+
+    - name: Cache LLVM and Clang
+      id: cache-llvm
+      uses: actions/cache@c64c572235d810460d0d6876e9c705ad5002b353
+      with:
+        path: $HOME/.clang
+        key: llvm-12.0
+
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@3c8956ce3469123af1c39125f684835e56ac58ee
+      with:
+        ubuntu-version: "20.04"
+        version: "12.0.0"
+        directory: $HOME/.clang
+        cached: ${{ steps.cache-llvm.outputs.cache-hit }}
+
+    - name: Generate
+      run: go generate .
+
+    - name: Build
+      run: go build .
