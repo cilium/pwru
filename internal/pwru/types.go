@@ -13,6 +13,7 @@ const (
 )
 
 type Flags struct {
+	FilterNetns   uint32
 	FilterMark    uint32
 	FilterFunc    string
 	FilterProto   string
@@ -33,6 +34,7 @@ func (f *Flags) SetFlags() {
 	flag.StringVar(&f.FilterProto, "filter-proto", "", "filter L4 protocol (tcp, udp, icmp, icmp6)")
 	flag.StringVar(&f.FilterSrcIP, "filter-src-ip", "", "filter source IP addr")
 	flag.StringVar(&f.FilterDstIP, "filter-dst-ip", "", "filter destination IP addr")
+	flag.Uint32Var(&f.FilterNetns, "filter-netns", 0, "filter netns inode")
 	flag.Uint32Var(&f.FilterMark, "filter-mark", 0, "filter skb mark")
 	flag.Uint16Var(&f.FilterSrcPort, "filter-src-port", 0, "filter source port")
 	flag.Uint16Var(&f.FilterDstPort, "filter-dst-port", 0, "filter destination port")
@@ -54,12 +56,13 @@ type Tuple struct {
 }
 
 type Meta struct {
+	Netns   uint32
 	Mark    uint32
 	Ifindex uint32
 	Len     uint32
 	MTU     uint32
 	Proto   uint16
-	Pad     [3]uint16
+	Pad     uint16
 }
 
 type StackData struct {

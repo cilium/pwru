@@ -32,12 +32,13 @@ union addr {
 } __attribute__((packed));
 
 struct skb_meta {
+	u32 netns;
 	u32 mark;
 	u32 ifindex;
 	u32 len;
 	u32 mtu;
 	u16 protocol;
-	u16 pad[3];
+	u16 pad;
 } __attribute__((packed));
 
 struct tuple {
@@ -69,6 +70,7 @@ struct {
 } events SEC(".maps");
 
 struct config {
+	u32 netns;
 	u32 mark;
 	u8 ipv6;
 	union addr saddr;
@@ -108,9 +110,38 @@ struct {
 } print_skb_map SEC(".maps");
 #endif
 
+
+static __always_inline u32
+get_netns(struct sk_buff *skb) {
+	u32 netns;
+
+	struct net_device *dev = BPF_CORE_READ(skb, dev);
+	// Get netns id. The code below is equivalent to: netns = dev->nd_net.net->ns.inum
+	netns = BPF_CORE_READ(dev, nd_net.net, ns.inum);
+
+	// maybe the skb->dev is not init, for this situation, we can get ns by sk->__sk_common.skc_net.net->ns.inum
+	if (netns == 0)
+	{
+		struct sock *sk;
+		sk = BPF_CORE_READ(skb, sk);
+		if (sk != NULL)
+		{
+			netns = BPF_CORE_READ(sk, __sk_common.skc_net.net, ns.inum);
+		}
+	}
+
+	return netns;
+}
+
 static __always_inline bool
 filter_meta(struct sk_buff *skb, struct config *cfg) {
-	u32 mark;
+	u32 netns, mark;
+
+	if (cfg->netns) {
+		netns = get_netns(skb);
+		if (netns != cfg->netns)
+			return false;
+	}
 
 	if (cfg->mark) {
 		mark = BPF_CORE_READ(skb, mark);
@@ -247,6 +278,7 @@ filter(struct sk_buff *skb, struct config *cfg) {
 
 static __always_inline void
 set_meta(struct sk_buff *skb, struct skb_meta *meta) {
+	meta->netns = get_netns(skb);
 	meta->mark = BPF_CORE_READ(skb, mark);
 	meta->len = BPF_CORE_READ(skb, len);
 	meta->protocol = BPF_CORE_READ(skb, protocol);
