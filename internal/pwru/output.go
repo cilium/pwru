@@ -33,7 +33,7 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map, add
 }
 
 func (o *output) PrintHeader() {
-	fmt.Printf("%18s %15s %24s %16s\n", "SKB", "PROCESS", "FUNC", "TIMESTAMP")
+	fmt.Printf("%18s %16s %24s %16s\n", "SKB", "PROCESS", "FUNC", "TIMESTAMP")
 }
 
 func (o *output) Print(event *Event) {
@@ -50,11 +50,11 @@ func (o *output) Print(event *Event) {
 			ts = 0
 		}
 	}
-	fmt.Printf("%18s %15s %24s %16d", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("[%s]", execName), o.addr2name.Addr2NameMap[event.Addr-1].name, ts)
+	fmt.Printf("%18s %16s %24s %16d", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("[%s]", execName), o.addr2name.Addr2NameMap[event.Addr-1].name, ts)
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
-		fmt.Printf(" mark=0x%x ifindex=%d proto=%x mtu=%d len=%d", event.Meta.Mark, event.Meta.Ifindex, event.Meta.Proto, event.Meta.MTU, event.Meta.Len)
+		fmt.Printf(" netns=%d mark=0x%x ifindex=%d proto=%x mtu=%d len=%d", event.Meta.Netns, event.Meta.Mark, event.Meta.Ifindex, event.Meta.Proto, event.Meta.MTU, event.Meta.Len)
 	}
 
 	if o.flags.OutputTuple {

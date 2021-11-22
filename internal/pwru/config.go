@@ -15,7 +15,8 @@ import (
 )
 
 type FilterCfg struct {
-	FilterMark uint32
+	FilterNetns uint32
+	FilterMark  uint32
 
 	//Filter l3
 	FilterIPv6  uint8
@@ -39,7 +40,8 @@ type FilterCfg struct {
 
 func ConfigBPFMap(flags *Flags, cfgMap *ebpf.Map) {
 	cfg := FilterCfg{
-		FilterMark: flags.FilterMark,
+		FilterNetns: flags.FilterNetns,
+		FilterMark:  flags.FilterMark,
 	}
 
 	if flags.FilterSrcPort > 0 {
