@@ -33,7 +33,7 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map, add
 }
 
 func (o *output) PrintHeader() {
-	fmt.Printf("%18s %16s %24s %16s\n", "SKB", "PROCESS", "FUNC", "TIMESTAMP")
+	fmt.Printf("%18s %16s %24s %8s %16s\n", "SKB", "PROCESS", "FUNC", "CPU", "TIMESTAMP")
 }
 
 func (o *output) Print(event *Event) {
@@ -50,11 +50,11 @@ func (o *output) Print(event *Event) {
 			ts = 0
 		}
 	}
-	fmt.Printf("%18s %16s %24s %16d", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("[%s]", execName), o.addr2name.Addr2NameMap[event.Addr-1].name, ts)
+	fmt.Printf("%18s %16s %24s %8d %16d", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("[%s]", execName), o.addr2name.Addr2NameMap[event.Addr-1].name, event.CPU, ts)
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
-		fmt.Printf(" netns=%d mark=0x%x ifindex=%d proto=%x mtu=%d len=%d", event.Meta.Netns, event.Meta.Mark, event.Meta.Ifindex, event.Meta.Proto, event.Meta.MTU, event.Meta.Len)
+		fmt.Printf(" netns=%d mark=0x%x pkt_type=%s ifindex=%d proto=%x mtu=%d len=%d", event.Meta.Netns, event.Meta.Mark, pktTypeToStr(event.Meta.PktType), event.Meta.Ifindex, event.Meta.Proto, event.Meta.MTU, event.Meta.Len)
 	}
 
 	if o.flags.OutputTuple {
@@ -111,4 +111,26 @@ func addrToStr(proto uint16, addr [16]byte) string {
 	default:
 		return ""
 	}
+}
+
+func pktTypeToStr(pktType uint8) string {
+	// See: https://elixir.bootlin.com/linux/latest/source/include/uapi/linux/if_packet.h#L26
+	const (
+		PACKET_USER   = 6
+		PACKET_KERNEL = 7
+	)
+	pktTypes := map[uint8]string{
+		syscall.PACKET_HOST:      "HOST",
+		syscall.PACKET_BROADCAST: "BROADCAST",
+		syscall.PACKET_MULTICAST: "MULTICAST",
+		syscall.PACKET_OTHERHOST: "OTHERHOST",
+		syscall.PACKET_OUTGOING:  "OUTGOING",
+		syscall.PACKET_LOOPBACK:  "LOOPBACK",
+		PACKET_USER:              "USER",
+		PACKET_KERNEL:            "KERNEL",
+	}
+	if s, ok := pktTypes[pktType]; ok {
+		return s
+	}
+	return ""
 }

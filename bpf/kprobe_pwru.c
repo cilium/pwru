@@ -38,7 +38,8 @@ struct skb_meta {
 	u32 len;
 	u32 mtu;
 	u16 protocol;
-	u16 pad;
+	u8 pkt_type;
+	u8 pad;
 } __attribute__((packed));
 
 struct tuple {
@@ -59,6 +60,8 @@ struct event_t {
 	u64 addr;
 	u64 skb_addr;
 	u64 ts;
+	u32 cpu;
+	u32 pad;
 	typeof(print_skb_id) print_skb_id;
 	struct skb_meta meta;
 	struct tuple tuple;
@@ -276,6 +279,14 @@ filter(struct sk_buff *skb, struct config *cfg) {
 	return filter_meta(skb, cfg) && filter_l3_and_l4(skb, cfg);
 }
 
+static __always_inline u8
+get_pkt_type(struct sk_buff *skb) {
+	u8 *pkt_type_p, pkt_type_byte;
+	pkt_type_p = BPF_CORE_READ(skb, __pkt_type_offset);
+	bpf_probe_read(&pkt_type_byte, 1, pkt_type_p);
+	return pkt_type_byte >> 5;
+}
+
 static __always_inline void
 set_meta(struct sk_buff *skb, struct skb_meta *meta) {
 	meta->netns = get_netns(skb);
@@ -284,6 +295,7 @@ set_meta(struct sk_buff *skb, struct skb_meta *meta) {
 	meta->protocol = BPF_CORE_READ(skb, protocol);
 	meta->ifindex = BPF_CORE_READ(skb, dev, ifindex);
 	meta->mtu = BPF_CORE_READ(skb, dev, mtu);
+	meta->pkt_type = get_pkt_type(skb);
 }
 
 static __always_inline void
@@ -383,6 +395,7 @@ handle_everything(struct sk_buff *skb, struct pt_regs *ctx) {
 	event.addr = PT_REGS_IP(ctx);
 	event.skb_addr = (u64) skb;
 	event.ts = bpf_ktime_get_ns();
+	event.cpu = bpf_get_smp_processor_id();
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 
 	return 0;

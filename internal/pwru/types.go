@@ -62,7 +62,8 @@ type Meta struct {
 	Len     uint32
 	MTU     uint32
 	Proto   uint16
-	Pad     uint16
+	PktType uint8
+	Pad     uint8
 }
 
 type StackData struct {
@@ -75,6 +76,8 @@ type Event struct {
 	Addr         uint64
 	SAddr        uint64
 	Timestamp    uint64
+	CPU          uint32
+	Pad          uint32
 	PrintSkbId   uint64
 	Meta         Meta
 	Tuple        Tuple
