@@ -81,7 +81,7 @@ The following kernel configuration is required.
 | CONFIG_KPROBES=y        |                        |
 | CONFIG_PERF_EVENTS=y    |                        |
 | CONFIG_BPF=y            |                        |
-| CONFIG_BPF_SYSCALLS=y   |                        |
+| CONFIG_BPF_SYSCALL=y    |                        |
 
 You can use `zgrep $OPTION /proc/config.gz` to validate whether option is enabled.
 
