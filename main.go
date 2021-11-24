@@ -51,10 +51,6 @@ func main() {
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-ctx.Done()
-		log.Println("Received signal, exiting program..")
-	}()
 	defer stop()
 
 	funcs, err := pwru.GetFuncs(flags.FilterFunc)
@@ -162,8 +158,18 @@ func main() {
 	output := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name)
 	output.PrintHeader()
 
+	defer func() {
+		select {
+		case <-ctx.Done():
+			log.Println("Received signal, exiting program..")
+		default:
+			log.Printf("Printed %d events, exiting program..\n", flags.OutputLimitLines)
+		}
+	}()
+
 	var event pwru.Event
-	for {
+	runForever := flags.OutputLimitLines == 0
+	for i := flags.OutputLimitLines; i > 0 || runForever; i-- {
 		record, err := rd.Read()
 		if err != nil {
 			if perf.IsClosed(err) {
