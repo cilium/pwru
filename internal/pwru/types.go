@@ -27,6 +27,7 @@ type Flags struct {
 	OutputTuple      bool
 	OutputSkb        bool
 	OutputStack      bool
+	OutputLimitLines uint64
 }
 
 func (f *Flags) SetFlags() {
@@ -43,6 +44,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputTuple, "output-tuple", false, "print L4 tuple")
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
+	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
 }
 
 type Tuple struct {

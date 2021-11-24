@@ -98,9 +98,11 @@ Usage of ./pwru:
       --filter-dst-port uint16      filter destination port
       --filter-func string          filter the kernel functions that can be probed; the filter can be a regular expression (RE2)
       --filter-mark uint32          filter skb mark
+      --filter-netns uint32         filter netns inode
       --filter-proto string         filter L4 protocol (tcp, udp, icmp)
       --filter-src-ip string        filter source IP addr
       --filter-src-port uint16      filter source port
+      --output-limit-lines uint     exit the program after the number of events has been received/printed
       --output-meta                 print skb metadata
       --output-relative-timestamp   print relative timestamp per skb
       --output-skb                  print skb
