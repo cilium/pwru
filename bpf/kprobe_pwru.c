@@ -61,7 +61,6 @@ struct event_t {
 	u64 skb_addr;
 	u64 ts;
 	u32 cpu;
-	u32 pad;
 	typeof(print_skb_id) print_skb_id;
 	struct skb_meta meta;
 	struct tuple tuple;
