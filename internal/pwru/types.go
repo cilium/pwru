@@ -77,6 +77,7 @@ type Event struct {
 	Addr         uint64
 	SAddr        uint64
 	Timestamp    uint64
+	CPU          uint32
 	PrintSkbId   uint64
 	Meta         Meta
 	Tuple        Tuple
