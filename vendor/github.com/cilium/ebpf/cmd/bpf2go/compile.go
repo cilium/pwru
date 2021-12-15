@@ -37,7 +37,7 @@ func compile(args compileArgs) error {
 		// Clang defaults to mcpu=probe which checks the kernel that we are
 		// compiling on. This isn't appropriate for ahead of time
 		// compiled code so force the most compatible version.
-		"-mcpu=probe",
+		"-mcpu=v1",
 	}
 
 	cmd := exec.Command(args.cc, append(overrideFlags, args.cFlags...)...)
