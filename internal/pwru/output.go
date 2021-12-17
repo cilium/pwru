@@ -7,6 +7,7 @@ package pwru
 import (
 	"fmt"
 	"net"
+	"runtime"
 	"syscall"
 
 	"github.com/cilium/cilium/pkg/byteorder"
@@ -50,7 +51,21 @@ func (o *output) Print(event *Event) {
 			ts = 0
 		}
 	}
-	fmt.Printf("%18s %16s %24s %8d %16d", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("[%s]", execName), o.addr2name.Addr2NameMap[event.Addr-1].name, event.CPU, ts)
+	var addr uint64
+	// XXX: not sure why the -1 offset is needed on x86 but not on arm64
+	switch runtime.GOARCH {
+	case "amd64":
+		addr = event.Addr - 1
+	case "arm64":
+		addr = event.Addr
+	}
+	var funcName string
+	if ksym, ok := o.addr2name.Addr2NameMap[addr]; ok {
+		funcName = ksym.name
+	} else {
+		funcName = fmt.Sprintf("0x%x", addr)
+	}
+	fmt.Printf("%18s %16s %24s %8d %16d", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("[%s]", execName), funcName, event.CPU, ts)
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
