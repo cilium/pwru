@@ -26,8 +26,9 @@ func GetFuncs(pattern string) (Funcs, error) {
 	}
 	callback := func(typ btf.Type) {
 		fn := typ.(*btf.Func)
+		fnName := string(fn.Name)
 
-		if pattern != "" && !reg.Match([]byte(fn.Name)) {
+		if pattern != "" && reg.FindString(fnName) != fnName {
 			return
 		}
 
@@ -37,7 +38,7 @@ func GetFuncs(pattern string) (Funcs, error) {
 			if ptr, ok := p.Type.(*btf.Pointer); ok {
 				if strct, ok := ptr.Target.(*btf.Struct); ok {
 					if strct.Name == "sk_buff" && i <= 5 {
-						funcs[string(fn.Name)] = i
+						funcs[fnName] = i
 						return
 					}
 				}
