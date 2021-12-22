@@ -96,7 +96,7 @@ the eBPF bytecode from the [release page](https://github.com/cilium/pwru/release
 Usage of ./pwru:
       --filter-dst-ip string        filter destination IP addr
       --filter-dst-port uint16      filter destination port
-      --filter-func string          filter the kernel functions that can be probed; the filter can be a regular expression (RE2)
+      --filter-func string          filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
       --filter-mark uint32          filter skb mark
       --filter-netns uint32         filter netns inode
       --filter-proto string         filter L4 protocol (tcp, udp, icmp)
@@ -112,6 +112,10 @@ Usage of ./pwru:
 
 If multiple filters are specified, all of them have to match in order for a
 packet to be traced.
+
+The `--filter-func` switch does an exact match on function names i.e.
+`--filter-func=foo` only matches `foo()`; for a wildcarded match, try
+`--filter-func=".*foo.*"` instead.
 
 ## Developing
 
