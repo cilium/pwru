@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (C) 2020-2021 Martynas Pumputis */
-/* Copyright (C) 2021 Authors of Cilium */
+/* Copyright (C) 2021-2022 Authors of Cilium */
 
 package main
 
@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -33,6 +34,11 @@ func main() {
 	flags := pwru.Flags{}
 	flags.SetFlags()
 	flag.Parse()
+
+	if flags.ShowVersion {
+		fmt.Printf("pwru %s\n", pwru.Version)
+		os.Exit(0)
+	}
 
 	if err := unix.Setrlimit(unix.RLIMIT_NOFILE, &unix.Rlimit{
 		Cur: 4096,

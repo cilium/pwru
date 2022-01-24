@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (C) 2020-2021 Martynas Pumputis */
-/* Copyright (C) 2021 Authors of Cilium */
+/* Copyright (C) 2021-2022 Authors of Cilium */
 
 package pwru
 
@@ -13,6 +13,9 @@ import (
 	"github.com/cilium/cilium/pkg/byteorder"
 	"github.com/cilium/ebpf"
 )
+
+// Version is the pwru version and is set at compile time via LDFLAGS-
+var Version string = "version unknown"
 
 type FilterCfg struct {
 	FilterNetns uint32
