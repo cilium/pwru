@@ -3,7 +3,7 @@
 ![logo](logo.png "Detective Gopher is looking for packet traces left by eBPF bee")
 
 `pwru` is an [eBPF](https://ebpf.io)-based tool for tracing network packets in
-the Linux kernel with advanced filtering capabilities. It allows fine-grained 
+the Linux kernel with advanced filtering capabilities. It allows fine-grained
 introspection of kernel state to facilitate debugging network connectivity issues.
 
 The following example shows where the packets of a `curl` request are dropped
@@ -30,8 +30,7 @@ above example with the following commands.
 3. Build `pwru`:
    ```console
    $ cd /pwru
-   $ go generate
-   $ go build
+   $ make
    ```
 
 4. Run `pwru`:
