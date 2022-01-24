@@ -24,7 +24,7 @@ release:
 		--rm \
 		--workdir /pwru \
 		--volume `pwd`:/pwru docker.io/library/golang:1.17.6-alpine3.15 \
-		sh -c "apk add --no-cache make git && make local-release VERSION=${VERSION}"
+		sh -c "apk add --no-cache make git clang && make local-release VERSION=${VERSION}"
 
 local-release: clean
 	OS=linux; \
@@ -32,6 +32,7 @@ local-release: clean
 	for ARCH in $$ARCHS; do \
 		echo Building release binary for $$OS/$$ARCH...; \
 		test -d release/$$OS/$$ARCH|| mkdir -p release/$$OS/$$ARCH; \
+		env GOOS=$$OS GOARCH=$$ARCH $(GO_GENERATE); \
 		env GOOS=$$OS GOARCH=$$ARCH $(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) -ldflags "-w -s -X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'" -o release/$$OS/$$ARCH/$(TARGET) ; \
 		tar -czf release/$(TARGET)-$$OS-$$ARCH.tar.gz -C release/$$OS/$$ARCH $(TARGET); \
 		(cd release && sha256sum $(TARGET)-$$OS-$$ARCH.tar.gz > $(TARGET)-$$OS-$$ARCH.tar.gz.sha256sum); \
@@ -47,6 +48,8 @@ install: $(TARGET)
 
 clean:
 	rm -f $(TARGET)
+	rm -f kprobepwru_bpf*
+	rm -f kprobepwruwithoutoutputskb_bpf*
 	rm -rf ./release
 
 test:
