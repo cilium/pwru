@@ -10,8 +10,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/cilium/cilium/pkg/byteorder"
 	"github.com/cilium/ebpf"
+
+	"github.com/cilium/pwru/internal/byteorder"
 )
 
 // Version is the pwru version and is set at compile time via LDFLAGS-

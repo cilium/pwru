@@ -10,9 +10,10 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/cilium/cilium/pkg/byteorder"
 	"github.com/cilium/ebpf"
 	ps "github.com/mitchellh/go-ps"
+
+	"github.com/cilium/pwru/internal/byteorder"
 )
 
 type output struct {
