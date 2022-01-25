@@ -32,7 +32,7 @@ local-release: clean
 	for ARCH in $$ARCHS; do \
 		echo Building release binary for $$OS/$$ARCH...; \
 		test -d release/$$OS/$$ARCH|| mkdir -p release/$$OS/$$ARCH; \
-		env GOOS=$$OS GOARCH=$$ARCH $(GO_GENERATE); \
+		$(GO_GENERATE) main_$$ARCH.go; \
 		env GOOS=$$OS GOARCH=$$ARCH $(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) -ldflags "-w -s -X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'" -o release/$$OS/$$ARCH/$(TARGET) ; \
 		tar -czf release/$(TARGET)-$$OS-$$ARCH.tar.gz -C release/$$OS/$$ARCH $(TARGET); \
 		(cd release && sha256sum $(TARGET)-$$OS-$$ARCH.tar.gz > $(TARGET)-$$OS-$$ARCH.tar.gz.sha256sum); \
