@@ -1,5 +1,5 @@
 GO := go
-GO_BUILD = $(GO) build
+GO_BUILD = CGO_ENABLED=0 $(GO) build
 GO_GENERATE = $(GO) generate
 GO_TAGS ?=
 TARGET=pwru
