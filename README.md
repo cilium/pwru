@@ -126,8 +126,7 @@ The `--filter-func` switch does an exact match on function names i.e.
 ### Building
 
 ```
-go generate .
-go build .
+make
 ```
 
 Alternatively, you can build and run in the Docker container:
