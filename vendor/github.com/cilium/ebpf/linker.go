@@ -1,48 +1,80 @@
 package ebpf
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/pkg/btf"
 )
 
-// link resolves bpf-to-bpf calls.
+// The linker is responsible for resolving bpf-to-bpf calls between programs
+// within an ELF. Each BPF program must be a self-contained binary blob,
+// so when an instruction in one ELF program section wants to jump to
+// a function in another, the linker needs to pull in the bytecode
+// (and BTF info) of the target function and concatenate the instruction
+// streams.
 //
-// Each library may contain multiple functions / labels, and is only linked
-// if prog references one of these functions.
+// Later on in the pipeline, all call sites are fixed up with relative jumps
+// within this newly-created instruction stream to then finally hand off to
+// the kernel with BPF_PROG_LOAD.
 //
-// Libraries also linked.
-func link(prog *ProgramSpec, libs []*ProgramSpec) error {
-	var (
-		linked  = make(map[*ProgramSpec]bool)
-		pending = []asm.Instructions{prog.Instructions}
-		insns   asm.Instructions
-	)
-	for len(pending) > 0 {
-		insns, pending = pending[0], pending[1:]
-		for _, lib := range libs {
-			if linked[lib] {
-				continue
-			}
+// Each function is denoted by an ELF symbol and the compiler takes care of
+// register setup before each jump instruction.
 
-			needed, err := needSection(insns, lib.Instructions)
-			if err != nil {
-				return fmt.Errorf("linking %s: %w", lib.Name, err)
-			}
+// populateReferences populates all of progs' Instructions and references
+// with their full dependency chains including transient dependencies.
+func populateReferences(progs map[string]*ProgramSpec) error {
+	type props struct {
+		insns asm.Instructions
+		refs  map[string]*ProgramSpec
+	}
 
-			if !needed {
-				continue
-			}
+	out := make(map[string]props)
 
-			linked[lib] = true
-			prog.Instructions = append(prog.Instructions, lib.Instructions...)
-			pending = append(pending, lib.Instructions)
+	// Resolve and store direct references between all progs.
+	if err := findReferences(progs); err != nil {
+		return fmt.Errorf("finding references: %w", err)
+	}
 
-			if prog.BTF != nil && lib.BTF != nil {
-				if err := btf.ProgramAppend(prog.BTF, lib.BTF); err != nil {
-					return fmt.Errorf("linking BTF of %s: %w", lib.Name, err)
-				}
+	// Flatten all progs' instruction streams.
+	for name, prog := range progs {
+		insns, refs := prog.flatten(nil)
+
+		prop := props{
+			insns: insns,
+			refs:  refs,
+		}
+
+		out[name] = prop
+	}
+
+	// Replace all progs' instructions and references
+	for name, props := range out {
+		progs[name].Instructions = props.insns
+		progs[name].references = props.refs
+	}
+
+	return nil
+}
+
+// findReferences finds bpf-to-bpf calls between progs and populates each
+// prog's references field with its direct neighbours.
+func findReferences(progs map[string]*ProgramSpec) error {
+	// Check all ProgramSpecs in the collection against each other.
+	for _, prog := range progs {
+		prog.references = make(map[string]*ProgramSpec)
+
+		// Look up call targets in progs and store pointers to their corresponding
+		// ProgramSpecs as direct references.
+		for refname := range prog.Instructions.FunctionReferences() {
+			ref := progs[refname]
+			// Call targets are allowed to be missing from an ELF. This occurs when
+			// a program calls into a forward function declaration that is left
+			// unimplemented. This is caught at load time during fixups.
+			if ref != nil {
+				prog.references[refname] = ref
 			}
 		}
 	}
@@ -50,91 +82,72 @@ func link(prog *ProgramSpec, libs []*ProgramSpec) error {
 	return nil
 }
 
-func needSection(insns, section asm.Instructions) (bool, error) {
-	// A map of symbols to the libraries which contain them.
-	symbols, err := section.SymbolOffsets()
-	if err != nil {
-		return false, err
+// marshalFuncInfos returns the BTF func infos of all progs in order.
+func marshalFuncInfos(layout []reference) ([]byte, error) {
+	if len(layout) == 0 {
+		return nil, nil
 	}
 
-	for _, ins := range insns {
-		if ins.Reference == "" {
-			continue
+	buf := bytes.NewBuffer(make([]byte, 0, binary.Size(&btf.FuncInfo{})*len(layout)))
+	for _, sym := range layout {
+		if err := sym.spec.BTF.FuncInfo.Marshal(buf, sym.offset); err != nil {
+			return nil, fmt.Errorf("marshaling prog %s func info: %w", sym.spec.Name, err)
 		}
-
-		if ins.OpCode.JumpOp() != asm.Call || ins.Src != asm.PseudoCall {
-			continue
-		}
-
-		if ins.Constant != -1 {
-			// This is already a valid call, no need to link again.
-			continue
-		}
-
-		if _, ok := symbols[ins.Reference]; !ok {
-			// Symbol isn't available in this section
-			continue
-		}
-
-		// At this point we know that at least one function in the
-		// library is called from insns, so we have to link it.
-		return true, nil
 	}
 
-	// None of the functions in the section are called.
-	return false, nil
+	return buf.Bytes(), nil
 }
 
-func fixupJumpsAndCalls(insns asm.Instructions) error {
-	symbolOffsets := make(map[string]asm.RawInstructionOffset)
+// marshalLineInfos returns the BTF line infos of all progs in order.
+func marshalLineInfos(layout []reference) ([]byte, error) {
+	if len(layout) == 0 {
+		return nil, nil
+	}
+
+	buf := bytes.NewBuffer(make([]byte, 0, binary.Size(&btf.LineInfo{})*len(layout)))
+	for _, sym := range layout {
+		if err := sym.spec.BTF.LineInfos.Marshal(buf, sym.offset); err != nil {
+			return nil, fmt.Errorf("marshaling prog %s line infos: %w", sym.spec.Name, err)
+		}
+	}
+
+	return buf.Bytes(), nil
+}
+
+// fixupAndValidate is called by the ELF reader right before marshaling the
+// instruction stream. It performs last-minute adjustments to the program and
+// runs some sanity checks before sending it off to the kernel.
+func fixupAndValidate(insns asm.Instructions) error {
 	iter := insns.Iterate()
 	for iter.Next() {
 		ins := iter.Ins
 
-		if ins.Symbol == "" {
-			continue
+		if ins.IsLoadFromMap() && ins.MapPtr() == -1 {
+			return fmt.Errorf("instruction %d: map %s: %w", iter.Index, ins.Reference, asm.ErrUnsatisfiedMapReference)
 		}
 
-		if _, ok := symbolOffsets[ins.Symbol]; ok {
-			return fmt.Errorf("duplicate symbol %s", ins.Symbol)
-		}
-
-		symbolOffsets[ins.Symbol] = iter.Offset
-	}
-
-	iter = insns.Iterate()
-	for iter.Next() {
-		i := iter.Index
-		offset := iter.Offset
-		ins := iter.Ins
-
-		if ins.Reference == "" {
-			continue
-		}
-
-		switch {
-		case ins.IsFunctionCall() && ins.Constant == -1:
-			// Rewrite bpf to bpf call
-			callOffset, ok := symbolOffsets[ins.Reference]
-			if !ok {
-				return fmt.Errorf("call at %d: reference to missing symbol %q", i, ins.Reference)
-			}
-
-			ins.Constant = int64(callOffset - offset - 1)
-
-		case ins.OpCode.Class() == asm.JumpClass && ins.Offset == -1:
-			// Rewrite jump to label
-			jumpOffset, ok := symbolOffsets[ins.Reference]
-			if !ok {
-				return fmt.Errorf("jump at %d: reference to missing symbol %q", i, ins.Reference)
-			}
-
-			ins.Offset = int16(jumpOffset - offset - 1)
-
-		case ins.IsLoadFromMap() && ins.MapPtr() == -1:
-			return fmt.Errorf("map %s: %w", ins.Reference, errUnsatisfiedReference)
-		}
+		fixupProbeReadKernel(ins)
 	}
 
 	return nil
+}
+
+// fixupProbeReadKernel replaces calls to bpf_probe_read_{kernel,user}(_str)
+// with bpf_probe_read(_str) on kernels that don't support it yet.
+func fixupProbeReadKernel(ins *asm.Instruction) {
+	if !ins.IsBuiltinCall() {
+		return
+	}
+
+	// Kernel supports bpf_probe_read_kernel, nothing to do.
+	if haveProbeReadKernel() == nil {
+		return
+	}
+
+	switch asm.BuiltinFunc(ins.Constant) {
+	case asm.FnProbeReadKernel, asm.FnProbeReadUser:
+		ins.Constant = int64(asm.FnProbeRead)
+	case asm.FnProbeReadKernelStr, asm.FnProbeReadUserStr:
+		ins.Constant = int64(asm.FnProbeReadStr)
+	}
 }

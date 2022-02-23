@@ -2,7 +2,7 @@ module github.com/cilium/pwru
 
 go 1.17
 
-replace github.com/cilium/ebpf => github.com/brb/ebpf v0.5.1-0.20210811084231-db593b53a544
+replace github.com/cilium/ebpf => github.com/brb/ebpf v0.5.1-0.20220223072220-42a6ffa7b05d
 
 require (
 	github.com/cheggaaa/pb/v3 v3.0.8
@@ -15,8 +15,6 @@ require (
 require (
 	github.com/VividCortex/ewma v1.1.1 // indirect
 	github.com/fatih/color v1.13.0 // indirect
-	github.com/google/go-cmp v0.5.6 // indirect
-	github.com/kr/pretty v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.11 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-runewidth v0.0.12 // indirect

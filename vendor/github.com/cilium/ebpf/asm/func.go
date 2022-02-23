@@ -184,6 +184,19 @@ const (
 	FnKtimeGetCoarseNs
 	FnImaInodeHash
 	FnSockFromFile
+	FnCheckMtu
+	FnForEachMapElem
+	FnSnprintf
+	FnSysBpf
+	FnBtfFindByNameKind
+	FnSysClose
+	FnTimerInit
+	FnTimerSetCallback
+	FnTimerStart
+	FnTimerCancel
+	FnGetFuncIp
+	FnGetAttachCookie
+	FnTaskPtRegs
 )
 
 // Call emits a function call.

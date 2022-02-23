@@ -4,6 +4,8 @@ import (
 	"bytes"
 
 	"github.com/cilium/ebpf/pkg"
+	"github.com/cilium/ebpf/pkg/sys"
+	"github.com/cilium/ebpf/pkg/unix"
 )
 
 // info describes a BTF object.
@@ -18,31 +20,32 @@ type info struct {
 	KernelBTF bool
 }
 
-func newInfoFromFd(fd *pkg.FD) (*info, error) {
+func newInfoFromFd(fd *sys.FD) (*info, error) {
 	// We invoke the syscall once with a empty BTF and name buffers to get size
 	// information to allocate buffers. Then we invoke it a second time with
 	// buffers to receive the data.
-	bpfInfo, err := bpfGetBTFInfoByFD(fd, nil, nil)
-	if err != nil {
+	var btfInfo sys.BtfInfo
+	if err := sys.ObjInfo(fd, &btfInfo); err != nil {
 		return nil, err
 	}
 
-	btfBuffer := make([]byte, bpfInfo.btfSize)
-	nameBuffer := make([]byte, bpfInfo.nameLen)
-	bpfInfo, err = bpfGetBTFInfoByFD(fd, btfBuffer, nameBuffer)
-	if err != nil {
+	btfBuffer := make([]byte, btfInfo.BtfSize)
+	nameBuffer := make([]byte, btfInfo.NameLen)
+	btfInfo.Btf, btfInfo.BtfSize = sys.NewSlicePointerLen(btfBuffer)
+	btfInfo.Name, btfInfo.NameLen = sys.NewSlicePointerLen(nameBuffer)
+	if err := sys.ObjInfo(fd, &btfInfo); err != nil {
 		return nil, err
 	}
 
-	spec, err := loadNakedSpec(bytes.NewReader(btfBuffer), pkg.NativeEndian, nil, nil)
+	spec, err := loadRawSpec(bytes.NewReader(btfBuffer), pkg.NativeEndian, nil, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	return &info{
 		BTF:       spec,
-		ID:        ID(bpfInfo.id),
-		Name:      pkg.CString(nameBuffer),
-		KernelBTF: bpfInfo.kernelBTF != 0,
+		ID:        ID(btfInfo.Id),
+		Name:      unix.ByteSliceToString(nameBuffer),
+		KernelBTF: btfInfo.KernelBtf != 0,
 	}, nil
 }

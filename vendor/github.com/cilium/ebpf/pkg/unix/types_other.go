@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 package unix
@@ -22,6 +23,7 @@ const (
 	ENODEV = syscall.ENODEV
 	EBADF  = syscall.Errno(0)
 	E2BIG  = syscall.Errno(0)
+	EFAULT = syscall.EFAULT
 	// ENOTSUPP is not the same as ENOTSUP or EOPNOTSUP
 	ENOTSUPP = syscall.Errno(0x20c)
 
@@ -36,6 +38,9 @@ const (
 	BPF_F_INNER_MAP          = 0
 	BPF_OBJ_NAME_LEN         = 0x10
 	BPF_TAG_SIZE             = 0x8
+	BPF_RINGBUF_BUSY_BIT     = 0
+	BPF_RINGBUF_DISCARD_BIT  = 0
+	BPF_RINGBUF_HDR_SZ       = 0
 	SYS_BPF                  = 321
 	F_DUPFD_CLOEXEC          = 0x406
 	EPOLLIN                  = 0x1
@@ -63,6 +68,9 @@ const (
 	PERF_RECORD_SAMPLE       = 9
 	AT_FDCWD                 = -0x2
 	RENAME_NOREPLACE         = 0x1
+	SO_ATTACH_BPF            = 0x32
+	SO_DETACH_BPF            = 0x1b
+	SOL_SOCKET               = 0x1
 )
 
 // Statfs_t is a wrapper
@@ -81,15 +89,12 @@ type Statfs_t struct {
 	Spare   [4]int64
 }
 
+type Stat_t struct{}
+
 // Rlimit is a wrapper
 type Rlimit struct {
 	Cur uint64
 	Max uint64
-}
-
-// Setrlimit is a wrapper
-func Setrlimit(resource int, rlim *Rlimit) (err error) {
-	return errNonLinux
 }
 
 // Syscall is a wrapper
@@ -259,6 +264,14 @@ func Renameat2(olddirfd int, oldpath string, newdirfd int, newpath string, flags
 	return errNonLinux
 }
 
-func KernelRelease() (string, error) {
-	return "", errNonLinux
+func Prlimit(pid, resource int, new, old *Rlimit) error {
+	return errNonLinux
+}
+
+func Open(path string, mode int, perm uint32) (int, error) {
+	return -1, errNonLinux
+}
+
+func Fstat(fd int, stat *Stat_t) error {
+	return errNonLinux
 }

@@ -2,18 +2,18 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"go/format"
-	"go/scanner"
 	"go/token"
 	"io"
 	"io/ioutil"
+	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
-	"unicode"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/pkg"
+	"github.com/cilium/ebpf/pkg/btf"
 )
 
 const ebpfModule = "github.com/cilium/ebpf"
@@ -27,11 +27,19 @@ package {{ .Package }}
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"io"
 
 	"{{ .Module }}"
 )
+
+{{- if .Types }}
+{{- range $type := .Types }}
+{{ $.TypeDeclaration (index $.TypeNames $type) $type }}
+
+{{ end }}
+{{- end }}
 
 // {{ .Name.Load }} returns the embedded CollectionSpec for {{ .Name }}.
 func {{ .Name.Load }}() (*ebpf.CollectionSpec, error) {
@@ -147,7 +155,8 @@ func {{ .Name.CloseHelper }}(closers ...io.Closer) error {
 }
 
 // Do not access this directly.
-var {{ .Name.Bytes }} = []byte("{{ .Bytes }}")
+//go:embed {{ .File }}
+var {{ .Name.Bytes }} []byte
 
 `
 
@@ -173,15 +182,15 @@ func (n templateName) Bytes() string {
 }
 
 func (n templateName) Specs() string {
-	return n.maybeExport(string(n) + "Specs")
+	return string(n) + "Specs"
 }
 
 func (n templateName) ProgramSpecs() string {
-	return n.maybeExport(string(n) + "ProgramSpecs")
+	return string(n) + "ProgramSpecs"
 }
 
 func (n templateName) MapSpecs() string {
-	return n.maybeExport(string(n) + "MapSpecs")
+	return string(n) + "MapSpecs"
 }
 
 func (n templateName) Load() string {
@@ -193,36 +202,39 @@ func (n templateName) LoadObjects() string {
 }
 
 func (n templateName) Objects() string {
-	return n.maybeExport(string(n) + "Objects")
+	return string(n) + "Objects"
 }
 
 func (n templateName) Maps() string {
-	return n.maybeExport(string(n) + "Maps")
+	return string(n) + "Maps"
 }
 
 func (n templateName) Programs() string {
-	return n.maybeExport(string(n) + "Programs")
+	return string(n) + "Programs"
 }
 
 func (n templateName) CloseHelper() string {
 	return "_" + toUpperFirst(string(n)) + "Close"
 }
 
-type writeArgs struct {
-	pkg   string
-	ident string
-	tags  []string
-	obj   io.Reader
-	out   io.Writer
+type outputArgs struct {
+	pkg             string
+	ident           string
+	tags            []string
+	cTypes          []string
+	skipGlobalTypes bool
+	obj             string
+	out             io.Writer
 }
 
-func writeCommon(args writeArgs) error {
-	obj, err := ioutil.ReadAll(args.obj)
+func output(args outputArgs) error {
+	obj, err := ioutil.ReadFile(args.obj)
 	if err != nil {
 		return fmt.Errorf("read object file contents: %s", err)
 	}
 
-	spec, err := ebpf.LoadCollectionSpecFromReader(bytes.NewReader(obj))
+	rd := bytes.NewReader(obj)
+	spec, err := ebpf.LoadCollectionSpecFromReader(rd)
 	if err != nil {
 		return fmt.Errorf("can't load BPF from ELF: %s", err)
 	}
@@ -234,30 +246,77 @@ func writeCommon(args writeArgs) error {
 			continue
 		}
 
-		maps[name] = identifier(name)
+		maps[name] = pkg.Identifier(name)
 	}
 
 	programs := make(map[string]string)
 	for name := range spec.Programs {
-		programs[name] = identifier(name)
+		programs[name] = pkg.Identifier(name)
+	}
+
+	// Collect any types which we've been asked for explicitly.
+	cTypes, err := collectCTypes(spec.BTF, args.cTypes)
+	if err != nil {
+		return err
+	}
+
+	typeNames := make(map[btf.Type]string)
+	for _, cType := range cTypes {
+		typeNames[cType] = args.ident + pkg.Identifier(cType.TypeName())
+	}
+
+	// Collect map key and value types, unless we've been asked not to.
+	if !args.skipGlobalTypes {
+		for _, typ := range collectMapTypes(spec.Maps) {
+			switch btf.UnderlyingType(typ).(type) {
+			case *btf.Datasec:
+				// Avoid emitting .rodata, .bss, etc. for now. We might want to
+				// name these types differently, etc.
+				continue
+
+			case *btf.Int:
+				// Don't emit primitive types by default.
+				continue
+			}
+
+			typeNames[typ] = args.ident + pkg.Identifier(typ.TypeName())
+		}
+	}
+
+	// Ensure we don't have conflicting names and generate a sorted list of
+	// named types so that the output is stable.
+	types, err := sortTypes(typeNames)
+	if err != nil {
+		return err
+	}
+
+	gf := &btf.GoFormatter{
+		Names:      typeNames,
+		Identifier: pkg.Identifier,
 	}
 
 	ctx := struct {
-		Module   string
-		Package  string
-		Tags     []string
-		Name     templateName
-		Maps     map[string]string
-		Programs map[string]string
-		Bytes    string
+		*btf.GoFormatter
+		Module    string
+		Package   string
+		Tags      []string
+		Name      templateName
+		Maps      map[string]string
+		Programs  map[string]string
+		Types     []btf.Type
+		TypeNames map[btf.Type]string
+		File      string
 	}{
+		gf,
 		ebpfModule,
 		args.pkg,
 		args.tags,
 		templateName(args.ident),
 		maps,
 		programs,
-		binaryString(obj),
+		types,
+		typeNames,
+		filepath.Base(args.obj),
 	}
 
 	var buf bytes.Buffer
@@ -265,85 +324,63 @@ func writeCommon(args writeArgs) error {
 		return fmt.Errorf("can't generate types: %s", err)
 	}
 
-	return writeFormatted(buf.Bytes(), args.out)
+	return pkg.WriteFormatted(buf.Bytes(), args.out)
 }
 
-func binaryString(buf []byte) string {
-	var builder strings.Builder
-	for _, b := range buf {
-		builder.WriteString(`\x`)
-		builder.WriteString(fmt.Sprintf("%02x", b))
+func collectCTypes(types *btf.Spec, names []string) ([]btf.Type, error) {
+	var result []btf.Type
+	for _, cType := range names {
+		typ, err := types.AnyTypeByName(cType)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, typ)
 	}
-	return builder.String()
+	return result, nil
 }
 
-func writeFormatted(src []byte, out io.Writer) error {
-	formatted, err := format.Source(src)
-	if err == nil {
-		_, err = out.Write(formatted)
-		return err
-	}
-
-	var el scanner.ErrorList
-	if !errors.As(err, &el) {
-		return err
-	}
-
-	var nel scanner.ErrorList
-	for _, err := range el {
-		if !err.Pos.IsValid() {
-			nel = append(nel, err)
+// collectMapTypes returns a list of all types used as map keys or values.
+func collectMapTypes(maps map[string]*ebpf.MapSpec) []btf.Type {
+	var result []btf.Type
+	for _, m := range maps {
+		if m.BTF == nil {
 			continue
 		}
 
-		buf := src[err.Pos.Offset:]
-		nl := bytes.IndexRune(buf, '\n')
-		if nl == -1 {
-			nel = append(nel, err)
+		if m.BTF.Key != nil && m.BTF.Key.TypeName() != "" {
+			result = append(result, m.BTF.Key)
+		}
+
+		if m.BTF.Value != nil && m.BTF.Value.TypeName() != "" {
+			result = append(result, m.BTF.Value)
+		}
+	}
+	return result
+}
+
+// sortTypes returns a list of types sorted by their (generated) Go type name.
+//
+// Duplicate Go type names are rejected.
+func sortTypes(typeNames map[btf.Type]string) ([]btf.Type, error) {
+	var types []btf.Type
+	var names []string
+	for typ, name := range typeNames {
+		i := sort.SearchStrings(names, name)
+		if i >= len(names) {
+			types = append(types, typ)
+			names = append(names, name)
 			continue
 		}
 
-		err.Msg += ": " + string(buf[:nl])
-		nel = append(nel, err)
-	}
-
-	return nel
-}
-
-func identifier(str string) string {
-	prev := rune(-1)
-	return strings.Map(func(r rune) rune {
-		// See https://golang.org/ref/spec#Identifiers
-		switch {
-		case unicode.IsLetter(r):
-			if prev == -1 {
-				r = unicode.ToUpper(r)
-			}
-
-		case r == '_':
-			switch {
-			// The previous rune was deleted, or we are at the
-			// beginning of the string.
-			case prev == -1:
-				fallthrough
-
-			// The previous rune is a lower case letter or a digit.
-			case unicode.IsDigit(prev) || (unicode.IsLetter(prev) && unicode.IsLower(prev)):
-				// delete the current rune, and force the
-				// next character to be uppercased.
-				r = -1
-			}
-
-		case unicode.IsDigit(r):
-
-		default:
-			// Delete the current rune. prev is unchanged.
-			return -1
+		if names[i] == name {
+			return nil, fmt.Errorf("type name %q is used multiple times", name)
 		}
 
-		prev = r
-		return r
-	}, str)
+		types = append(types[:i], append([]btf.Type{typ}, types[i:]...)...)
+		names = append(names[:i], append([]string{name}, names[i:]...)...)
+	}
+
+	return types, nil
 }
 
 func tag(str string) string {
