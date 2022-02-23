@@ -175,7 +175,7 @@ func main() {
 	for i := flags.OutputLimitLines; i > 0 || runForever; i-- {
 		record, err := rd.Read()
 		if err != nil {
-			if perf.IsClosed(err) {
+			if errors.Is(err, perf.ErrClosed) {
 				return
 			}
 			log.Printf("Reading from perf event reader: %s", err)

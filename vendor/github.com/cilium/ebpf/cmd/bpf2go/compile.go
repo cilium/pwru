@@ -54,6 +54,7 @@ func compile(args compileArgs) error {
 		target = "bpf"
 	}
 
+	// C flags that can't be overridden.
 	cmd.Args = append(cmd.Args,
 		"-target", target,
 		"-c", args.source,
@@ -65,6 +66,7 @@ func compile(args compileArgs) error {
 		"-fdebug-compilation-dir", ".",
 		// We always want BTF to be generated, so enforce debug symbols
 		"-g",
+		fmt.Sprintf("-D__BPF_TARGET_MISSING=%q", "GCC error \"The eBPF is using target specific macros, please provide -target\""),
 	)
 	cmd.Dir = args.dir
 
@@ -204,4 +206,14 @@ func parseDependencies(baseDir string, in io.Reader) ([]dependency, error) {
 		return nil, fmt.Errorf("empty dependency file")
 	}
 	return deps, nil
+}
+
+// strip DWARF debug info from file by executing exe.
+func strip(exe, file string) error {
+	cmd := exec.Command(exe, "-g", file)
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s: %s", exe, err)
+	}
+	return nil
 }
