@@ -30,6 +30,8 @@ type Flags struct {
 	OutputSkb        bool
 	OutputStack      bool
 	OutputLimitLines uint64
+
+	PerCPUBuffer	uint32
 }
 
 func (f *Flags) SetFlags() {
@@ -48,6 +50,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
+	flag.Uint32Var(&f.PerCPUBuffer, "per-cpu-buffer", 0, "per CPU buffer in bytes")
 }
 
 type Tuple struct {
