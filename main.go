@@ -29,8 +29,6 @@ func main() {
 	var (
 		kprobe1, kprobe2, kprobe3, kprobe4, kprobe5 *ebpf.Program
 		cfgMap, events, printSkbMap, printStackMap  *ebpf.Map
-		// Size of the per CPU buffer in bytes
-		perCPUBuffer int
 	)
 
 	flags := pwru.Flags{}
@@ -101,13 +99,7 @@ func main() {
 		printStackMap = objs.PrintStackMap
 	}
 
-	if flags.PerCPUBuffer == 0 {
-		perCPUBuffer = os.Getpagesize()
-	} else {
-		perCPUBuffer = int(flags.PerCPUBuffer)
-	}
-
-	log.Printf("Per cpu buffer size: %d bytes\n", perCPUBuffer)
+	log.Printf("Per cpu buffer size: %d bytes\n", flags.PerCPUBuffer)
 	pwru.ConfigBPFMap(&flags, cfgMap)
 
 	log.Println("Attaching kprobes...")
@@ -151,7 +143,7 @@ func main() {
 	bar.Finish()
 	log.Printf("Attached (ignored %d)\n", ignored)
 
-	rd, err := perf.NewReader(events, perCPUBuffer)
+	rd, err := perf.NewReader(events, flags.PerCPUBuffer)
 	if err != nil {
 		log.Fatalf("Creating perf event reader: %s", err)
 	}

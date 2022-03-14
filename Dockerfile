@@ -9,6 +9,7 @@ RUN wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
 RUN apt -y update
 RUN apt install -y llvm-12 clang-12
 RUN ln -s /usr/bin/clang-12 /usr/bin/clang
+RUN ln -s /usr/lib/llvm-12/bin/llvm-strip /usr/local/bin/llvm-strip
 WORKDIR /pwru
 COPY . .
 RUN make
