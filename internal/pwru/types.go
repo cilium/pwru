@@ -6,6 +6,7 @@ package pwru
 
 import (
 	flag "github.com/spf13/pflag"
+	"os"
 )
 
 const (
@@ -31,7 +32,7 @@ type Flags struct {
 	OutputStack      bool
 	OutputLimitLines uint64
 
-	PerCPUBuffer	uint32
+	PerCPUBuffer	int
 }
 
 func (f *Flags) SetFlags() {
@@ -50,7 +51,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
-	flag.Uint32Var(&f.PerCPUBuffer, "per-cpu-buffer", 0, "per CPU buffer in bytes")
+	flag.IntVar(&f.PerCPUBuffer, "per-cpu-buffer", os.Getpagesize(), "per CPU buffer in bytes")
 }
 
 type Tuple struct {
