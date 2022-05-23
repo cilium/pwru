@@ -10,7 +10,7 @@ updates:
       # don't update until https://github.com/cilium/pwru/issues/8 is resolved.
       - dependency-name: "github.com/cilium/ebpf"
     labels:
-    - kind/enhancement
+    - enhancement
 
   - package-ecosystem: github-actions
     directory: /
@@ -19,4 +19,4 @@ updates:
     open-pull-requests-limit: 1
     rebase-strategy: disabled
     labels:
-    - kind/enhancement
+    - enhancement
