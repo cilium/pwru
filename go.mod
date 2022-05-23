@@ -2,14 +2,12 @@ module github.com/cilium/pwru
 
 go 1.17
 
-replace github.com/cilium/ebpf => github.com/brb/ebpf v0.5.1-0.20220223072220-42a6ffa7b05d
-
 require (
 	github.com/cheggaaa/pb/v3 v3.0.8
-	github.com/cilium/ebpf v0.7.0
+	github.com/cilium/ebpf v0.8.2-0.20220523131249-951bb28908d2
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/spf13/pflag v1.0.5
-	golang.org/x/sys v0.0.0-20211103184734-ae416a5f93c7
+	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
 )
 
 require (

@@ -12,8 +12,8 @@ import (
 	"text/template"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/pkg"
-	"github.com/cilium/ebpf/pkg/btf"
+	"github.com/cilium/ebpf/btf"
+	"github.com/cilium/ebpf/internal"
 )
 
 const ebpfModule = "github.com/cilium/ebpf"
@@ -246,23 +246,23 @@ func output(args outputArgs) error {
 			continue
 		}
 
-		maps[name] = pkg.Identifier(name)
+		maps[name] = internal.Identifier(name)
 	}
 
 	programs := make(map[string]string)
 	for name := range spec.Programs {
-		programs[name] = pkg.Identifier(name)
+		programs[name] = internal.Identifier(name)
 	}
 
 	// Collect any types which we've been asked for explicitly.
-	cTypes, err := collectCTypes(spec.BTF, args.cTypes)
+	cTypes, err := collectCTypes(spec.Types, args.cTypes)
 	if err != nil {
 		return err
 	}
 
 	typeNames := make(map[btf.Type]string)
 	for _, cType := range cTypes {
-		typeNames[cType] = args.ident + pkg.Identifier(cType.TypeName())
+		typeNames[cType] = args.ident + internal.Identifier(cType.TypeName())
 	}
 
 	// Collect map key and value types, unless we've been asked not to.
@@ -279,7 +279,7 @@ func output(args outputArgs) error {
 				continue
 			}
 
-			typeNames[typ] = args.ident + pkg.Identifier(typ.TypeName())
+			typeNames[typ] = args.ident + internal.Identifier(typ.TypeName())
 		}
 	}
 
@@ -292,7 +292,7 @@ func output(args outputArgs) error {
 
 	gf := &btf.GoFormatter{
 		Names:      typeNames,
-		Identifier: pkg.Identifier,
+		Identifier: internal.Identifier,
 	}
 
 	ctx := struct {
@@ -324,7 +324,7 @@ func output(args outputArgs) error {
 		return fmt.Errorf("can't generate types: %s", err)
 	}
 
-	return pkg.WriteFormatted(buf.Bytes(), args.out)
+	return internal.WriteFormatted(buf.Bytes(), args.out)
 }
 
 func collectCTypes(types *btf.Spec, names []string) ([]btf.Type, error) {
@@ -343,16 +343,12 @@ func collectCTypes(types *btf.Spec, names []string) ([]btf.Type, error) {
 func collectMapTypes(maps map[string]*ebpf.MapSpec) []btf.Type {
 	var result []btf.Type
 	for _, m := range maps {
-		if m.BTF == nil {
-			continue
+		if m.Key != nil && m.Key.TypeName() != "" {
+			result = append(result, m.Key)
 		}
 
-		if m.BTF.Key != nil && m.BTF.Key.TypeName() != "" {
-			result = append(result, m.BTF.Key)
-		}
-
-		if m.BTF.Value != nil && m.BTF.Value.TypeName() != "" {
-			result = append(result, m.BTF.Value)
+		if m.Value != nil && m.Value.TypeName() != "" {
+			result = append(result, m.Value)
 		}
 	}
 	return result

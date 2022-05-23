@@ -7,9 +7,9 @@ import (
 	"os"
 
 	"github.com/cilium/ebpf/asm"
-	"github.com/cilium/ebpf/pkg"
-	"github.com/cilium/ebpf/pkg/sys"
-	"github.com/cilium/ebpf/pkg/unix"
+	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/sys"
+	"github.com/cilium/ebpf/internal/unix"
 )
 
 // ErrNotExist is returned when loading a non-existing map or program.
@@ -38,7 +38,22 @@ func invalidBPFObjNameChar(char rune) bool {
 	}
 }
 
-var haveNestedMaps = pkg.FeatureTest("nested maps", "4.12", func() error {
+func progLoad(insns asm.Instructions, typ ProgramType, license string) (*sys.FD, error) {
+	buf := bytes.NewBuffer(make([]byte, 0, insns.Size()))
+	if err := insns.Marshal(buf, internal.NativeEndian); err != nil {
+		return nil, err
+	}
+	bytecode := buf.Bytes()
+
+	return sys.ProgLoad(&sys.ProgLoadAttr{
+		ProgType: sys.ProgType(typ),
+		License:  sys.NewStringPointer(license),
+		Insns:    sys.NewSlicePointer(bytecode),
+		InsnCnt:  uint32(len(bytecode) / asm.InstructionSize),
+	})
+}
+
+var haveNestedMaps = internal.FeatureTest("nested maps", "4.12", func() error {
 	_, err := sys.MapCreate(&sys.MapCreateAttr{
 		MapType:    sys.MapType(ArrayOfMaps),
 		KeySize:    4,
@@ -48,7 +63,7 @@ var haveNestedMaps = pkg.FeatureTest("nested maps", "4.12", func() error {
 		InnerMapFd: ^uint32(0),
 	})
 	if errors.Is(err, unix.EINVAL) {
-		return pkg.ErrNotSupported
+		return internal.ErrNotSupported
 	}
 	if errors.Is(err, unix.EBADF) {
 		return nil
@@ -56,7 +71,7 @@ var haveNestedMaps = pkg.FeatureTest("nested maps", "4.12", func() error {
 	return err
 })
 
-var haveMapMutabilityModifiers = pkg.FeatureTest("read- and write-only maps", "5.2", func() error {
+var haveMapMutabilityModifiers = internal.FeatureTest("read- and write-only maps", "5.2", func() error {
 	// This checks BPF_F_RDONLY_PROG and BPF_F_WRONLY_PROG. Since
 	// BPF_MAP_FREEZE appeared in 5.2 as well we don't do a separate check.
 	m, err := sys.MapCreate(&sys.MapCreateAttr{
@@ -67,13 +82,13 @@ var haveMapMutabilityModifiers = pkg.FeatureTest("read- and write-only maps", "5
 		MapFlags:   unix.BPF_F_RDONLY_PROG,
 	})
 	if err != nil {
-		return pkg.ErrNotSupported
+		return internal.ErrNotSupported
 	}
 	_ = m.Close()
 	return nil
 })
 
-var haveMmapableMaps = pkg.FeatureTest("mmapable maps", "5.5", func() error {
+var haveMmapableMaps = internal.FeatureTest("mmapable maps", "5.5", func() error {
 	// This checks BPF_F_MMAPABLE, which appeared in 5.5 for array maps.
 	m, err := sys.MapCreate(&sys.MapCreateAttr{
 		MapType:    sys.MapType(Array),
@@ -83,13 +98,13 @@ var haveMmapableMaps = pkg.FeatureTest("mmapable maps", "5.5", func() error {
 		MapFlags:   unix.BPF_F_MMAPABLE,
 	})
 	if err != nil {
-		return pkg.ErrNotSupported
+		return internal.ErrNotSupported
 	}
 	_ = m.Close()
 	return nil
 })
 
-var haveInnerMaps = pkg.FeatureTest("inner maps", "5.10", func() error {
+var haveInnerMaps = internal.FeatureTest("inner maps", "5.10", func() error {
 	// This checks BPF_F_INNER_MAP, which appeared in 5.10.
 	m, err := sys.MapCreate(&sys.MapCreateAttr{
 		MapType:    sys.MapType(Array),
@@ -99,13 +114,13 @@ var haveInnerMaps = pkg.FeatureTest("inner maps", "5.10", func() error {
 		MapFlags:   unix.BPF_F_INNER_MAP,
 	})
 	if err != nil {
-		return pkg.ErrNotSupported
+		return internal.ErrNotSupported
 	}
 	_ = m.Close()
 	return nil
 })
 
-var haveNoPreallocMaps = pkg.FeatureTest("prealloc maps", "4.6", func() error {
+var haveNoPreallocMaps = internal.FeatureTest("prealloc maps", "4.6", func() error {
 	// This checks BPF_F_NO_PREALLOC, which appeared in 4.6.
 	m, err := sys.MapCreate(&sys.MapCreateAttr{
 		MapType:    sys.MapType(Hash),
@@ -115,7 +130,7 @@ var haveNoPreallocMaps = pkg.FeatureTest("prealloc maps", "4.6", func() error {
 		MapFlags:   unix.BPF_F_NO_PREALLOC,
 	})
 	if err != nil {
-		return pkg.ErrNotSupported
+		return internal.ErrNotSupported
 	}
 	_ = m.Close()
 	return nil
@@ -145,7 +160,7 @@ func wrapMapError(err error) error {
 	return err
 }
 
-var haveObjName = pkg.FeatureTest("object names", "4.15", func() error {
+var haveObjName = internal.FeatureTest("object names", "4.15", func() error {
 	attr := sys.MapCreateAttr{
 		MapType:    sys.MapType(Array),
 		KeySize:    4,
@@ -156,14 +171,14 @@ var haveObjName = pkg.FeatureTest("object names", "4.15", func() error {
 
 	fd, err := sys.MapCreate(&attr)
 	if err != nil {
-		return pkg.ErrNotSupported
+		return internal.ErrNotSupported
 	}
 
 	_ = fd.Close()
 	return nil
 })
 
-var objNameAllowsDot = pkg.FeatureTest("dot in object names", "5.2", func() error {
+var objNameAllowsDot = internal.FeatureTest("dot in object names", "5.2", func() error {
 	if err := haveObjName(); err != nil {
 		return err
 	}
@@ -178,14 +193,14 @@ var objNameAllowsDot = pkg.FeatureTest("dot in object names", "5.2", func() erro
 
 	fd, err := sys.MapCreate(&attr)
 	if err != nil {
-		return pkg.ErrNotSupported
+		return internal.ErrNotSupported
 	}
 
 	_ = fd.Close()
 	return nil
 })
 
-var haveBatchAPI = pkg.FeatureTest("map batch api", "5.6", func() error {
+var haveBatchAPI = internal.FeatureTest("map batch api", "5.6", func() error {
 	var maxEntries uint32 = 2
 	attr := sys.MapCreateAttr{
 		MapType:    sys.MapType(Hash),
@@ -196,7 +211,7 @@ var haveBatchAPI = pkg.FeatureTest("map batch api", "5.6", func() error {
 
 	fd, err := sys.MapCreate(&attr)
 	if err != nil {
-		return pkg.ErrNotSupported
+		return internal.ErrNotSupported
 	}
 	defer fd.Close()
 
@@ -212,12 +227,12 @@ var haveBatchAPI = pkg.FeatureTest("map batch api", "5.6", func() error {
 		Count:  maxEntries,
 	})
 	if err != nil {
-		return pkg.ErrNotSupported
+		return internal.ErrNotSupported
 	}
 	return nil
 })
 
-var haveProbeReadKernel = pkg.FeatureTest("bpf_probe_read_kernel", "5.5", func() error {
+var haveProbeReadKernel = internal.FeatureTest("bpf_probe_read_kernel", "5.5", func() error {
 	insns := asm.Instructions{
 		asm.Mov.Reg(asm.R1, asm.R10),
 		asm.Add.Imm(asm.R1, -8),
@@ -226,20 +241,29 @@ var haveProbeReadKernel = pkg.FeatureTest("bpf_probe_read_kernel", "5.5", func()
 		asm.FnProbeReadKernel.Call(),
 		asm.Return(),
 	}
-	buf := bytes.NewBuffer(make([]byte, 0, insns.Size()))
-	if err := insns.Marshal(buf, pkg.NativeEndian); err != nil {
-		return err
-	}
-	bytecode := buf.Bytes()
 
-	fd, err := sys.ProgLoad(&sys.ProgLoadAttr{
-		ProgType: sys.ProgType(Kprobe),
-		License:  sys.NewStringPointer("GPL"),
-		Insns:    sys.NewSlicePointer(bytecode),
-		InsnCnt:  uint32(len(bytecode) / asm.InstructionSize),
-	})
+	fd, err := progLoad(insns, Kprobe, "GPL")
 	if err != nil {
-		return pkg.ErrNotSupported
+		return internal.ErrNotSupported
+	}
+	_ = fd.Close()
+	return nil
+})
+
+var haveBPFToBPFCalls = internal.FeatureTest("bpf2bpf calls", "4.16", func() error {
+	insns := asm.Instructions{
+		asm.Call.Label("prog2").WithSymbol("prog1"),
+		asm.Return(),
+		asm.Mov.Imm(asm.R0, 0).WithSymbol("prog2"),
+		asm.Return(),
+	}
+
+	fd, err := progLoad(insns, SocketFilter, "MIT")
+	if errors.Is(err, unix.EINVAL) {
+		return internal.ErrNotSupported
+	}
+	if err != nil {
+		return err
 	}
 	_ = fd.Close()
 	return nil

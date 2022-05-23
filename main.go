@@ -128,7 +128,7 @@ func main() {
 		default:
 		}
 
-		kp, err := link.Kprobe(name, fn)
+		kp, err := link.Kprobe(name, fn, nil)
 		bar.Increment()
 		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) {

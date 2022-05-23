@@ -14,10 +14,10 @@ import (
 	"unsafe"
 
 	"github.com/cilium/ebpf/asm"
-	"github.com/cilium/ebpf/pkg"
-	"github.com/cilium/ebpf/pkg/btf"
-	"github.com/cilium/ebpf/pkg/sys"
-	"github.com/cilium/ebpf/pkg/unix"
+	"github.com/cilium/ebpf/btf"
+	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/sys"
+	"github.com/cilium/ebpf/internal/unix"
 )
 
 // MapInfo describes a map.
@@ -154,9 +154,9 @@ func newProgramInfoFromProc(fd *sys.FD) (*ProgramInfo, error) {
 		"prog_tag":  &info.Tag,
 	})
 	if errors.Is(err, errMissingFields) {
-		return nil, &pkg.UnsupportedFeatureError{
+		return nil, &internal.UnsupportedFeatureError{
 			Name:           "reading program info from /proc/self/fdinfo",
-			MinimumVersion: pkg.Version{4, 10, 0},
+			MinimumVersion: internal.Version{4, 10, 0},
 		}
 	}
 	if err != nil {
@@ -214,7 +214,10 @@ func (pi *ProgramInfo) Runtime() (time.Duration, bool) {
 // inspecting loaded programs for troubleshooting, dumping, etc.
 //
 // For example, map accesses are made to reference their kernel map IDs,
-// not the FDs they had when the program was inserted.
+// not the FDs they had when the program was inserted. Note that before
+// the introduction of bpf_insn_prepare_dump in kernel 4.16, xlated
+// instructions were not sanitized, making the output even less reusable
+// and less likely to round-trip or evaluate to the same program Tag.
 //
 // The first instruction is marked as a symbol using the Program's name.
 //
@@ -228,12 +231,12 @@ func (pi *ProgramInfo) Instructions() (asm.Instructions, error) {
 
 	r := bytes.NewReader(pi.insns)
 	var insns asm.Instructions
-	if err := insns.Unmarshal(r, pkg.NativeEndian); err != nil {
+	if err := insns.Unmarshal(r, internal.NativeEndian); err != nil {
 		return nil, fmt.Errorf("unmarshaling instructions: %w", err)
 	}
 
 	// Tag the first instruction with the name of the program, if available.
-	insns[0] = insns[0].Sym(pi.Name)
+	insns[0] = insns[0].WithSymbol(pi.Name)
 
 	return insns, nil
 }
