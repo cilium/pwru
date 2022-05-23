@@ -24,7 +24,7 @@ release:
 		--rm \
 		--workdir /pwru \
 		--volume `pwd`:/pwru docker.io/library/golang:1.18.2-alpine3.15 \
-		sh -c "apk add --no-cache make git clang && make local-release VERSION=${VERSION}"
+		sh -c "apk add --no-cache make git clang && git config --global --add safe.directory /cilium && make local-release VERSION=${VERSION}"
 
 local-release: clean
 	OS=linux; \
