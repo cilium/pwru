@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/pkg/sys"
+	"github.com/cilium/ebpf/internal/sys"
 )
 
 type RawTracepointOptions struct {

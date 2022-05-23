@@ -28,7 +28,7 @@ The BPF Type Format describes more than just the types used by a BPF program. It
 includes debug aids like which source line corresponds to which instructions and
 what global variables are used.
 
-[BTF parsing](pkg/btf/) lives in a separate pkg package since exposing
+[BTF parsing](internal/btf/) lives in a separate internal package since exposing
 it would mean an additional maintenance burden, and because the API still
 has sharp corners. The most important concept is the `btf.Type` interface, which
 also describes things that aren't really types like `.rodata` or `.bss` sections.

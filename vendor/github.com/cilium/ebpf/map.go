@@ -8,14 +8,13 @@ import (
 	"math/rand"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"time"
 	"unsafe"
 
-	"github.com/cilium/ebpf/pkg"
-	"github.com/cilium/ebpf/pkg/btf"
-	"github.com/cilium/ebpf/pkg/sys"
-	"github.com/cilium/ebpf/pkg/unix"
+	"github.com/cilium/ebpf/btf"
+	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/sys"
+	"github.com/cilium/ebpf/internal/unix"
 )
 
 // Errors returned by Map and MapIterator methods.
@@ -24,7 +23,8 @@ var (
 	ErrKeyNotExist      = errors.New("key does not exist")
 	ErrKeyExist         = errors.New("key already exists")
 	ErrIterationAborted = errors.New("iteration aborted")
-	ErrMapIncompatible  = errors.New("map's spec is incompatible with pinned map")
+	ErrMapIncompatible  = errors.New("map spec is incompatible with existing map")
+	errMapNoBTFValue    = errors.New("map spec does not contain a BTF Value")
 )
 
 // MapOptions control loading a map into the kernel.
@@ -76,8 +76,11 @@ type MapSpec struct {
 	// Must be nil or empty before instantiating the MapSpec into a Map.
 	Extra *bytes.Reader
 
+	// The key and value type of this map. May be nil.
+	Key, Value btf.Type
+
 	// The BTF associated with this map.
-	BTF *btf.Map
+	BTF *btf.Spec
 }
 
 func (ms *MapSpec) String() string {
@@ -113,7 +116,7 @@ func (ms *MapSpec) clampPerfEventArraySize() error {
 		return nil
 	}
 
-	n, err := pkg.PossibleCPUs()
+	n, err := internal.PossibleCPUs()
 	if err != nil {
 		return fmt.Errorf("perf event array: %w", err)
 	}
@@ -123,6 +126,31 @@ func (ms *MapSpec) clampPerfEventArraySize() error {
 	}
 
 	return nil
+}
+
+// dataSection returns the contents and BTF Datasec descriptor of the spec.
+func (ms *MapSpec) dataSection() ([]byte, *btf.Datasec, error) {
+
+	if ms.Value == nil {
+		return nil, nil, errMapNoBTFValue
+	}
+
+	ds, ok := ms.Value.(*btf.Datasec)
+	if !ok {
+		return nil, nil, fmt.Errorf("map value BTF is a %T, not a *btf.Datasec", ms.Value)
+	}
+
+	if n := len(ms.Contents); n != 1 {
+		return nil, nil, fmt.Errorf("expected one key, found %d", n)
+	}
+
+	kv := ms.Contents[0]
+	value, ok := kv.Value.([]byte)
+	if !ok {
+		return nil, nil, fmt.Errorf("value at first map key is %T, not []byte", kv.Value)
+	}
+
+	return value, ds, nil
 }
 
 // MapKV is used to initialize the contents of a Map.
@@ -323,7 +351,7 @@ func (spec *MapSpec) createMap(inner *sys.FD, opts MapOptions, handles *handleCa
 	// In order to support loading these definitions, tolerate the presence of
 	// extra bytes, but require them to be zeroes.
 	if spec.Extra != nil {
-		if _, err := io.Copy(pkg.DiscardZeroes{}, spec.Extra); err != nil {
+		if _, err := io.Copy(internal.DiscardZeroes{}, spec.Extra); err != nil {
 			return nil, errors.New("extra contains unhandled non-zero bytes, drain before creating map")
 		}
 	}
@@ -351,7 +379,7 @@ func (spec *MapSpec) createMap(inner *sys.FD, opts MapOptions, handles *handleCa
 		spec.ValueSize = 4
 
 		if spec.MaxEntries == 0 {
-			n, err := pkg.PossibleCPUs()
+			n, err := internal.PossibleCPUs()
 			if err != nil {
 				return nil, fmt.Errorf("perf event array: %w", err)
 			}
@@ -398,15 +426,25 @@ func (spec *MapSpec) createMap(inner *sys.FD, opts MapOptions, handles *handleCa
 	}
 
 	if spec.hasBTF() {
-		handle, err := handles.btfHandle(spec.BTF.Spec)
+		handle, err := handles.btfHandle(spec.BTF)
 		if err != nil && !errors.Is(err, btf.ErrNotSupported) {
 			return nil, fmt.Errorf("load BTF: %w", err)
 		}
 
 		if handle != nil {
+			keyTypeID, err := spec.BTF.TypeID(spec.Key)
+			if err != nil {
+				return nil, err
+			}
+
+			valueTypeID, err := spec.BTF.TypeID(spec.Value)
+			if err != nil {
+				return nil, err
+			}
+
 			attr.BtfFd = uint32(handle.FD())
-			attr.BtfKeyTypeId = uint32(spec.BTF.Key.ID())
-			attr.BtfValueTypeId = uint32(spec.BTF.Value.ID())
+			attr.BtfKeyTypeId = uint32(keyTypeID)
+			attr.BtfValueTypeId = uint32(valueTypeID)
 		}
 	}
 
@@ -449,12 +487,12 @@ func newMap(fd *sys.FD, name string, typ MapType, keySize, valueSize, maxEntries
 		return m, nil
 	}
 
-	possibleCPUs, err := pkg.PossibleCPUs()
+	possibleCPUs, err := internal.PossibleCPUs()
 	if err != nil {
 		return nil, err
 	}
 
-	m.fullValueSize = pkg.Align(int(valueSize), 8) * possibleCPUs
+	m.fullValueSize = internal.Align(int(valueSize), 8) * possibleCPUs
 	return m, nil
 }
 
@@ -1055,7 +1093,7 @@ func (m *Map) Clone() (*Map, error) {
 //
 // This requires bpffs to be mounted above fileName. See https://docs.cilium.io/en/k8s-doc/admin/#admin-mount-bpffs
 func (m *Map) Pin(fileName string) error {
-	if err := pkg.Pin(m.pinnedPath, fileName, m.fd); err != nil {
+	if err := internal.Pin(m.pinnedPath, fileName, m.fd); err != nil {
 		return err
 	}
 	m.pinnedPath = fileName
@@ -1068,7 +1106,7 @@ func (m *Map) Pin(fileName string) error {
 //
 // Unpinning an unpinned Map returns nil.
 func (m *Map) Unpin() error {
-	if err := pkg.Unpin(m.pinnedPath); err != nil {
+	if err := internal.Unpin(m.pinnedPath); err != nil {
 		return err
 	}
 	m.pinnedPath = ""
@@ -1254,7 +1292,7 @@ func unmarshalMap(buf []byte) (*Map, error) {
 		return nil, errors.New("map id requires 4 byte value")
 	}
 
-	id := pkg.NativeEndian.Uint32(buf)
+	id := internal.NativeEndian.Uint32(buf)
 	return NewMapFromID(MapID(id))
 }
 
@@ -1265,62 +1303,8 @@ func marshalMap(m *Map, length int) ([]byte, error) {
 	}
 
 	buf := make([]byte, 4)
-	pkg.NativeEndian.PutUint32(buf, m.fd.Uint())
+	internal.NativeEndian.PutUint32(buf, m.fd.Uint())
 	return buf, nil
-}
-
-func patchValue(value []byte, typ btf.Type, replacements map[string]interface{}) error {
-	replaced := make(map[string]bool)
-	replace := func(name string, offset, size int, replacement interface{}) error {
-		if offset+size > len(value) {
-			return fmt.Errorf("%s: offset %d(+%d) is out of bounds", name, offset, size)
-		}
-
-		buf, err := marshalBytes(replacement, size)
-		if err != nil {
-			return fmt.Errorf("marshal %s: %w", name, err)
-		}
-
-		copy(value[offset:offset+size], buf)
-		replaced[name] = true
-		return nil
-	}
-
-	switch parent := typ.(type) {
-	case *btf.Datasec:
-		for _, secinfo := range parent.Vars {
-			name := string(secinfo.Type.(*btf.Var).Name)
-			replacement, ok := replacements[name]
-			if !ok {
-				continue
-			}
-
-			err := replace(name, int(secinfo.Offset), int(secinfo.Size), replacement)
-			if err != nil {
-				return err
-			}
-		}
-
-	default:
-		return fmt.Errorf("patching %T is not supported", typ)
-	}
-
-	if len(replaced) == len(replacements) {
-		return nil
-	}
-
-	var missing []string
-	for name := range replacements {
-		if !replaced[name] {
-			missing = append(missing, name)
-		}
-	}
-
-	if len(missing) == 1 {
-		return fmt.Errorf("unknown field: %s", missing[0])
-	}
-
-	return fmt.Errorf("unknown fields: %s", strings.Join(missing, ","))
 }
 
 // MapIterator iterates a Map.

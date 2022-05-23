@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/pkg/btf"
-	"github.com/cilium/ebpf/pkg/sys"
+	"github.com/cilium/ebpf/btf"
+	"github.com/cilium/ebpf/internal/sys"
 )
 
 type tracing struct {
@@ -61,7 +61,10 @@ func AttachFreplace(targetProg *ebpf.Program, name string, prog *ebpf.Program) (
 		}
 
 		target = targetProg.FD()
-		typeID = function.ID()
+		typeID, err = btfHandle.Spec().TypeID(function)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	link, err := AttachRawLink(RawLinkOptions{

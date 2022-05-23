@@ -6,8 +6,9 @@ package pwru
 
 import (
 	"fmt"
-	"github.com/cilium/ebpf/pkg/btf"
 	"regexp"
+
+	"github.com/cilium/ebpf/btf"
 )
 
 type Funcs map[string]int
@@ -24,12 +25,19 @@ func GetFuncs(pattern string) (Funcs, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to compile regular expression %v", err)
 	}
-	callback := func(typ btf.Type) {
-		fn := typ.(*btf.Func)
+
+	iter := spec.Iterate()
+	for iter.Next() {
+		typ := iter.Type
+		fn, ok := typ.(*btf.Func)
+		if !ok {
+			continue
+		}
+
 		fnName := string(fn.Name)
 
 		if pattern != "" && reg.FindString(fnName) != fnName {
-			return
+			continue
 		}
 
 		fnProto := fn.Type.(*btf.FuncProto)
@@ -39,15 +47,13 @@ func GetFuncs(pattern string) (Funcs, error) {
 				if strct, ok := ptr.Target.(*btf.Struct); ok {
 					if strct.Name == "sk_buff" && i <= 5 {
 						funcs[fnName] = i
-						return
+						continue
 					}
 				}
 			}
 			i += 1
 		}
 	}
-	fn := &btf.Func{}
-	spec.Iterate(callback, fn)
 
 	return funcs, nil
 }

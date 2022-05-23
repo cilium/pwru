@@ -6,12 +6,12 @@ import (
 	"fmt"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/pkg"
-	"github.com/cilium/ebpf/pkg/btf"
-	"github.com/cilium/ebpf/pkg/sys"
+	"github.com/cilium/ebpf/btf"
+	"github.com/cilium/ebpf/internal"
+	"github.com/cilium/ebpf/internal/sys"
 )
 
-var ErrNotSupported = pkg.ErrNotSupported
+var ErrNotSupported = internal.ErrNotSupported
 
 // Link represents a Program attached to a BPF hook.
 type Link interface {
@@ -249,7 +249,7 @@ func (l *RawLink) Close() error {
 // Calling Close on a pinned Link will not break the link
 // until the pin is removed.
 func (l *RawLink) Pin(fileName string) error {
-	if err := pkg.Pin(l.pinnedPath, fileName, l.fd); err != nil {
+	if err := internal.Pin(l.pinnedPath, fileName, l.fd); err != nil {
 		return err
 	}
 	l.pinnedPath = fileName
@@ -258,7 +258,7 @@ func (l *RawLink) Pin(fileName string) error {
 
 // Unpin implements the Link interface.
 func (l *RawLink) Unpin() error {
-	if err := pkg.Unpin(l.pinnedPath); err != nil {
+	if err := internal.Unpin(l.pinnedPath); err != nil {
 		return err
 	}
 	l.pinnedPath = ""
@@ -325,13 +325,15 @@ func (l *RawLink) Info() (*Info, error) {
 		extra = &TracingInfo{}
 	case XDPType:
 		extra = &XDPInfo{}
+	case PerfEventType:
+		// no extra
 	default:
 		return nil, fmt.Errorf("unknown link info type: %d", info.Type)
 	}
 
-	if info.Type != RawTracepointType && info.Type != IterType {
+	if info.Type != RawTracepointType && info.Type != IterType && info.Type != PerfEventType {
 		buf := bytes.NewReader(info.Extra[:])
-		err := binary.Read(buf, pkg.NativeEndian, extra)
+		err := binary.Read(buf, internal.NativeEndian, extra)
 		if err != nil {
 			return nil, fmt.Errorf("can not read extra link info: %w", err)
 		}
