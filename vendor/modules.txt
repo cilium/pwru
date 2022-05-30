@@ -5,7 +5,7 @@ github.com/VividCortex/ewma
 ## explicit; go 1.12
 github.com/cheggaaa/pb/v3
 github.com/cheggaaa/pb/v3/termutil
-# github.com/cilium/ebpf v0.8.2-0.20220523131249-951bb28908d2
+# github.com/cilium/ebpf v0.9.0
 ## explicit; go 1.17
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
