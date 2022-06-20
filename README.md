@@ -70,7 +70,7 @@ above example with the following commands.
 
 ### Requirements
 
-`pwru` requires >= 5.5 kernel to run. For `--output-skb` >= 5.9 kernel is required.
+`pwru` requires >= 5.3 kernel to run. For `--output-skb` >= 5.9 kernel is required.
 
 The following kernel configuration is required.
 
