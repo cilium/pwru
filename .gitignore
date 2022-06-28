@@ -1,5 +1,6 @@
 .vagrant
 pwru
+release
 tags
 kprobepwru_bpf*
 kprobepwruwithoutoutputskb_bpf*
