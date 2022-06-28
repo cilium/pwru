@@ -19,12 +19,13 @@ $(TARGET):
 
 release:
 	docker run \
-		--env "RELEASE_UID=$(RELEASE_UID)" \
-		--env "RELEASE_GID=$(RELEASE_GID)" \
 		--rm \
 		--workdir /pwru \
 		--volume `pwd`:/pwru docker.io/library/golang:1.18.3-alpine3.16 \
-		sh -c "apk add --no-cache make git clang llvm && git config --global --add safe.directory /cilium && make local-release VERSION=${VERSION}"
+		sh -c "apk add --no-cache make git clang llvm && \
+			addgroup -g $(RELEASE_GID) release && \
+			adduser -u $(RELEASE_UID) -D -G release release && \
+			su release -c 'make local-release VERSION=${VERSION}'"
 
 local-release: clean
 	OS=linux; \
@@ -38,9 +39,6 @@ local-release: clean
 		(cd release && sha256sum $(TARGET)-$$OS-$$ARCH.tar.gz > $(TARGET)-$$OS-$$ARCH.tar.gz.sha256sum); \
 		rm -r release/$$OS; \
 	done; \
-	if [ $$(id -u) -eq 0 -a -n "$$RELEASE_UID" -a -n "$$RELEASE_GID" ]; then \
-		chown -R "$$RELEASE_UID:$$RELEASE_GID" release; \
-	fi
 
 install: $(TARGET)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
