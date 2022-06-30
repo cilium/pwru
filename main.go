@@ -17,6 +17,7 @@ import (
 
 	pb "github.com/cheggaaa/pb/v3"
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	flag "github.com/spf13/pflag"
@@ -56,7 +57,18 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	funcs, err := pwru.GetFuncs(flags.FilterFunc)
+	var btfSpec *btf.Spec
+	var err error
+	if flags.KernelBTF != "" {
+		btfSpec, err = btf.LoadSpec(flags.KernelBTF)
+	} else {
+		btfSpec, err = btf.LoadKernelSpec()
+	}
+	if err != nil {
+		log.Fatalf("Failed to load BTF spec: %s", err)
+	}
+
+	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec)
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
 	}
@@ -68,9 +80,12 @@ func main() {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}
 
+	var opts ebpf.CollectionOptions
+	opts.Programs.KernelTypes = btfSpec
+
 	if flags.OutputSkb {
 		objs := KProbePWRUObjects{}
-		if err := LoadKProbePWRUObjects(&objs, nil); err != nil {
+		if err := LoadKProbePWRUObjects(&objs, &opts); err != nil {
 			log.Fatalf("Loading objects: %v", err)
 		}
 		defer objs.Close()
@@ -85,7 +100,7 @@ func main() {
 		printStackMap = objs.PrintStackMap
 	} else {
 		objs := KProbePWRUWithoutOutputSKBObjects{}
-		if err := LoadKProbePWRUWithoutOutputSKBObjects(&objs, nil); err != nil {
+		if err := LoadKProbePWRUWithoutOutputSKBObjects(&objs, &opts); err != nil {
 			log.Fatalf("Loading objects: %v", err)
 		}
 		defer objs.Close()
@@ -101,6 +116,25 @@ func main() {
 
 	log.Printf("Per cpu buffer size: %d bytes\n", flags.PerCPUBuffer)
 	pwru.ConfigBPFMap(&flags, cfgMap)
+
+	var kprobes []link.Link
+	defer func() {
+		select {
+		case <-ctx.Done():
+			log.Println("Detaching kprobes...")
+			bar := pb.StartNew(len(kprobes))
+			for _, kp := range kprobes {
+				_ = kp.Close()
+				bar.Increment()
+			}
+			bar.Finish()
+
+		default:
+			for _, kp := range kprobes {
+				_ = kp.Close()
+			}
+		}
+	}()
 
 	log.Println("Attaching kprobes...")
 	ignored := 0
@@ -137,7 +171,7 @@ func main() {
 				ignored += 1
 			}
 		} else {
-			defer kp.Close()
+			kprobes = append(kprobes, kp)
 		}
 	}
 	bar.Finish()
