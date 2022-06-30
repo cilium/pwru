@@ -13,13 +13,8 @@ import (
 
 type Funcs map[string]int
 
-func GetFuncs(pattern string) (Funcs, error) {
+func GetFuncs(pattern string, spec *btf.Spec) (Funcs, error) {
 	funcs := Funcs{}
-
-	spec, err := btf.LoadKernelSpec()
-	if err != nil {
-		return nil, err
-	}
 
 	reg, err := regexp.Compile(pattern)
 	if err != nil {

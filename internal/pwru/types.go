@@ -5,8 +5,9 @@
 package pwru
 
 import (
-	flag "github.com/spf13/pflag"
 	"os"
+
+	flag "github.com/spf13/pflag"
 )
 
 const (
@@ -15,6 +16,8 @@ const (
 
 type Flags struct {
 	ShowVersion bool
+
+	KernelBTF string
 
 	FilterNetns   uint32
 	FilterMark    uint32
@@ -32,11 +35,12 @@ type Flags struct {
 	OutputStack      bool
 	OutputLimitLines uint64
 
-	PerCPUBuffer	int
+	PerCPUBuffer int
 }
 
 func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.ShowVersion, "version", false, "show pwru version and exit")
+	flag.StringVar(&f.KernelBTF, "kernel-btf", "", "specify kernel BTF file")
 	flag.StringVar(&f.FilterFunc, "filter-func", "", "filter kernel functions to be probed by name (exact match, supports RE2 regular expression)")
 	flag.StringVar(&f.FilterProto, "filter-proto", "", "filter L4 protocol (tcp, udp, icmp, icmp6)")
 	flag.StringVar(&f.FilterSrcIP, "filter-src-ip", "", "filter source IP addr")
