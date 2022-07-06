@@ -68,14 +68,14 @@ func main() {
 		log.Fatalf("Failed to load BTF spec: %s", err)
 	}
 
-	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec)
+	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods)
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
 	}
 	if len(funcs) <= 0 {
 		log.Fatalf("Cannot find a matching kernel function")
 	}
-	addr2name, err := pwru.GetAddrs(funcs, flags.OutputStack)
+	addr2name, err := pwru.GetAddrs(funcs, flags.OutputStack || len(flags.KMods) != 0)
 	if err != nil {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}

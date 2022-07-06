@@ -36,11 +36,13 @@ type Flags struct {
 	OutputLimitLines uint64
 
 	PerCPUBuffer int
+	KMods        []string
 }
 
 func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.ShowVersion, "version", false, "show pwru version and exit")
 	flag.StringVar(&f.KernelBTF, "kernel-btf", "", "specify kernel BTF file")
+	flag.StringSliceVar(&f.KMods, "kmods", nil, "list of kernel modules names to attach to")
 	flag.StringVar(&f.FilterFunc, "filter-func", "", "filter kernel functions to be probed by name (exact match, supports RE2 regular expression)")
 	flag.StringVar(&f.FilterProto, "filter-proto", "", "filter L4 protocol (tcp, udp, icmp, icmp6)")
 	flag.StringVar(&f.FilterSrcIP, "filter-src-ip", "", "filter source IP addr")
