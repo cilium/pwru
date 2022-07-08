@@ -7,7 +7,6 @@ package pwru
 import (
 	"fmt"
 	"net"
-	"runtime"
 	"syscall"
 
 	"github.com/cilium/ebpf"
@@ -53,13 +52,7 @@ func (o *output) Print(event *Event) {
 		}
 	}
 	var addr uint64
-	// XXX: not sure why the -1 offset is needed on x86 but not on arm64
-	switch runtime.GOARCH {
-	case "amd64":
-		addr = event.Addr - 1
-	case "arm64":
-		addr = event.Addr
-	}
+	addr = adjustAddr(event.Addr)
 	var funcName string
 	if ksym, ok := o.addr2name.Addr2NameMap[addr]; ok {
 		funcName = ksym.name
