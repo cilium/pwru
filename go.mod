@@ -3,7 +3,7 @@ module github.com/cilium/pwru
 go 1.18
 
 require (
-	github.com/cheggaaa/pb/v3 v3.0.8
+	github.com/cheggaaa/pb/v3 v3.1.0
 	github.com/cilium/ebpf v0.9.1-0.20220705115408-426053e5393e
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/spf13/pflag v1.0.5
