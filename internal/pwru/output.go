@@ -63,6 +63,11 @@ func (o *output) Print(event *Event) {
 	var funcName string
 	if ksym, ok := o.addr2name.Addr2NameMap[addr]; ok {
 		funcName = ksym.name
+	} else if ksym, ok := o.addr2name.Addr2NameMap[addr-4]; runtime.GOARCH == "amd64" && ok {
+		// Assume that function has ENDBR in its prelude (enabled by CONFIG_X86_KERNEL_IBT).
+		// See https://lore.kernel.org/bpf/20220811091526.172610-5-jolsa@kernel.org/
+		// for more ctx.
+		funcName = ksym.name
 	} else {
 		funcName = fmt.Sprintf("0x%x", addr)
 	}
