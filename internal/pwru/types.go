@@ -94,4 +94,5 @@ type Event struct {
 	Meta         Meta
 	Tuple        Tuple
 	PrintStackId int64
+	CPU          uint32
 }
