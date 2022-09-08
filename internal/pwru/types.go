@@ -28,7 +28,7 @@ type Flags struct {
 	FilterSrcPort uint16
 	FilterDstPort uint16
 
-	OutputRelativeTS bool
+	OutputTS         string
 	OutputMeta       bool
 	OutputTuple      bool
 	OutputSkb        bool
@@ -51,7 +51,7 @@ func (f *Flags) SetFlags() {
 	flag.Uint32Var(&f.FilterMark, "filter-mark", 0, "filter skb mark")
 	flag.Uint16Var(&f.FilterSrcPort, "filter-src-port", 0, "filter source port")
 	flag.Uint16Var(&f.FilterDstPort, "filter-dst-port", 0, "filter destination port")
-	flag.BoolVar(&f.OutputRelativeTS, "output-relative-timestamp", false, "print relative timestamp per skb")
+	flag.StringVar(&f.OutputTS, "timestamp", "none", "print timestamp per skb (\"current\", \"relative\", \"none\")")
 	flag.BoolVar(&f.OutputMeta, "output-meta", false, "print skb metadata")
 	flag.BoolVar(&f.OutputTuple, "output-tuple", false, "print L4 tuple")
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
