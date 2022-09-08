@@ -35,7 +35,11 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map, add
 }
 
 func (o *output) PrintHeader() {
-	fmt.Printf("%18s %6s %16s %24s %16s\n", "SKB", "CPU", "PROCESS", "FUNC", "TIMESTAMP")
+	fmt.Printf("%18s %6s %16s %24s", "SKB", "CPU", "PROCESS", "FUNC")
+	if o.flags.OutputTS != "none" {
+		fmt.Printf(" %16s", "TIMESTAMP")
+	}
+	fmt.Printf("\n")
 }
 
 func (o *output) Print(event *Event) {
@@ -45,7 +49,7 @@ func (o *output) Print(event *Event) {
 		execName = p.Executable()
 	}
 	ts := event.Timestamp
-	if o.flags.OutputRelativeTS {
+	if o.flags.OutputTS == "relative" {
 		if last, found := o.lastSeenSkb[event.SAddr]; found {
 			ts = ts - last
 		} else {
@@ -71,7 +75,10 @@ func (o *output) Print(event *Event) {
 	} else {
 		funcName = fmt.Sprintf("0x%x", addr)
 	}
-	fmt.Printf("%18s %6s %16s %24s %16d", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName), funcName, ts)
+	fmt.Printf("%18s %6s %16s %24s", fmt.Sprintf("0x%x", event.SAddr), fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName), funcName)
+	if o.flags.OutputTS != "none" {
+		fmt.Printf(" %16d", ts)
+	}
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {

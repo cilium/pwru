@@ -92,26 +92,26 @@ the eBPF bytecode from the [release page](https://github.com/cilium/pwru/release
 ### Usage
 
 ```
-> ./pwru --help
+$ pwru --help
 Usage of ./pwru:
-      --filter-dst-ip string        filter destination IP addr
-      --filter-dst-port uint16      filter destination port
-      --filter-func string          filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
-      --filter-mark uint32          filter skb mark
-      --filter-netns uint32         filter netns inode
-      --filter-proto string         filter L4 protocol (tcp, udp, icmp, icmp6)
-      --filter-src-ip string        filter source IP addr
-      --filter-src-port uint16      filter source port
-      --kernel-btf string           specify kernel BTF file
-      --kmods strings               list of kernel modules names to attach to
-      --output-limit-lines uint     exit the program after the number of events has been received/printed
-      --output-meta                 print skb metadata
-      --output-relative-timestamp   print relative timestamp per skb
-      --output-skb                  print skb
-      --output-stack                print stack
-      --output-tuple                print L4 tuple
-      --per-cpu-buffer int          per CPU buffer in bytes (default 4096)
-      --version                     show pwru version and exit
+      --filter-dst-ip string      filter destination IP addr
+      --filter-dst-port uint16    filter destination port
+      --filter-func string        filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
+      --filter-mark uint32        filter skb mark
+      --filter-netns uint32       filter netns inode
+      --filter-proto string       filter L4 protocol (tcp, udp, icmp, icmp6)
+      --filter-src-ip string      filter source IP addr
+      --filter-src-port uint16    filter source port
+      --kernel-btf string         specify kernel BTF file
+      --kmods strings             list of kernel modules names to attach to
+      --output-limit-lines uint   exit the program after the number of events has been received/printed
+      --output-meta               print skb metadata
+      --output-skb                print skb
+      --output-stack              print stack
+      --output-tuple              print L4 tuple
+      --per-cpu-buffer int        per CPU buffer in bytes (default 4096)
+      --timestamp string          print timestamp per skb ("current", "relative", "none") (default "none")
+      --version                   show pwru version and exit
 ```
 
 If multiple filters are specified, all of them have to match in order for a
