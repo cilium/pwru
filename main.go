@@ -26,12 +26,65 @@ import (
 	"github.com/cilium/pwru/internal/pwru"
 )
 
+type Progs map[int]*ebpf.Program
+
+func singleKprobe(funcs pwru.Funcs, progs Progs, ctx context.Context) ([]link.Link, error) {
+
+	var kprobes []link.Link
+
+	log.Println("Attaching kprobes...")
+	ignored := 0
+	bar := pb.StartNew(len(funcs))
+
+	for name, pos := range funcs {
+		var fn *ebpf.Program
+		switch pos {
+		case 1:
+			fn = progs[1]
+		case 2:
+			fn = progs[2]
+		case 3:
+			fn = progs[3]
+		case 4:
+			fn = progs[4]
+		case 5:
+			fn = progs[5]
+		default:
+			ignored += 1
+			continue
+		}
+		select {
+		case <-ctx.Done():
+			return kprobes, nil
+		default:
+		}
+
+		kp, err := link.Kprobe(name, fn, nil)
+		bar.Increment()
+		if err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return nil, fmt.Errorf("Opening kprobe %s: %w\n", name, err)
+			} else {
+				ignored += 1
+			}
+		} else {
+			kprobes = append(kprobes, kp)
+		}
+
+	}
+
+	bar.Finish()
+	log.Printf("Attached (ignored %d)\n", ignored)
+
+	return kprobes, nil
+}
+
 func main() {
 	var (
-		kprobe1, kprobe2, kprobe3, kprobe4, kprobe5 *ebpf.Program
-		cfgMap, events, printSkbMap, printStackMap  *ebpf.Map
+		cfgMap, events, printSkbMap, printStackMap *ebpf.Map
 	)
 
+	kProbeSkb := Progs{}
 	flags := pwru.Flags{}
 	flags.SetFlags()
 	flag.Parse()
@@ -89,11 +142,11 @@ func main() {
 			log.Fatalf("Loading objects: %v", err)
 		}
 		defer objs.Close()
-		kprobe1 = objs.KprobeSkb1
-		kprobe2 = objs.KprobeSkb2
-		kprobe3 = objs.KprobeSkb3
-		kprobe4 = objs.KprobeSkb4
-		kprobe5 = objs.KprobeSkb5
+		kProbeSkb[1] = objs.KprobeSkb1
+		kProbeSkb[2] = objs.KprobeSkb2
+		kProbeSkb[3] = objs.KprobeSkb3
+		kProbeSkb[4] = objs.KprobeSkb4
+		kProbeSkb[5] = objs.KprobeSkb5
 		cfgMap = objs.CfgMap
 		events = objs.Events
 		printSkbMap = objs.PrintSkbMap
@@ -104,11 +157,11 @@ func main() {
 			log.Fatalf("Loading objects: %v", err)
 		}
 		defer objs.Close()
-		kprobe1 = objs.KprobeSkb1
-		kprobe2 = objs.KprobeSkb2
-		kprobe3 = objs.KprobeSkb3
-		kprobe4 = objs.KprobeSkb4
-		kprobe5 = objs.KprobeSkb5
+		kProbeSkb[1] = objs.KprobeSkb1
+		kProbeSkb[2] = objs.KprobeSkb2
+		kProbeSkb[3] = objs.KprobeSkb3
+		kProbeSkb[4] = objs.KprobeSkb4
+		kProbeSkb[5] = objs.KprobeSkb5
 		cfgMap = objs.CfgMap
 		events = objs.Events
 		printStackMap = objs.PrintStackMap
@@ -117,7 +170,11 @@ func main() {
 	log.Printf("Per cpu buffer size: %d bytes\n", flags.PerCPUBuffer)
 	pwru.ConfigBPFMap(&flags, cfgMap)
 
-	var kprobes []link.Link
+	kprobes, err := singleKprobe(funcs, kProbeSkb, ctx)
+	if err != nil {
+		log.Fatalf("Failed to attach kprobes: %s", err)
+	}
+
 	defer func() {
 		select {
 		case <-ctx.Done():
@@ -135,47 +192,6 @@ func main() {
 			}
 		}
 	}()
-
-	log.Println("Attaching kprobes...")
-	ignored := 0
-	bar := pb.StartNew(len(funcs))
-	for name, pos := range funcs {
-		var fn *ebpf.Program
-		switch pos {
-		case 1:
-			fn = kprobe1
-		case 2:
-			fn = kprobe2
-		case 3:
-			fn = kprobe3
-		case 4:
-			fn = kprobe4
-		case 5:
-			fn = kprobe5
-		default:
-			ignored += 1
-			continue
-		}
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		kp, err := link.Kprobe(name, fn, nil)
-		bar.Increment()
-		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				log.Fatalf("Opening kprobe %s: %s\n", name, err)
-			} else {
-				ignored += 1
-			}
-		} else {
-			kprobes = append(kprobes, kp)
-		}
-	}
-	bar.Finish()
-	log.Printf("Attached (ignored %d)\n", ignored)
 
 	rd, err := perf.NewReader(events, flags.PerCPUBuffer)
 	if err != nil {
