@@ -4,10 +4,10 @@ go 1.18
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.0
-	github.com/cilium/ebpf v0.9.1-0.20220705115408-426053e5393e
+	github.com/cilium/ebpf v0.9.2
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/spf13/pflag v1.0.5
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a
+	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261
 )
 
 require (

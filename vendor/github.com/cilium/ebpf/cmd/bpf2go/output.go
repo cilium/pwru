@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"go/token"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -56,9 +56,9 @@ func {{ .Name.Load }}() (*ebpf.CollectionSpec, error) {
 //
 // The following types are suitable as obj argument:
 //
-//     *{{ .Name.Objects }}
-//     *{{ .Name.Programs }}
-//     *{{ .Name.Maps }}
+//	*{{ .Name.Objects }}
+//	*{{ .Name.Programs }}
+//	*{{ .Name.Maps }}
 //
 // See ebpf.CollectionSpec.LoadAndAssign documentation for details.
 func {{ .Name.LoadObjects }}(obj interface{}, opts *ebpf.CollectionOptions) (error) {
@@ -228,7 +228,7 @@ type outputArgs struct {
 }
 
 func output(args outputArgs) error {
-	obj, err := ioutil.ReadFile(args.obj)
+	obj, err := os.ReadFile(args.obj)
 	if err != nil {
 		return fmt.Errorf("read object file contents: %s", err)
 	}
