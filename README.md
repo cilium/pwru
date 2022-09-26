@@ -76,6 +76,19 @@ An example how to run `pwru` with Docker:
 docker run --privileged --rm -t --pid=host cilium/pwru --filter-dst-ip=1.1.1.1
 ```
 
+### Running on Kubernetes
+
+The following example shows how to run `pwru` on a given node:
+```
+NODE=node-foobar
+kubectl run pwru \
+    --image=cilium/pwru:latest \
+    --privileged=true \
+    --attach=true -i=true --tty=true --rm=true \
+    --overrides='{"apiVersion":"v1","spec":{"nodeSelector":{"kubernetes.io/hostname":"'$NODE'"}, "hostNetwork": true, "hostPID": true}}' \
+    -- --filter-dst-ip=1.1.1.1 --output-tuple
+```
+
 ### Running on Vagrant
 
 If you have [Vagrant](https://www.vagrantup.com/) installed, you can run the
