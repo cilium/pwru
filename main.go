@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -32,7 +33,7 @@ func singleKprobe(funcs pwru.Funcs, progs Progs, ctx context.Context) ([]link.Li
 
 	var kprobes []link.Link
 
-	log.Println("Attaching kprobes...")
+	log.Println("Attaching single kprobe...")
 	ignored := 0
 	bar := pb.StartNew(len(funcs))
 
@@ -77,6 +78,96 @@ func singleKprobe(funcs pwru.Funcs, progs Progs, ctx context.Context) ([]link.Li
 	log.Printf("Attached (ignored %d)\n", ignored)
 
 	return kprobes, nil
+}
+
+func multiKprobe(funcs pwru.Funcs, progs Progs, ffuncs []string, ctx context.Context) ([]link.Link, error) {
+
+	var kprobes []link.Link
+	ksyms := make(map[*ebpf.Program][]string)
+	ignored := 0
+
+	for name, pos := range funcs {
+		var p *ebpf.Program
+		switch pos {
+		case 1:
+			p = progs[1]
+			ksyms[p] = append(ksyms[p], name)
+		case 2:
+			p = progs[2]
+			ksyms[p] = append(ksyms[p], name)
+		case 3:
+			p = progs[3]
+			ksyms[p] = append(ksyms[p], name)
+		case 4:
+			p = progs[4]
+			ksyms[p] = append(ksyms[p], name)
+		case 5:
+			p = progs[5]
+			ksyms[p] = append(ksyms[p], name)
+		default:
+			ignored += 1
+			continue
+		}
+
+	}
+
+	log.Println("Attaching multi kprobes...")
+
+	for prog, syms := range ksyms {
+
+		s := interSection(ffuncs, syms)
+		opts := link.KprobeMultiOptions{Symbols: s}
+
+		lnk, err := link.KprobeMulti(prog, opts)
+		if err != nil {
+			return nil, fmt.Errorf("attaching '%s' failed: %w", prog, err)
+		} else {
+			kprobes = append(kprobes, lnk)
+		}
+
+		select {
+		case <-ctx.Done():
+			return kprobes, nil
+		default:
+		}
+
+	}
+
+	log.Printf("Attached (ignored %d)\n", ignored)
+
+	return kprobes, nil
+}
+
+// readLines reads a whole file into memory
+// and returns a slice of its lines.
+func readLines(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines, scanner.Err()
+}
+
+// took from https://go.dev/play/p/eGGcyIlZD6y
+func interSection(ffuncs, syms []string) (inter []string) {
+	out := []string{}
+	bucket := map[string]bool{}
+	for _, i := range ffuncs {
+		for _, j := range syms {
+			if i == j && !bucket[i] {
+				out = append(out, i)
+				bucket[i] = true
+			}
+		}
+	}
+	return out
 }
 
 func main() {
@@ -170,11 +261,22 @@ func main() {
 	log.Printf("Per cpu buffer size: %d bytes\n", flags.PerCPUBuffer)
 	pwru.ConfigBPFMap(&flags, cfgMap)
 
-	kprobes, err := singleKprobe(funcs, kProbeSkb, ctx)
+	var kprobes []link.Link
+
+	ffuncs, err := readLines("/sys/kernel/debug/tracing/available_filter_functions")
 	if err != nil {
-		log.Fatalf("Failed to attach kprobes: %s", err)
+		log.Fatalf("readLines: %s", err)
 	}
 
+	kprobes, err = multiKprobe(funcs, kProbeSkb, ffuncs, ctx)
+
+	if err != nil {
+		log.Printf("Failed to attach multi kprobes: %s", err)
+		kprobes, err = singleKprobe(funcs, kProbeSkb, ctx)
+		if err != nil {
+			log.Fatalf("Failed to attach single kprobe: %s", err)
+		}
+	}
 	defer func() {
 		select {
 		case <-ctx.Done():
