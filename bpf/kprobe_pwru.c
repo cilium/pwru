@@ -380,35 +380,35 @@ handle_everything(struct sk_buff *skb, struct pt_regs *ctx) {
 	return 0;
 }
 
-SEC("kprobe/skb-1")
+SEC("kprobe.multi/skb-1")
 int kprobe_skb_1(struct pt_regs *ctx) {
 	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM1(ctx);
 
 	return handle_everything(skb, ctx);
 }
 
-SEC("kprobe/skb-2")
+SEC("kprobe.multi/skb-2")
 int kprobe_skb_2(struct pt_regs *ctx) {
 	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM2(ctx);
 
 	return handle_everything(skb, ctx);
 }
 
-SEC("kprobe/skb-3")
+SEC("kprobe.multi/skb-3")
 int kprobe_skb_3(struct pt_regs *ctx) {
 	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM3(ctx);
 
 	return handle_everything(skb, ctx);
 }
 
-SEC("kprobe/skb-4")
+SEC("kprobe.multi/skb-4")
 int kprobe_skb_4(struct pt_regs *ctx) {
 	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM4(ctx);
 
 	return handle_everything(skb, ctx);
 }
 
-SEC("kprobe/skb-5")
+SEC("kprobe.multi/skb-5")
 int kprobe_skb_5(struct pt_regs *ctx) {
 	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM5(ctx);
 
