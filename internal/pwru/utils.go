@@ -12,7 +12,10 @@ import (
 	"path/filepath"
 	"regexp"
 
+	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/ebpf/btf"
+	"github.com/cilium/ebpf/link"
 )
 
 type Funcs map[string]int
@@ -111,4 +114,31 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string) (Funcs, error) {
 	}
 
 	return funcs, nil
+}
+
+// Very hacky way to check whether multi-link kprobe is supported.
+func HaveBPFLinkKprobeMulti() bool {
+	prog, err := ebpf.NewProgram(&ebpf.ProgramSpec{
+		Name: "probe_kpm_link",
+		Type: ebpf.Kprobe,
+		Instructions: asm.Instructions{
+			asm.Mov.Imm(asm.R0, 0),
+			asm.Return(),
+		},
+		AttachType: ebpf.AttachTraceKprobeMulti,
+		License:    "MIT",
+	})
+	if err != nil {
+		return false
+	}
+	defer prog.Close()
+
+	opts := link.KprobeMultiOptions{Symbols: []string{"vprintk"}}
+	link, err := link.KretprobeMulti(prog, opts)
+	if err != nil {
+		return false
+	}
+	defer link.Close()
+
+	return true
 }
