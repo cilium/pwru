@@ -25,10 +25,11 @@ type output struct {
 	printStackMap *ebpf.Map
 	addr2name     Addr2Name
 	writer        io.Writer
+	kprobeMulti   bool
 }
 
 func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
-	addr2Name Addr2Name) (*output, error) {
+	addr2Name Addr2Name, kprobeMulti bool) (*output, error) {
 
 	writer := os.Stdout
 
@@ -47,6 +48,7 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
 		printStackMap: printStackMap,
 		addr2name:     addr2Name,
 		writer:        writer,
+		kprobeMulti:   kprobeMulti,
 	}, nil
 }
 
@@ -76,7 +78,10 @@ func (o *output) Print(event *Event) {
 	// XXX: not sure why the -1 offset is needed on x86 but not on arm64
 	switch runtime.GOARCH {
 	case "amd64":
-		addr = event.Addr - 1
+		addr = event.Addr
+		if !o.kprobeMulti {
+			addr -= 1
+		}
 	case "arm64":
 		addr = event.Addr
 	}

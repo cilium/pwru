@@ -5,6 +5,7 @@
 package pwru
 
 import (
+	"fmt"
 	"os"
 
 	flag "github.com/spf13/pflag"
@@ -12,6 +13,9 @@ import (
 
 const (
 	MaxStackDepth = 50
+
+	BackendKprobe      = "kprobe"
+	BackendKprobeMulti = "kprobe-multi"
 )
 
 type Flags struct {
@@ -41,6 +45,8 @@ type Flags struct {
 	AllKMods     bool
 
 	ReadyFile string
+
+	Backend string
 }
 
 func (f *Flags) SetFlags() {
@@ -68,6 +74,9 @@ func (f *Flags) SetFlags() {
 
 	flag.StringVar(&f.ReadyFile, "ready-file", "", "create file after all BPF progs are attached")
 	flag.Lookup("ready-file").Hidden = true
+
+	flag.StringVar(&f.Backend, "backend", "",
+		fmt.Sprintf("Tracing backend('%s', '%s'). Will auto-detect if not specified.", BackendKprobe, BackendKprobeMulti))
 }
 
 type Tuple struct {

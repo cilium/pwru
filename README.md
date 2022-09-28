@@ -40,6 +40,7 @@ You can download the statically linked executable for x86\_64 and amd64 from the
 $ pwru --help
 Usage of ./pwru:
       --all-kmods                 attach to all available kernel modules
+      --backend string            Tracing backend('kprobe', 'kprobe-multi'). Will auto-detect if not specified.
       --filter-dst-ip string      filter destination IP addr
       --filter-dst-port uint16    filter destination port
       --filter-func string        filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
@@ -50,6 +51,7 @@ Usage of ./pwru:
       --filter-src-port uint16    filter source port
       --kernel-btf string         specify kernel BTF file
       --kmods strings             list of kernel modules names to attach to
+      --output-file string        write traces to file
       --output-limit-lines uint   exit the program after the number of events has been received/printed
       --output-meta               print skb metadata
       --output-skb                print skb
