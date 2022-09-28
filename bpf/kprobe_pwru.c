@@ -357,7 +357,8 @@ set_output(struct pt_regs *ctx, struct sk_buff *skb, struct event_t *event, stru
 }
 
 static __always_inline int
-handle_everything(struct sk_buff *skb, struct pt_regs *ctx) {
+handle_everything(struct sk_buff *skb, struct pt_regs *ctx,
+		  bool has_get_func_ip) {
 	struct event_t event = {};
 
 	u32 index = 0;
@@ -371,7 +372,10 @@ handle_everything(struct sk_buff *skb, struct pt_regs *ctx) {
 	}
 
 	event.pid = bpf_get_current_pid_tgid();
-	event.addr = PT_REGS_IP(ctx);
+	if (has_get_func_ip)
+		event.addr = bpf_get_func_ip(ctx);
+	else
+		event.addr = PT_REGS_IP(ctx);
 	event.skb_addr = (u64) skb;
 	event.ts = bpf_ktime_get_ns();
 	event.cpu_id = bpf_get_smp_processor_id();
@@ -384,35 +388,35 @@ SEC("kprobe/skb-1")
 int kprobe_skb_1(struct pt_regs *ctx) {
 	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM1(ctx);
 
-	return handle_everything(skb, ctx);
+	return handle_everything(skb, ctx, false);
 }
 
 SEC("kprobe/skb-2")
 int kprobe_skb_2(struct pt_regs *ctx) {
 	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM2(ctx);
 
-	return handle_everything(skb, ctx);
+	return handle_everything(skb, ctx, false);
 }
 
 SEC("kprobe/skb-3")
 int kprobe_skb_3(struct pt_regs *ctx) {
 	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM3(ctx);
 
-	return handle_everything(skb, ctx);
+	return handle_everything(skb, ctx, false);
 }
 
 SEC("kprobe/skb-4")
 int kprobe_skb_4(struct pt_regs *ctx) {
 	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM4(ctx);
 
-	return handle_everything(skb, ctx);
+	return handle_everything(skb, ctx, false);
 }
 
 SEC("kprobe/skb-5")
 int kprobe_skb_5(struct pt_regs *ctx) {
 	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM5(ctx);
 
-	return handle_everything(skb, ctx);
+	return handle_everything(skb, ctx, false);
 }
 
 char __license[] SEC("license") = "GPL";
