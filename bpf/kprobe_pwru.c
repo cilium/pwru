@@ -419,4 +419,39 @@ int kprobe_skb_5(struct pt_regs *ctx) {
 	return handle_everything(skb, ctx, false);
 }
 
+SEC("kprobe.multi/skb-1")
+int kprobe_multi_skb_1(struct pt_regs *ctx) {
+	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM1(ctx);
+
+	return handle_everything(skb, ctx, true);
+}
+
+SEC("kprobe.multi/skb-2")
+int kprobe_multi_skb_2(struct pt_regs *ctx) {
+	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM2(ctx);
+
+	return handle_everything(skb, ctx, true);
+}
+
+SEC("kprobe.multi/skb-3")
+int kprobe_multi_skb_3(struct pt_regs *ctx) {
+	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM3(ctx);
+
+	return handle_everything(skb, ctx, true);
+}
+
+SEC("kprobe.multi/skb-4")
+int kprobe_multi_skb_4(struct pt_regs *ctx) {
+	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM4(ctx);
+
+	return handle_everything(skb, ctx, true);
+}
+
+SEC("kprobe.multi/skb-5")
+int kprobe_multi_skb_5(struct pt_regs *ctx) {
+	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM5(ctx);
+
+	return handle_everything(skb, ctx, true);
+}
+
 char __license[] SEC("license") = "GPL";
