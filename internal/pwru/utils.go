@@ -42,8 +42,9 @@ func getAvailableFilterFunctions() (map[string]struct{}, error) {
 	return availableFuncs, nil
 }
 
-func GetFuncs(pattern string, spec *btf.Spec, kmods []string) (Funcs, error) {
+func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) (Funcs, error) {
 	funcs := Funcs{}
+
 	type iterator struct {
 		kmod string
 		iter *btf.TypesIterator
@@ -103,7 +104,11 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string) (Funcs, error) {
 				if ptr, ok := p.Type.(*btf.Pointer); ok {
 					if strct, ok := ptr.Target.(*btf.Struct); ok {
 						if strct.Name == "sk_buff" && i <= 5 {
-							funcs[fnName] = i
+							name := fnName
+							if kprobeMulti && it.kmod != "" {
+								name = fmt.Sprintf("%s [%s]", fnName, it.kmod)
+							}
+							funcs[name] = i
 							continue
 						}
 					}
@@ -114,6 +119,14 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string) (Funcs, error) {
 	}
 
 	return funcs, nil
+}
+
+func GetFuncsByPos(funcs Funcs) map[int][]string {
+	ret := make(map[int][]string, len(funcs))
+	for fn, pos := range funcs {
+		ret[pos] = append(ret[pos], fn)
+	}
+	return ret
 }
 
 // Very hacky way to check whether multi-link kprobe is supported.

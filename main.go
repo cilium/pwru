@@ -82,7 +82,20 @@ func main() {
 		}
 	}
 
-	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods)
+	var useKprobeMulti bool
+	if flags.Backend != "" && (flags.Backend != pwru.BackendKprobe && flags.Backend != pwru.BackendKprobeMulti) {
+		log.Fatalf("Invalid tracing backend %s", flags.Backend)
+	}
+	// Until https://lore.kernel.org/bpf/20221025134148.3300700-1-jolsa@kernel.org/
+	// has been backported to the stable, kprobe-multi cannot be used when attaching
+	// to kmods.
+	if flags.Backend == "" && len(flags.KMods) == 0 {
+		useKprobeMulti = pwru.HaveBPFLinkKprobeMulti()
+	} else if flags.Backend == pwru.BackendKprobeMulti {
+		useKprobeMulti = true
+	}
+
+	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods, useKprobeMulti)
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
 	}
@@ -103,11 +116,20 @@ func main() {
 			log.Fatalf("Loading objects: %v", err)
 		}
 		defer objs.Close()
-		kprobe1 = objs.KprobeSkb1
-		kprobe2 = objs.KprobeSkb2
-		kprobe3 = objs.KprobeSkb3
-		kprobe4 = objs.KprobeSkb4
-		kprobe5 = objs.KprobeSkb5
+		if useKprobeMulti {
+			kprobe1 = objs.KprobeMultiSkb1
+			kprobe2 = objs.KprobeMultiSkb2
+			kprobe3 = objs.KprobeMultiSkb3
+			kprobe4 = objs.KprobeMultiSkb4
+			kprobe5 = objs.KprobeMultiSkb5
+		} else {
+			kprobe1 = objs.KprobeSkb1
+			kprobe2 = objs.KprobeSkb2
+			kprobe3 = objs.KprobeSkb3
+			kprobe4 = objs.KprobeSkb4
+			kprobe5 = objs.KprobeSkb5
+
+		}
 		cfgMap = objs.CfgMap
 		events = objs.Events
 		printSkbMap = objs.PrintSkbMap
@@ -118,11 +140,20 @@ func main() {
 			log.Fatalf("Loading objects: %v", err)
 		}
 		defer objs.Close()
-		kprobe1 = objs.KprobeSkb1
-		kprobe2 = objs.KprobeSkb2
-		kprobe3 = objs.KprobeSkb3
-		kprobe4 = objs.KprobeSkb4
-		kprobe5 = objs.KprobeSkb5
+		if useKprobeMulti {
+			kprobe1 = objs.KprobeMultiSkb1
+			kprobe2 = objs.KprobeMultiSkb2
+			kprobe3 = objs.KprobeMultiSkb3
+			kprobe4 = objs.KprobeMultiSkb4
+			kprobe5 = objs.KprobeMultiSkb5
+		} else {
+			kprobe1 = objs.KprobeSkb1
+			kprobe2 = objs.KprobeSkb2
+			kprobe3 = objs.KprobeSkb3
+			kprobe4 = objs.KprobeSkb4
+			kprobe5 = objs.KprobeSkb5
+
+		}
 		cfgMap = objs.CfgMap
 		events = objs.Events
 		printStackMap = objs.PrintStackMap
@@ -150,10 +181,15 @@ func main() {
 		}
 	}()
 
-	log.Println("Attaching kprobes...")
+	msg := "kprobe"
+	if useKprobeMulti {
+		msg = "kprobe-multi"
+	}
+	log.Printf("Attaching kprobes (via %s)...\n", msg)
 	ignored := 0
 	bar := pb.StartNew(len(funcs))
-	for name, pos := range funcs {
+	funcsByPos := pwru.GetFuncsByPos(funcs)
+	for pos, fns := range funcsByPos {
 		var fn *ebpf.Program
 		switch pos {
 		case 1:
@@ -170,21 +206,40 @@ func main() {
 			ignored += 1
 			continue
 		}
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
 
-		kp, err := link.Kprobe(name, fn, nil)
-		bar.Increment()
-		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				log.Fatalf("Opening kprobe %s: %s\n", name, err)
-			} else {
-				ignored += 1
+		if !useKprobeMulti {
+			for _, name := range fns {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				kp, err := link.Kprobe(name, fn, nil)
+				bar.Increment()
+				if err != nil {
+					if !errors.Is(err, os.ErrNotExist) {
+						log.Fatalf("Opening kprobe %s: %s\n", name, err)
+					} else {
+						ignored += 1
+					}
+				} else {
+					kprobes = append(kprobes, kp)
+				}
 			}
 		} else {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			opts := link.KprobeMultiOptions{Symbols: funcsByPos[pos]}
+			kp, err := link.KprobeMulti(fn, opts)
+			bar.Add(len(fns))
+			if err != nil {
+				log.Fatalf("Opening kprobe-multi for pos %d: %s\n", pos, err)
+			}
 			kprobes = append(kprobes, kp)
 		}
 	}
@@ -215,7 +270,7 @@ func main() {
 		file.Close()
 	}
 
-	output, err := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name)
+	output, err := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name, useKprobeMulti)
 	if err != nil {
 		log.Fatalf("Failed to create outputer: %s", err)
 	}
