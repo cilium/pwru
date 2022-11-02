@@ -39,6 +39,7 @@ You can download the statically linked executable for x86\_64 and amd64 from the
 ```
 $ pwru --help
 Usage of ./pwru:
+      --all-kmods                 attach to all available kernel modules
       --filter-dst-ip string      filter destination IP addr
       --filter-dst-port uint16    filter destination port
       --filter-func string        filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
@@ -73,16 +74,7 @@ Docker images for `pwru` are published at https://hub.docker.com/r/cilium/pwru.
 An example how to run `pwru` with Docker:
 
 ```
-docker run --privileged --rm -t --pid=host -v /sys/kernel/debug/tracing:/sys/kernel/debug/tracing cilium/pwru --filter-dst-ip=1.1.1.1
-```
-
-Note: In case the path `/sys/kernel/debug/tracing` doesn't exist in the container, you can see error similar to 
-```
-docker: Error response from daemon: error while creating mount source path '/sys/kernel/debug/tracing': mkdir /sys/kernel/debug/tracing: no such file or directory
-```
-One way to avoid this is to mount the entire `/sys/kernel/debug` path from host to the container.
-```
-docker run --privileged --rm -t --pid=host -v /sys/kernel/debug:/sys/kernel/debug cilium/pwru --filter-dst-ip=1.1.1.1
+docker run --privileged --rm -t --pid=host -v /sys/kernel/debug/:/sys/kernel/debug/ cilium/pwru --filter-dst-ip=1.1.1.1
 ```
 
 ### Running on Kubernetes
@@ -98,7 +90,7 @@ kubectl run pwru \
     -- --filter-dst-ip=1.1.1.1 --output-tuple
 ```
 
-Note: You may need to create a volume for `/sys/kernel/debug/tracing` and mount it for the`pwru` pod. Similar to docker, if `/sys/kernel/debug/tracing` path doesn't exist in the container, mount entire `/sys/kernel/debug` to the container.
+Note: You may need to create a volume for `/sys/kernel/debug/` and mount it for the`pwru` pod.
 
 ### Running on Vagrant
 
