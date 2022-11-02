@@ -68,6 +68,20 @@ func main() {
 		log.Fatalf("Failed to load BTF spec: %s", err)
 	}
 
+	if flags.AllKMods {
+		files, err := os.ReadDir("/sys/kernel/btf")
+		if err != nil {
+			log.Fatalf("Failed to read directory: %s", err)
+		}
+
+		flags.KMods = nil
+		for _, file := range files {
+			if !file.IsDir() && file.Name() != "vmlinux" {
+				flags.KMods = append(flags.KMods, file.Name())
+			}
+		}
+	}
+
 	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods)
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
