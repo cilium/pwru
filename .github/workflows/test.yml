@@ -1,0 +1,111 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+
+    - name: Set up Go
+      uses: actions/setup-go@c4a742cab115ed795e34d4513e2cf7d472deb55f
+      with:
+        go-version: 1.18
+
+    - name: Check module vendoring
+      run: |
+        go mod tidy
+        go mod vendor
+        go mod verify
+        test -z "$(git status --porcelain)" || (echo "please run 'go mod tidy && go mod vendor', and submit your changes"; exit 1)
+
+    - name: Cache LLVM and Clang
+      id: cache-llvm
+      uses: actions/cache@9b0c1fce7a93df8e3bb8926b0d6e9d89e92f20a7
+      with:
+        path: $HOME/.clang
+        key: llvm-12.0
+
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@665aaf9d6fba342a852f55fecc5688e7f00e6663
+      with:
+        ubuntu-version: "20.04"
+        version: "12.0.0"
+        directory: $HOME/.clang
+        cached: ${{ steps.cache-llvm.outputs.cache-hit }}
+
+    - name: Generate
+      run: go generate .
+
+    - name: Build
+      run: go build .
+
+    - name: Store executable
+      uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8
+      with:
+        name: pwru
+        path: pwru
+
+  test:
+    runs-on: self-hosted
+    name: Test
+    strategy:
+      fail-fast: false
+      matrix:
+        kernel: [ '5.4-main', '5.15-main', 'bpf-next-main' ]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+
+      - name: Retrieve stored pwru executable
+        uses: actions/download-artifact@v3
+        with:
+          name: pwru
+          path: pwru
+
+      - name: Run tests
+        uses: cilium/little-vm-helper@9bb7d6016e00968adff49dae192a0be87d9c3aef
+        with:
+          test-name: pwru-test
+          image: kind
+          lvh-version: 'v0.0.1'
+          image-version: ${{ matrix.kernel }}
+          host-mount: ./
+          serial-port: 6666
+          cmd: |
+            set -eux
+
+            iptables -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.0/32 -j DROP
+
+            chmod +x /host/pwru/pwru
+            /host/pwru/pwru --filter-dst-ip=1.0.0.0 --output-tuple \
+              --output-file=/tmp/pwru.log \
+              --ready-file=/tmp/pwru.ready 2>/tmp/pwru.status &
+            PWRU_PID=\$!
+
+            trap "kill \$PWRU_PID" ERR
+
+            while [ ! -f /tmp/pwru.ready ]; do sleep 1; done
+
+            curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.0 || true
+
+            kill \$PWRU_PID
+            wait \$PWRU_PID
+
+            grep -E 'kfree_skb.*1\.0\.0\.0:80' /tmp/pwru.log
+
+      - name: Fetch artifacts
+        if: ${{ !success() }}
+        uses: cilium/little-vm-helper@9bb7d6016e00968adff49dae192a0be87d9c3aef
+        with:
+          provision: 'false'
+          cmd: |
+            cat /tmp/pwru.status || true
+            cat /tmp/pwru.ready || true
+            cat /tmp/pwru.log || true
