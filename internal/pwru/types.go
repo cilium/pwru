@@ -34,6 +34,7 @@ type Flags struct {
 	OutputSkb        bool
 	OutputStack      bool
 	OutputLimitLines uint64
+	OutputFile       string
 
 	PerCPUBuffer int
 	KMods        []string
@@ -60,6 +61,8 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
 	flag.IntVar(&f.PerCPUBuffer, "per-cpu-buffer", os.Getpagesize(), "per CPU buffer in bytes")
+
+	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
 }
 
 type Tuple struct {
