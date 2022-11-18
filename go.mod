@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.0
-	github.com/cilium/ebpf v0.9.3
+	github.com/cilium/ebpf v0.9.4-0.20221114103841-71b98d0977c1
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec
