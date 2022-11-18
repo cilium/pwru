@@ -207,7 +207,10 @@ func main() {
 
 	log.Println("Listening for events..")
 
-	output := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name)
+	output, err := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name)
+	if err != nil {
+		log.Fatalf("Failed to create outputer: %s", err)
+	}
 	output.PrintHeader()
 
 	defer func() {
