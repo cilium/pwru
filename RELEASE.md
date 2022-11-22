@@ -3,7 +3,7 @@
 Release process and checklist for `pwru`.
 
 This repository doesn't use release branches. All releases currently stem from
-the master branch.
+the `main` branch.
 
 ## Prepare the variables
 
