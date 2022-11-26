@@ -39,6 +39,8 @@ type Flags struct {
 	PerCPUBuffer int
 	KMods        []string
 	AllKMods     bool
+
+	ReadyFile string
 }
 
 func (f *Flags) SetFlags() {
@@ -63,6 +65,9 @@ func (f *Flags) SetFlags() {
 	flag.IntVar(&f.PerCPUBuffer, "per-cpu-buffer", os.Getpagesize(), "per CPU buffer in bytes")
 
 	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
+
+	flag.StringVar(&f.ReadyFile, "ready-file", "", "create file after all BPF progs are attached")
+	flag.Lookup("ready-file").Hidden = true
 }
 
 type Tuple struct {

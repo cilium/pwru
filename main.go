@@ -207,6 +207,14 @@ func main() {
 
 	log.Println("Listening for events..")
 
+	if flags.ReadyFile != "" {
+		file, err := os.Create(flags.ReadyFile)
+		if err != nil {
+			log.Fatalf("Failed to create ready file: %s", err)
+		}
+		file.Close()
+	}
+
 	output, err := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name)
 	if err != nil {
 		log.Fatalf("Failed to create outputer: %s", err)
