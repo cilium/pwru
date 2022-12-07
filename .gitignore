@@ -4,3 +4,5 @@ release
 tags
 kprobepwru_bpf*
 kprobepwruwithoutoutputskb_bpf*
+kprobemultipwru_bpf*
+kprobemultipwruwithoutoutputskb_bpf*
