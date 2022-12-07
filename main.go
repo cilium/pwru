@@ -110,53 +110,38 @@ func main() {
 	var opts ebpf.CollectionOptions
 	opts.Programs.KernelTypes = btfSpec
 
+	var objs Objs
+	switch {
+	case flags.OutputSkb && useKprobeMulti:
+		objs = &KProbeMultiPWRUObjects{}
+		err = LoadKProbeMultiPWRUObjects(objs, &opts)
+	case flags.OutputSkb:
+		objs = &KProbePWRUObjects{}
+		err = LoadKProbePWRUObjects(objs, &opts)
+	case useKprobeMulti:
+		objs = &KProbeMultiPWRUWithoutOutputSKBObjects{}
+		err = LoadKProbeMultiPWRUWithoutOutputSKBObjects(objs, &opts)
+	default:
+		objs = &KProbePWRUWithoutOutputSKBObjects{}
+		err = LoadKProbePWRUWithoutOutputSKBObjects(objs, &opts)
+	}
+
+	if err != nil {
+		log.Fatalf("Loading objects: %v", err)
+	}
+	defer objs.Close()
+
+	kprobe1 = objs.GetKprobe(1)
+	kprobe2 = objs.GetKprobe(2)
+	kprobe3 = objs.GetKprobe(3)
+	kprobe4 = objs.GetKprobe(4)
+	kprobe5 = objs.GetKprobe(5)
+
+	cfgMap = objs.GetMap("CfgMap")
+	events = objs.GetMap("Events")
+	printStackMap = objs.GetMap("PrintStackMap")
 	if flags.OutputSkb {
-		objs := KProbePWRUObjects{}
-		if err := LoadKProbePWRUObjects(&objs, &opts); err != nil {
-			log.Fatalf("Loading objects: %v", err)
-		}
-		defer objs.Close()
-		if useKprobeMulti {
-			kprobe1 = objs.KprobeMultiSkb1
-			kprobe2 = objs.KprobeMultiSkb2
-			kprobe3 = objs.KprobeMultiSkb3
-			kprobe4 = objs.KprobeMultiSkb4
-			kprobe5 = objs.KprobeMultiSkb5
-		} else {
-			kprobe1 = objs.KprobeSkb1
-			kprobe2 = objs.KprobeSkb2
-			kprobe3 = objs.KprobeSkb3
-			kprobe4 = objs.KprobeSkb4
-			kprobe5 = objs.KprobeSkb5
-
-		}
-		cfgMap = objs.CfgMap
-		events = objs.Events
-		printSkbMap = objs.PrintSkbMap
-		printStackMap = objs.PrintStackMap
-	} else {
-		objs := KProbePWRUWithoutOutputSKBObjects{}
-		if err := LoadKProbePWRUWithoutOutputSKBObjects(&objs, &opts); err != nil {
-			log.Fatalf("Loading objects: %v", err)
-		}
-		defer objs.Close()
-		if useKprobeMulti {
-			kprobe1 = objs.KprobeMultiSkb1
-			kprobe2 = objs.KprobeMultiSkb2
-			kprobe3 = objs.KprobeMultiSkb3
-			kprobe4 = objs.KprobeMultiSkb4
-			kprobe5 = objs.KprobeMultiSkb5
-		} else {
-			kprobe1 = objs.KprobeSkb1
-			kprobe2 = objs.KprobeSkb2
-			kprobe3 = objs.KprobeSkb3
-			kprobe4 = objs.KprobeSkb4
-			kprobe5 = objs.KprobeSkb5
-
-		}
-		cfgMap = objs.CfgMap
-		events = objs.Events
-		printStackMap = objs.PrintStackMap
+		printSkbMap = objs.GetMap("PrintSkbMap")
 	}
 
 	log.Printf("Per cpu buffer size: %d bytes\n", flags.PerCPUBuffer)
