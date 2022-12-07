@@ -27,11 +27,6 @@ import (
 )
 
 func main() {
-	var (
-		kprobe1, kprobe2, kprobe3, kprobe4, kprobe5 *ebpf.Program
-		cfgMap, events, printSkbMap, printStackMap  *ebpf.Map
-	)
-
 	flags := pwru.Flags{}
 	flags.SetFlags()
 	flag.Parse()
@@ -131,15 +126,16 @@ func main() {
 	}
 	defer objs.Close()
 
-	kprobe1 = objs.GetKprobe(1)
-	kprobe2 = objs.GetKprobe(2)
-	kprobe3 = objs.GetKprobe(3)
-	kprobe4 = objs.GetKprobe(4)
-	kprobe5 = objs.GetKprobe(5)
+	kprobe1 := objs.GetKprobe(1)
+	kprobe2 := objs.GetKprobe(2)
+	kprobe3 := objs.GetKprobe(3)
+	kprobe4 := objs.GetKprobe(4)
+	kprobe5 := objs.GetKprobe(5)
 
-	cfgMap = objs.GetMap("CfgMap")
-	events = objs.GetMap("Events")
-	printStackMap = objs.GetMap("PrintStackMap")
+	cfgMap := objs.GetMap("CfgMap")
+	events := objs.GetMap("Events")
+	printStackMap := objs.GetMap("PrintStackMap")
+	var printSkbMap *ebpf.Map
 	if flags.OutputSkb {
 		printSkbMap = objs.GetMap("PrintSkbMap")
 	}
