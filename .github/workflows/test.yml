@@ -70,42 +70,49 @@ jobs:
           path: pwru
 
       - name: Run tests
-        uses: cilium/little-vm-helper@76cb7b131c9fa60f697af29106b529c0a423a17e
+        uses: cilium/little-vm-helper@2a076423707ff588c2b0ed676d835e779b4c4af4
         with:
           test-name: pwru-test
-          image: kind
-          lvh-version: 'v0.0.1'
           image-version: ${{ matrix.kernel }}
           host-mount: ./
-          serial-port: 6666
           cmd: |
-            set -eux
-
-            iptables -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.0/32 -j DROP
+            set -x
 
             chmod +x /host/pwru/pwru
-            /host/pwru/pwru --filter-dst-ip=1.0.0.0 --output-tuple \
-              --output-file=/tmp/pwru.log \
-              --ready-file=/tmp/pwru.ready 2>/tmp/pwru.status &
-            PWRU_PID=\$!
 
-            trap "kill \$PWRU_PID" ERR
+            # Block traffic to both endpoints, so that we can see kfree_skb*
+            # in traces (test assertion)
+            iptables -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 -j DROP
+            ip6tables -I OUTPUT 1 -m tcp --proto tcp --dst 2606:4700:4700::1001 -j DROP
 
-            while [ ! -f /tmp/pwru.ready ]; do sleep 1; done
+            i=0
+            for addr in '1.0.0.1' '2606:4700:4700::1001'; do
+              i=\$((i+1))
+              /host/pwru/pwru --filter-dst-ip="\$addr" --output-tuple \
+                --output-file=/tmp/pwru-\$i.log \
+                --ready-file=/tmp/pwru-\$i.ready 2>/tmp/pwru-\$i.status &
+              PWRU_PID=\$!
 
-            curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.0 || true
+              while [ ! -f /tmp/pwru-\$i.ready ]; do sleep 1; done
 
-            kill \$PWRU_PID
-            wait \$PWRU_PID
+              url=\$addr
+              if \$(echo \$addr | grep -q ':'); then url="[\$addr]"; fi
+              echo \$url
 
-            grep -E 'kfree_skb.*1\.0\.0\.0:80' /tmp/pwru.log
+              curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://\$url || true
+
+              kill \$PWRU_PID
+              wait \$PWRU_PID
+
+              grep "kfree_skb" /tmp/pwru-\$i.log | grep -F "\${url}:80"
+            done
 
       - name: Fetch artifacts
         if: ${{ !success() }}
-        uses: cilium/little-vm-helper@76cb7b131c9fa60f697af29106b529c0a423a17e
+        uses: cilium/little-vm-helper@2a076423707ff588c2b0ed676d835e779b4c4af4
         with:
           provision: 'false'
           cmd: |
-            cat /tmp/pwru.status || true
-            cat /tmp/pwru.ready || true
-            cat /tmp/pwru.log || true
+            cat /tmp/pwru-*.status || true
+            cat /tmp/pwru-*.ready || true
+            cat /tmp/pwru-*.log || true
