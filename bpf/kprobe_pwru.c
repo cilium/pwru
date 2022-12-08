@@ -193,7 +193,7 @@ filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
 	bpf_probe_read(&iphdr_first_byte, 1, tmp);
 	ip_vsn = iphdr_first_byte >> 4;
 
-	if (ip_vsn == 4) {
+	if (cfg->ipv6 == 0 && ip_vsn == 4) {
 		struct iphdr ip4;
 		bpf_probe_read(&ip4, sizeof(ip4), tmp);
 
@@ -204,7 +204,7 @@ filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
 			return false;
 
 		l4_proto = ip4.protocol;
-	} else if (ip_vsn == 6) {
+	} else if (cfg->ipv6 == 1 && ip_vsn == 6) {
 		struct ipv6hdr ip6;
 		bpf_probe_read(&ip6, sizeof(ip6), tmp);
 
