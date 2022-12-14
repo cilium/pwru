@@ -8,8 +8,6 @@ BINDIR ?= /usr/local/bin
 VERSION=$(shell git describe --tags --always)
 
 TEST_TIMEOUT ?= 5s
-RELEASE_UID ?= $(shell id -u)
-RELEASE_GID ?= $(shell id -g)
 
 $(TARGET):
 	$(GO_GENERATE)
@@ -23,9 +21,8 @@ release:
 		--workdir /pwru \
 		--volume `pwd`:/pwru docker.io/library/golang:1.18.3-alpine3.16 \
 		sh -c "apk add --no-cache make git clang llvm && \
-			addgroup -g $(RELEASE_GID) release && \
-			adduser -u $(RELEASE_UID) -D -G release release && \
-			su release -c 'make local-release VERSION=${VERSION}'"
+			git config --global --add safe.directory /pwru && \
+			make local-release VERSION=${VERSION}"
 
 local-release: clean
 	OS=linux; \
