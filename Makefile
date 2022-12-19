@@ -44,7 +44,9 @@ install: $(TARGET)
 clean:
 	rm -f $(TARGET)
 	rm -f kprobepwru_bpf*
+	rm -f kprobemultipwru_bpf*
 	rm -f kprobepwruwithoutoutputskb_bpf*
+	rm -f kprobemultipwruwithoutoutputskb_bpf*
 	rm -rf ./release
 
 test:
