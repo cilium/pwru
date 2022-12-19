@@ -105,7 +105,7 @@ func main() {
 	var opts ebpf.CollectionOptions
 	opts.Programs.KernelTypes = btfSpec
 
-	var objs Objs
+	var objs pwru.KProbeObjects
 	switch {
 	case flags.OutputSkb && useKprobeMulti:
 		objs = &KProbeMultiPWRUObjects{}
@@ -126,18 +126,18 @@ func main() {
 	}
 	defer objs.Close()
 
-	kprobe1 := objs.GetKprobe(1)
-	kprobe2 := objs.GetKprobe(2)
-	kprobe3 := objs.GetKprobe(3)
-	kprobe4 := objs.GetKprobe(4)
-	kprobe5 := objs.GetKprobe(5)
+	kprobe1 := objs.GetKprobeSkb1()
+	kprobe2 := objs.GetKprobeSkb2()
+	kprobe3 := objs.GetKprobeSkb3()
+	kprobe4 := objs.GetKprobeSkb4()
+	kprobe5 := objs.GetKprobeSkb5()
 
-	cfgMap := objs.GetMap("CfgMap")
-	events := objs.GetMap("Events")
-	printStackMap := objs.GetMap("PrintStackMap")
+	cfgMap := objs.GetCfgMap()
+	events := objs.GetEvents()
+	printStackMap := objs.GetPrintStackMap()
 	var printSkbMap *ebpf.Map
 	if flags.OutputSkb {
-		printSkbMap = objs.GetMap("PrintSkbMap")
+		printSkbMap = objs.(pwru.KProbeMapsWithOutputSKB).GetPrintSkbMap()
 	}
 
 	log.Printf("Per cpu buffer size: %d bytes\n", flags.PerCPUBuffer)
