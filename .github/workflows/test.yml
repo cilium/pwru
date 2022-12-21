@@ -53,8 +53,9 @@ jobs:
         path: pwru
 
   test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest-4cores-16gb
     name: Test
+    needs: build
     strategy:
       fail-fast: false
       matrix:
@@ -74,6 +75,8 @@ jobs:
         with:
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
+          install-dependencies: 'true'
+          dns-resolver: '1.1.1.1'
           host-mount: ./
           cmd: |
             set -x
