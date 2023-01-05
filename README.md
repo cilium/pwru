@@ -15,17 +15,19 @@ after installing an IP tables rule:
 
 ### Requirements
 
-`pwru` requires >= 5.3 kernel to run. For `--output-skb` >= 5.9 kernel is required.
+`pwru` requires >= 5.3 kernel to run. For `--output-skb` >= 5.9 kernel is required. For `--backend=kprobe-multi` >= 5.18 kernel is required.
 
 The following kernel configuration is required.
 
-|           Option        |        Note            |
-| ----------------------- | ---------------------- |
-| CONFIG_DEBUG_INFO_BTF=y | Available since >= 5.3 |
-| CONFIG_KPROBES=y        |                        |
-| CONFIG_PERF_EVENTS=y    |                        |
-| CONFIG_BPF=y            |                        |
-| CONFIG_BPF_SYSCALL=y    |                        |
+|           Option         |                         Note                         |
+| ------------------------ | ---------------------------------------------------- |
+| CONFIG_DEBUG_INFO_BTF=y  | available since >= 5.3                               |
+| CONFIG_KPROBES=y         |                                                      |
+| CONFIG_PERF_EVENTS=y     |                                                      |
+| CONFIG_BPF=y             |                                                      |
+| CONFIG_BPF_SYSCALL=y     |                                                      |
+| CONFIG_FUNCTION_TRACER=y | /sys/kernel/debug/tracing/available_filter_functions |
+| CONFIG_FPROBE=y          | --backend=kprobe-multi, available since >= 5.18      |
 
 You can use `zgrep $OPTION /proc/config.gz` to validate whether option is enabled.
 
