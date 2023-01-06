@@ -359,78 +359,30 @@ handle_everything(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip
 	return 0;
 }
 
-#ifndef HAS_KPROBE_MULTI
-SEC("kprobe/skb-1")
-int kprobe_skb_1(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM1(ctx);
-
-	return handle_everything(skb, ctx, false);
-}
-
-SEC("kprobe/skb-2")
-int kprobe_skb_2(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM2(ctx);
-
-	return handle_everything(skb, ctx, false);
-}
-
-SEC("kprobe/skb-3")
-int kprobe_skb_3(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM3(ctx);
-
-	return handle_everything(skb, ctx, false);
-}
-
-SEC("kprobe/skb-4")
-int kprobe_skb_4(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM4(ctx);
-
-	return handle_everything(skb, ctx, false);
-}
-
-SEC("kprobe/skb-5")
-int kprobe_skb_5(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM5(ctx);
-
-	return handle_everything(skb, ctx, false);
-}
-
+#ifdef HAS_KPROBE_MULTI
+#define PWRU_KPROBE_TYPE "kprobe.multi"
+#define PWRU_HAS_GET_FUNC_IP true
 #else
-
-SEC("kprobe.multi/skb-1")
-int kprobe_skb_1(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM1(ctx);
-
-	return handle_everything(skb, ctx, true);
-}
-
-SEC("kprobe.multi/skb-2")
-int kprobe_skb_2(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM2(ctx);
-
-	return handle_everything(skb, ctx, true);
-}
-
-SEC("kprobe.multi/skb-3")
-int kprobe_skb_3(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM3(ctx);
-
-	return handle_everything(skb, ctx, true);
-}
-
-SEC("kprobe.multi/skb-4")
-int kprobe_skb_4(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM4(ctx);
-
-	return handle_everything(skb, ctx, true);
-}
-
-SEC("kprobe.multi/skb-5")
-int kprobe_skb_5(struct pt_regs *ctx) {
-	struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM5(ctx);
-
-	return handle_everything(skb, ctx, true);
-}
+#define PWRU_KPROBE_TYPE "kprobe"
+#define PWRU_HAS_GET_FUNC_IP false
 #endif /* HAS_KPROBE_MULTI */
+
+#define PWRU_ADD_KPROBE(X)                                                 \
+	SEC(PWRU_KPROBE_TYPE "/skb-" #X)                                       \
+	int kprobe_skb_##X(struct pt_regs *ctx)                               \
+	{                                                                     \
+		struct sk_buff *skb = (struct sk_buff *)PT_REGS_PARM##X(ctx); \
+		return handle_everything(skb, ctx, PWRU_HAS_GET_FUNC_IP);     \
+	}
+
+PWRU_ADD_KPROBE(1)
+PWRU_ADD_KPROBE(2)
+PWRU_ADD_KPROBE(3)
+PWRU_ADD_KPROBE(4)
+PWRU_ADD_KPROBE(5)
+
+#undef PWRU_KPROBE
+#undef PWRU_HAS_GET_FUNC_IP
+#undef PWRU_KPROBE_TYPE
 
 char __license[] SEC("license") = "GPL";
