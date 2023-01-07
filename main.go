@@ -192,6 +192,7 @@ func main() {
 			for _, name := range fns {
 				select {
 				case <-ctx.Done():
+					bar.Finish()
 					return
 				default:
 				}
@@ -211,6 +212,7 @@ func main() {
 		} else {
 			select {
 			case <-ctx.Done():
+				bar.Finish()
 				return
 			default:
 			}
@@ -291,9 +293,8 @@ func main() {
 
 		select {
 		case <-ctx.Done():
-			break
+			return
 		default:
-			continue
 		}
 	}
 }
