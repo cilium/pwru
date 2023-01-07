@@ -1,0 +1,2 @@
+bpf/headers/bpf/ linguist-vendored
+bpf/headers/vmlinux* linguist-vendored
