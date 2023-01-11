@@ -85,13 +85,14 @@ jobs:
 
             # Block traffic to both endpoints, so that we can see kfree_skb*
             # in traces (test assertion)
-            iptables -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 -j DROP
-            ip6tables -I OUTPUT 1 -m tcp --proto tcp --dst 2606:4700:4700::1001 -j DROP
+            iptables -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 --dport 8080 -j DROP
+            ip6tables -I OUTPUT 1 -m tcp --proto tcp --dst 2606:4700:4700::1001 --dport 8080 -j DROP
 
             i=0
             for addr in '1.0.0.1' '2606:4700:4700::1001'; do
               i=\$((i+1))
-              /host/pwru/pwru --filter-dst-ip="\$addr" --output-tuple \
+              port=8080
+              /host/pwru/pwru --filter-dst-ip="\$addr" --filter-port="\$port" --output-tuple \
                 --output-file=/tmp/pwru-\$i.log \
                 --ready-file=/tmp/pwru-\$i.ready 2>/tmp/pwru-\$i.status &
               PWRU_PID=\$!
@@ -102,12 +103,12 @@ jobs:
               if \$(echo \$addr | grep -q ':'); then url="[\$addr]"; fi
               echo \$url
 
-              curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://\$url || true
+              curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://\$url:\$port || true
 
               kill \$PWRU_PID
               wait \$PWRU_PID
 
-              grep "kfree_skb" /tmp/pwru-\$i.log | grep -F "\${url}:80"
+              grep "kfree_skb" /tmp/pwru-\$i.log | grep -F "\${url}:\${port}"
             done
 
       - name: Fetch artifacts
