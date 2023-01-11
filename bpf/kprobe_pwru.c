@@ -69,6 +69,7 @@ struct config {
 	u8 l4_proto;
 	u16 sport;
 	u16 dport;
+	u16 port;
 	u8 output_timestamp;
 	u8 output_meta;
 	u8 output_tuple;
@@ -164,7 +165,7 @@ config_tuple_empty(struct config *cfg) {
 	if (!cfg->l4_proto && \
         addr_is_zero(cfg->saddr) && \
         addr_is_zero(cfg->daddr) && \
-        !cfg->sport && !cfg->dport)
+        !cfg->sport && !cfg->dport && !cfg->port)
 		return true;
 
 	return false;
@@ -232,7 +233,7 @@ filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
 	if (cfg->l4_proto && l4_proto != cfg->l4_proto)
 		return false;
 
-	if (cfg->dport || cfg->sport) {
+	if (cfg->dport || cfg->sport || cfg->port) {
 		if (l4_proto == IPPROTO_TCP) {
 			struct tcphdr *tmp = (struct tcphdr *) (skb_head + l4_off);
 			struct tcphdr tcp;
@@ -255,6 +256,9 @@ filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
 			return false;
 
 		if (cfg->dport && dport != cfg->dport)
+			return false;
+
+		if (cfg->port && (dport != cfg->port && sport != cfg->port))
 			return false;
 	}
 

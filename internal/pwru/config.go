@@ -31,6 +31,7 @@ type FilterCfg struct {
 	FilterProto   uint8
 	FilterSrcPort uint16
 	FilterDstPort uint16
+	FilterPort    uint16
 
 	//TODO: if there are more options later, then you can consider using a bit map
 	OutputRelativeTS uint8
@@ -47,12 +48,15 @@ func ConfigBPFMap(flags *Flags, cfgMap *ebpf.Map) {
 		FilterNetns: flags.FilterNetns,
 		FilterMark:  flags.FilterMark,
 	}
-
-	if flags.FilterSrcPort > 0 {
-		cfg.FilterSrcPort = byteorder.HostToNetwork16(flags.FilterSrcPort)
-	}
-	if flags.FilterDstPort > 0 {
-		cfg.FilterDstPort = byteorder.HostToNetwork16(flags.FilterDstPort)
+	if flags.FilterPort > 0 {
+		cfg.FilterPort = byteorder.HostToNetwork16(flags.FilterPort)
+	} else {
+		if flags.FilterSrcPort > 0 {
+			cfg.FilterSrcPort = byteorder.HostToNetwork16(flags.FilterSrcPort)
+		}
+		if flags.FilterDstPort > 0 {
+			cfg.FilterDstPort = byteorder.HostToNetwork16(flags.FilterDstPort)
+		}
 	}
 	if flags.OutputSkb {
 		cfg.OutputSkb = 1
