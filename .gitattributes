@@ -1,2 +1,2 @@
-bpf/headers/bpf/ linguist-vendored
-bpf/headers/vmlinux* linguist-vendored
+bpf/headers/bpf/* linguist-vendored
+bpf/headers/vmlinux*.h linguist-vendored
