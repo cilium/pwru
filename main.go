@@ -253,7 +253,7 @@ func main() {
 		file.Close()
 	}
 
-	output, err := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name, useKprobeMulti)
+	output, err := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name, useKprobeMulti, btfSpec)
 	if err != nil {
 		log.Fatalf("Failed to create outputer: %s", err)
 	}

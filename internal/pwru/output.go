@@ -7,12 +7,14 @@ package pwru
 import (
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"runtime"
 	"syscall"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/btf"
 	ps "github.com/mitchellh/go-ps"
 
 	"github.com/cilium/pwru/internal/byteorder"
@@ -26,10 +28,11 @@ type output struct {
 	addr2name     Addr2Name
 	writer        io.Writer
 	kprobeMulti   bool
+	kfreeReasons  map[uint64]string
 }
 
 func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
-	addr2Name Addr2Name, kprobeMulti bool) (*output, error) {
+	addr2Name Addr2Name, kprobeMulti bool, btfSpec *btf.Spec) (*output, error) {
 
 	writer := os.Stdout
 
@@ -41,6 +44,11 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
 		writer = file
 	}
 
+	reasons, err := getKFreeSKBReasons(btfSpec)
+	if err != nil {
+		log.Printf("Unable to load packet drop reaons: %v", err)
+	}
+
 	return &output{
 		flags:         flags,
 		lastSeenSkb:   map[uint64]uint64{},
@@ -49,6 +57,7 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
 		addr2name:     addr2Name,
 		writer:        writer,
 		kprobeMulti:   kprobeMulti,
+		kfreeReasons:  reasons,
 	}, nil
 }
 
@@ -96,8 +105,18 @@ func (o *output) Print(event *Event) {
 	} else {
 		funcName = fmt.Sprintf("0x%x", addr)
 	}
+
+	outFuncName := funcName
+	if funcName == "kfree_skb_reason" {
+		if reason, ok := o.kfreeReasons[event.ParamSecond]; ok {
+			outFuncName = fmt.Sprintf("%s(%s)", funcName, reason)
+		} else {
+			outFuncName = fmt.Sprintf("%s (%d)", funcName, event.ParamSecond)
+		}
+	}
+
 	fmt.Fprintf(o.writer, "%18s %6s %16s %24s", fmt.Sprintf("0x%x", event.SAddr),
-		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName), funcName)
+		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName), outFuncName)
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %16d", ts)
 	}
@@ -161,4 +180,26 @@ func addrToStr(proto uint16, addr [16]byte) string {
 	default:
 		return ""
 	}
+}
+
+// getKFreeSKBReasons dervices SKB drop reasons from the "skb_drop_reason" enum
+// defined in /include/net/dropreason.h.
+func getKFreeSKBReasons(spec *btf.Spec) (map[uint64]string, error) {
+	if _, err := spec.AnyTypeByName("kfree_skb_reason"); err != nil {
+		// Kernel is too old to have kfree_skb_reason
+		return nil, nil
+	}
+
+	var dropReasonsEnum *btf.Enum
+	if err := spec.TypeByName("skb_drop_reason", &dropReasonsEnum); err != nil {
+		return nil, fmt.Errorf("failed to find 'skb_drop_reason' enum: %v", err)
+	}
+
+	ret := map[uint64]string{}
+	for _, val := range dropReasonsEnum.Values {
+		ret[uint64(val.Value)] = val.Name
+
+	}
+
+	return ret, nil
 }
