@@ -62,6 +62,7 @@ struct event_t {
 	struct skb_meta meta;
 	struct tuple tuple;
 	s64 print_stack_id;
+	u64 param_second;
 	u32 cpu_id;
 } __attribute__((packed));
 
@@ -356,6 +357,7 @@ handle_everything(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip
 	event.skb_addr = (u64) skb;
 	event.ts = bpf_ktime_get_ns();
 	event.cpu_id = bpf_get_smp_processor_id();
+	event.param_second = PT_REGS_PARM2(ctx);
 
 	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
 
