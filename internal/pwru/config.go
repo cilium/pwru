@@ -103,6 +103,7 @@ func ConfigBPFMap(flags *Flags, cfgMap *ebpf.Map) {
 
 		versionMatch := true
 		if ip4 := ip.To4(); ip4 == nil {
+			cfg.FilterIPv6 = 1
 			if cfg.FilterIPv6 <= 0 && flags.FilterDstIP != "" {
 				versionMatch = false
 			}
