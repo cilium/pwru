@@ -85,7 +85,7 @@ struct config {
 	u8 output_tuple;
 	u8 output_skb;
 	u8 output_stack;
-	u8 setted;
+	u8 is_set;
 } __attribute__((packed));
 
 static volatile const struct config CFG;
@@ -333,11 +333,11 @@ set_output(struct pt_regs *ctx, struct sk_buff *skb, struct event_t *event) {
 	}
 }
 
-static __always_inline int
+static __noinline int
 handle_everything(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip) {
 	struct event_t event = {};
 
-	if (cfg->setted) {
+	if (cfg->is_set) {
 		if (!filter(skb)) {
 			return 0;
 		}

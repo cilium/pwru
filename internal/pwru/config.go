@@ -38,14 +38,14 @@ type FilterCfg struct {
 	OutputSkb        uint8
 	OutputStack      uint8
 
-	Setted byte
+	IsSet byte
 }
 
 func GetConfig(flags *Flags) FilterCfg {
 	cfg := FilterCfg{
 		FilterNetns: flags.FilterNetns,
 		FilterMark:  flags.FilterMark,
-		Setted:      1,
+		IsSet:       1,
 	}
 	if flags.FilterPort > 0 {
 		cfg.FilterPort = byteorder.HostToNetwork16(flags.FilterPort)
