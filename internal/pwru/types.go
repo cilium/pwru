@@ -121,7 +121,6 @@ type Event struct {
 }
 
 type KProbeMaps interface {
-	GetCfgMap() *ebpf.Map
 	GetEvents() *ebpf.Map
 	GetPrintStackMap() *ebpf.Map
 }

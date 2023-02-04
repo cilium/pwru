@@ -10,8 +10,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/cilium/ebpf"
-
 	"github.com/cilium/pwru/internal/byteorder"
 )
 
@@ -22,31 +20,32 @@ type FilterCfg struct {
 	FilterNetns uint32
 	FilterMark  uint32
 
-	//Filter l3
+	// Filter l3
 	FilterIPv6  uint8
 	FilterSrcIP [16]byte
 	FilterDstIP [16]byte
 
-	//Filter l4
+	// Filter l4
 	FilterProto   uint8
 	FilterSrcPort uint16
 	FilterDstPort uint16
 	FilterPort    uint16
 
-	//TODO: if there are more options later, then you can consider using a bit map
+	// TODO: if there are more options later, then you can consider using a bit map
 	OutputRelativeTS uint8
 	OutputMeta       uint8
 	OutputTuple      uint8
 	OutputSkb        uint8
 	OutputStack      uint8
 
-	Pad byte
+	Setted byte
 }
 
-func ConfigBPFMap(flags *Flags, cfgMap *ebpf.Map) {
+func GetConfig(flags *Flags) FilterCfg {
 	cfg := FilterCfg{
 		FilterNetns: flags.FilterNetns,
 		FilterMark:  flags.FilterMark,
+		Setted:      1,
 	}
 	if flags.FilterPort > 0 {
 		cfg.FilterPort = byteorder.HostToNetwork16(flags.FilterPort)
@@ -119,7 +118,5 @@ func ConfigBPFMap(flags *Flags, cfgMap *ebpf.Map) {
 		}
 	}
 
-	if err := cfgMap.Update(uint32(0), cfg, 0); err != nil {
-		log.Fatalf("Failed to set filter map: %v", err)
-	}
+	return cfg
 }

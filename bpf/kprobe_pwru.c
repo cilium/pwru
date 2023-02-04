@@ -85,8 +85,11 @@ struct config {
 	u8 output_tuple;
 	u8 output_skb;
 	u8 output_stack;
-	u8 pad;
+	u8 setted;
 } __attribute__((packed));
+
+static volatile const struct config CFG;
+#define cfg (&CFG)
 
 #define MAX_STACK_DEPTH 50
 struct {
@@ -95,13 +98,6 @@ struct {
 	__uint(key_size, sizeof(u32));
 	__uint(value_size, MAX_STACK_DEPTH * sizeof(u64));
 } print_stack_map SEC(".maps");
-
-struct {
-	__uint(type, BPF_MAP_TYPE_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, u32);
-	__type(value, struct config);
-} cfg_map SEC(".maps");
 
 #ifdef OUTPUT_SKB
 struct {
@@ -129,7 +125,7 @@ get_netns(struct sk_buff *skb) {
 }
 
 static __always_inline bool
-filter_meta(struct sk_buff *skb, struct config *cfg) {
+filter_meta(struct sk_buff *skb) {
 	if (cfg->netns && get_netns(skb) != cfg->netns) {
 			return false;
 	}
@@ -151,7 +147,7 @@ v6addr_equal(union addr addr, u8 bytes[16]) {
 }
 
 static __always_inline bool
-config_tuple_empty(struct config *cfg) {
+config_tuple_empty() {
 	if (!addr_empty(cfg->saddr) || !addr_empty(cfg->daddr)) {
 		return false;
 	}
@@ -166,8 +162,8 @@ config_tuple_empty(struct config *cfg) {
  * if one of the other fields does not match.
  */
 static __always_inline bool
-filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
-	if (config_tuple_empty(cfg)) {
+filter_l3_and_l4(struct sk_buff *skb) {
+	if (config_tuple_empty()) {
 		return true;
 	}
 
@@ -246,8 +242,8 @@ filter_l3_and_l4(struct sk_buff *skb, struct config *cfg) {
 }
 
 static __always_inline bool
-filter(struct sk_buff *skb, struct config *cfg) {
-	return filter_meta(skb, cfg) && filter_l3_and_l4(skb, cfg);
+filter(struct sk_buff *skb) {
+	return filter_meta(skb) && filter_l3_and_l4(skb);
 }
 
 static __always_inline void
@@ -319,7 +315,7 @@ set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
 }
 
 static __always_inline void
-set_output(struct pt_regs *ctx, struct sk_buff *skb, struct event_t *event, struct config *cfg) {
+set_output(struct pt_regs *ctx, struct sk_buff *skb, struct event_t *event) {
 	if (cfg->output_meta) {
 		set_meta(skb, &event->meta);
 	}
@@ -341,15 +337,12 @@ static __always_inline int
 handle_everything(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip) {
 	struct event_t event = {};
 
-	u32 index = 0;
-	struct config *cfg = bpf_map_lookup_elem(&cfg_map, &index);
-
-	if (cfg) {
-		if (!filter(skb, cfg)) {
+	if (cfg->setted) {
+		if (!filter(skb)) {
 			return 0;
 		}
 
-		set_output(ctx, skb, &event, cfg);
+		set_output(ctx, skb, &event);
 	}
 
 	event.pid = bpf_get_current_pid_tgid();

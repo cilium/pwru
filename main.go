@@ -105,24 +105,34 @@ func main() {
 	var opts ebpf.CollectionOptions
 	opts.Programs.KernelTypes = btfSpec
 
+	var bpfSpec *ebpf.CollectionSpec
 	var objs pwru.KProbeObjects
 	switch {
 	case flags.OutputSkb && useKprobeMulti:
+		bpfSpec, err = LoadKProbeMultiPWRU()
 		objs = &KProbeMultiPWRUObjects{}
-		err = LoadKProbeMultiPWRUObjects(objs, &opts)
 	case flags.OutputSkb:
+		bpfSpec, err = LoadKProbePWRU()
 		objs = &KProbePWRUObjects{}
-		err = LoadKProbePWRUObjects(objs, &opts)
 	case useKprobeMulti:
+		bpfSpec, err = LoadKProbeMultiPWRUWithoutOutputSKB()
 		objs = &KProbeMultiPWRUWithoutOutputSKBObjects{}
-		err = LoadKProbeMultiPWRUWithoutOutputSKBObjects(objs, &opts)
 	default:
-		objs = &KProbePWRUWithoutOutputSKBObjects{}
-		err = LoadKProbePWRUWithoutOutputSKBObjects(objs, &opts)
+		bpfSpec, err = LoadKProbePWRUWithoutOutputSKB()
+		objs = &KProbeMultiPWRUWithoutOutputSKBObjects{}
+	}
+	if err != nil {
+		log.Fatalf("Failed to load bpf spec: %v", err)
 	}
 
-	if err != nil {
-		log.Fatalf("Loading objects: %v", err)
+	if err := bpfSpec.RewriteConstants(map[string]interface{}{
+		"CFG": pwru.GetConfig(&flags),
+	}); err != nil {
+		log.Fatalf("Failed to rewrite config: %v", err)
+	}
+
+	if err := bpfSpec.LoadAndAssign(objs, &opts); err != nil {
+		log.Fatalf("Failed to load objects: %v", err)
 	}
 	defer objs.Close()
 
@@ -132,7 +142,6 @@ func main() {
 	kprobe4 := objs.GetKprobeSkb4()
 	kprobe5 := objs.GetKprobeSkb5()
 
-	cfgMap := objs.GetCfgMap()
 	events := objs.GetEvents()
 	printStackMap := objs.GetPrintStackMap()
 	var printSkbMap *ebpf.Map
@@ -141,7 +150,6 @@ func main() {
 	}
 
 	log.Printf("Per cpu buffer size: %d bytes\n", flags.PerCPUBuffer)
-	pwru.ConfigBPFMap(&flags, cfgMap)
 
 	var kprobes []link.Link
 	defer func() {
