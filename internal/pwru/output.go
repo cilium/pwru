@@ -12,6 +12,7 @@ import (
 	"os"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
@@ -19,6 +20,8 @@ import (
 
 	"github.com/cilium/pwru/internal/byteorder"
 )
+
+const absoluteTS string = "15:04:05.000"
 
 type output struct {
 	flags         *Flags
@@ -62,6 +65,9 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
 }
 
 func (o *output) PrintHeader() {
+	if o.flags.OutputTS == "absolute" {
+		fmt.Fprintf(o.writer, "%12s ", "TIME")
+	}
 	fmt.Fprintf(o.writer, "%18s %6s %16s %24s", "SKB", "CPU", "PROCESS", "FUNC")
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %16s", "TIMESTAMP")
@@ -70,6 +76,9 @@ func (o *output) PrintHeader() {
 }
 
 func (o *output) Print(event *Event) {
+	if o.flags.OutputTS == "absolute" {
+		fmt.Fprintf(o.writer, "%12s ", time.Now().Format(absoluteTS))
+	}
 	p, err := ps.FindProcess(int(event.PID))
 	execName := "<empty>"
 	if err == nil && p != nil {
