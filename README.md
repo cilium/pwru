@@ -39,7 +39,7 @@ You can download the statically linked executable for x86\_64 and amd64 from the
 ### Usage
 
 ```
-$ pwru --help
+$ ./pwru --help
 Usage of ./pwru:
       --all-kmods                 attach to all available kernel modules
       --backend string            Tracing backend('kprobe', 'kprobe-multi'). Will auto-detect if not specified.
@@ -48,6 +48,7 @@ Usage of ./pwru:
       --filter-func string        filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
       --filter-mark uint32        filter skb mark
       --filter-netns uint32       filter netns inode
+      --filter-port uint16        filter either destination or source port
       --filter-proto string       filter L4 protocol (tcp, udp, icmp, icmp6)
       --filter-src-ip string      filter source IP addr
       --filter-src-port uint16    filter source port
@@ -60,7 +61,7 @@ Usage of ./pwru:
       --output-stack              print stack
       --output-tuple              print L4 tuple
       --per-cpu-buffer int        per CPU buffer in bytes (default 4096)
-      --timestamp string          print timestamp per skb ("current", "relative", "none") (default "none")
+      --timestamp string          print timestamp per skb ("current", "relative", "absolute", "none") (default "none")
       --version                   show pwru version and exit
 ```
 
