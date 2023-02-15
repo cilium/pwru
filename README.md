@@ -128,6 +128,12 @@ welcome to contribute. Contributors are required to follow the
 and must adhere to the [Developer Certificate of Origin](https://developercertificate.org/)
 by adding a Signed-off-by line to their commit messages.
 
+## Community
+
+Join the `#pwru` [Slack channel](https://cilium.herokuapp.com/) to chat with
+developers, maintainers, and other users. This is a good first stop to ask
+questions and share your experiences.
+
 ## Logo Credits
 
 The detective gopher is based on the Go gopher designed by Renee French.
