@@ -79,18 +79,25 @@ func GetConfig(flags *Flags) FilterCfg {
 		cfg.FilterProto = syscall.IPPROTO_ICMP
 	case "icmp6":
 		cfg.FilterProto = syscall.IPPROTO_ICMPV6
+		cfg.FilterIPv6 = 1
 	}
+
+	versionMatch := true
 
 	if flags.FilterDstIP != "" {
 		ip := net.ParseIP(flags.FilterDstIP)
 		if ip == nil {
 			log.Fatalf("Failed to parse --filter-dst-ip")
 		}
-		if ip4 := ip.To4(); ip4 == nil {
+
+		if ip.To4() == nil { // ipv6
 			cfg.FilterIPv6 = 1
 			copy(cfg.FilterDstIP[:], ip.To16()[:])
-		} else {
-			copy(cfg.FilterDstIP[:], ip4[:])
+		} else { // ipv4
+			if cfg.FilterIPv6 == 1 {
+				versionMatch = false
+			}
+			copy(cfg.FilterDstIP[:], ip.To4()[:])
 		}
 	}
 
@@ -100,21 +107,22 @@ func GetConfig(flags *Flags) FilterCfg {
 			log.Fatalf("Failed to parse --filter-src-ip")
 		}
 
-		versionMatch := true
-		if ip4 := ip.To4(); ip4 == nil {
+		if ip.To4() == nil { // ipv6
+			if flags.FilterDstIP != "" && cfg.FilterIPv6 == 0 {
+				versionMatch = false
+			}
+
 			cfg.FilterIPv6 = 1
-			if cfg.FilterIPv6 <= 0 && flags.FilterDstIP != "" {
-				versionMatch = false
-			}
 			copy(cfg.FilterSrcIP[:], ip.To16()[:])
-		} else {
-			if cfg.FilterIPv6 > 0 {
+		} else { // ipv4
+			if cfg.FilterIPv6 == 1 {
 				versionMatch = false
 			}
-			copy(cfg.FilterSrcIP[:], ip4[:])
+			copy(cfg.FilterSrcIP[:], ip.To4()[:])
 		}
+
 		if !versionMatch {
-			log.Fatalf("filter-src-ip and filter-dst-ip should have same version.")
+			log.Fatalf("filter-src-ip, filter-dst-ip and filter-proto  should have same version.")
 		}
 	}
 
