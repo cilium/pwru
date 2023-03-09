@@ -135,16 +135,17 @@ filter_meta(struct sk_buff *skb) {
 	return true;
 }
 
-static __always_inline bool
-addr_empty(union addr addr) {
-	return addr.v6addr.d1 == 0 && addr.v6addr.d2 == 0;
-}
+#define addr_empty(addr)                                \
+	((addr).v6addr.d1 == 0 && (addr).v6addr.d2 == 0)
 
-static __always_inline bool
-v6addr_equal(union addr addr, u8 bytes[16]) {
-	u64 *u64p = (u64 *) bytes;
-	return addr.v6addr.d1 == *u64p && addr.v6addr.d2 == *(u64p + 1);
-}
+
+#define v6addr_equal(addr, bytes)                                                   \
+	({                                                                              \
+		bool is_equal;                                                              \
+		u64 *u64p = (u64 *) (bytes);                                                \
+		is_equal = (addr).v6addr.d1 == *u64p && (addr).v6addr.d2 == *(u64p + 1);    \
+		is_equal;                                                                   \
+	})
 
 static __always_inline bool
 config_tuple_empty() {
