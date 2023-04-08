@@ -39,7 +39,7 @@ You can use `zgrep $OPTION /proc/config.gz` to validate whether option is enable
 
 ### Downloading
 
-You can download the statically linked executable for x86\_64 and amd64 from the
+You can download the statically linked executable for x86\_64 and arm64 from the
 [release page](https://github.com/cilium/pwru/releases).
 
 ### Usage
