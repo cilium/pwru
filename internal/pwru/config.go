@@ -16,6 +16,7 @@ import (
 // Version is the pwru version and is set at compile time via LDFLAGS-
 var Version string = "version unknown"
 
+// The layout here must match exactly to the "struct config" in bpf/kprobe_pwru.c
 type FilterCfg struct {
 	FilterNetns uint32
 	FilterMark  uint32
@@ -26,10 +27,12 @@ type FilterCfg struct {
 	FilterDstIP [16]byte
 
 	// Filter l4
-	FilterProto   uint8
-	FilterSrcPort uint16
-	FilterDstPort uint16
-	FilterPort    uint16
+	FilterProto        uint8
+	FilterTcpFlags     uint8
+	FilterTcpFlagsMask uint8
+	FilterSrcPort      uint16
+	FilterDstPort      uint16
+	FilterPort         uint16
 
 	// TODO: if there are more options later, then you can consider using a bit map
 	OutputRelativeTS uint8
@@ -39,6 +42,30 @@ type FilterCfg struct {
 	OutputStack      uint8
 
 	IsSet byte
+}
+
+func name2flag(f string) uint8 {
+	switch strings.ToLower(f) {
+	case "fin":
+		return 0x01
+	case "syn":
+		return 0x02
+	case "rst":
+		return 0x04
+	case "psh":
+		return 0x08
+	case "ack":
+		return 0x10
+	case "urg":
+		return 0x20
+	case "ece":
+		return 0x40
+	case "cwr":
+		return 0x80
+	default:
+		log.Fatalf("Invalid tcp flag format")
+		panic("unreachable")
+	}
 }
 
 func GetConfig(flags *Flags) FilterCfg {
@@ -68,6 +95,21 @@ func GetConfig(flags *Flags) FilterCfg {
 	}
 	if flags.OutputStack {
 		cfg.OutputStack = 1
+	}
+
+	if flags.FilterTcpFlags != "" {
+		split := strings.Split(flags.FilterTcpFlags, "/")
+		if len(split) != 2 {
+			log.Fatalf("Invalid --filter-tcp-flags format")
+		}
+		flags, mask := split[0], split[1]
+		for _, flag := range strings.Split(flags, ",") {
+			cfg.FilterTcpFlags |= name2flag(flag)
+		}
+		for _, flag := range strings.Split(mask, ",") {
+			cfg.FilterTcpFlagsMask |= name2flag(flag)
+		}
+		cfg.FilterProto = syscall.IPPROTO_TCP
 	}
 
 	switch strings.ToLower(flags.FilterProto) {

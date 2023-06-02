@@ -77,6 +77,9 @@ struct config {
 	union addr saddr;
 	union addr daddr;
 	u8 l4_proto;
+	u8 tcp_flags;
+	u8 tcp_flags_mask;
+
 	u16 sport;
 	u16 dport;
 	u16 port;
@@ -152,7 +155,7 @@ config_tuple_empty() {
 	if (!addr_empty(cfg->saddr) || !addr_empty(cfg->daddr)) {
 		return false;
 	}
-	if (cfg->l4_proto || cfg->sport || cfg->dport || cfg->port) {
+	if (cfg->l4_proto || cfg->sport || cfg->dport || cfg->port || cfg->tcp_flags_mask) {
 		return false;
 	}
 	return true;
@@ -210,13 +213,15 @@ filter_l3_and_l4(struct sk_buff *skb) {
 		return false;
 	}
 
-	if (cfg->dport || cfg->sport || cfg->port) {
+	if (cfg->dport || cfg->sport || cfg->port || cfg->tcp_flags_mask) {
+		u8 flags = 0;
 		u16 sport, dport;
 
 		if (l4_proto == IPPROTO_TCP) {
 			struct tcphdr *tcp = (struct tcphdr *) (skb_head + l4_off);
 			sport = BPF_CORE_READ(tcp, source);
 			dport = BPF_CORE_READ(tcp, dest);
+			bpf_probe_read_kernel(&flags, 1, skb_head + l4_off + 13); // 13 is offset for flags.
 		} else if (l4_proto == IPPROTO_UDP) {
 			struct udphdr *udp = (struct udphdr *) (skb_head + l4_off);
 			sport = BPF_CORE_READ(udp, source);
@@ -236,8 +241,10 @@ filter_l3_and_l4(struct sk_buff *skb) {
 		if (cfg->port && (dport != cfg->port && sport != cfg->port)) {
 			return false;
 		}
+		if (cfg->tcp_flags_mask && ((flags & cfg->tcp_flags_mask) != cfg->tcp_flags)) {
+			return false;
+		}
 	}
-
 
 	return true;
 }
