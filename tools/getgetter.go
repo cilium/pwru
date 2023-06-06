@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0-only
-// Copyright (C) 2022 Authors of Cilium
+// SPDX-License-Identifier: Apache-2.0
+// Copyright Authors of Cilium
 
 // This tool parses the provided Go files to generate getters for any exported
 // fields of each struct matching the struct regexp filter.

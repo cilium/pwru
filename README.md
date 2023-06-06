@@ -125,11 +125,14 @@ make release
 
 ## Contributing
 
-`pwru` is an open source project licensed under [GPLv2](LICENSE). Everybody is
-welcome to contribute. Contributors are required to follow the
-[Contributor Covenant Code of Conduct](https://www.contributor-covenant.org/version/1/4/code-of-conduct/)
-and must adhere to the [Developer Certificate of Origin](https://developercertificate.org/)
-by adding a Signed-off-by line to their commit messages.
+`pwru` is an open source project. The userspace code is licensed under
+[Apache-2.0](LICENSE), while the BPF under [BSD 2-Clause](bpf/LICENSE.BSD-2-Clause]
+and [GPL-2.0](bpf/LICENSE.GPL-2.0). Everybody is welcome to contribute.
+Contributors are required to follow the [Contributor Covenant Code of
+Conduct](https://www.contributor-covenant.org/version/1/4/code-of-conduct/) and
+must adhere to the [Developer Certificate of
+Origin](https://developercertificate.org/) by adding a Signed-off-by line to
+their commit messages.
 
 ## Community
 

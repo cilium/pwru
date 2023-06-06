@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (C) 2020-2021 Martynas Pumputis */
-/* Copyright (C) 2021 Authors of Cilium */
+// SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+/* Copyright Martynas Pumputis */
+/* Copyright Authors of Cilium */
 
 /*
  * WARNING: `bpf_printk()` has special intention in this program: it is used for
@@ -321,4 +321,4 @@ PWRU_ADD_KPROBE(5)
 #undef PWRU_HAS_GET_FUNC_IP
 #undef PWRU_KPROBE_TYPE
 
-char __license[] SEC("license") = "GPL";
+char __license[] SEC("license") = "Dual BSD/GPL";
