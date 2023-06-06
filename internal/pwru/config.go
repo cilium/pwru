@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (C) 2020-2021 Martynas Pumputis */
-/* Copyright (C) 2021-2022 Authors of Cilium */
+// SPDX-License-Identifier: Apache-2.0
+/* Copyright Martynas Pumputis */
+/* Copyright Authors of Cilium */
 
 package pwru
 

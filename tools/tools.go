@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: GPL-2.0-only
-// Copyright (C) 2021 Authors of Cilium
+// SPDX-License-Identifier: Apache-2.0
+// Copyright Authors of Cilium
 
 //go:build tools
 // +build tools
