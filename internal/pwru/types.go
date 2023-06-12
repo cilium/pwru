@@ -59,7 +59,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.AllKMods, "all-kmods", false, "attach to all available kernel modules")
 	flag.StringVar(&f.FilterFunc, "filter-func", "", "filter kernel functions to be probed by name (exact match, supports RE2 regular expression)")
 	flag.StringVar(&f.FilterProto, "filter-proto", "", "filter L4 protocol (tcp, udp, icmp, icmp6)")
-	flag.StringVar(&f.FilterTcpFlags, "filter-tcp-flags", "", "filter tcp flags (flags/mask) e.g. \"SYN/SYN,ACK\". implies filter-proto tcp")
+	flag.StringVar(&f.FilterTcpFlags, "filter-tcp-flags", "", "filter tcp flags (flags or flags/mask) e.g. \"SYN\" or \"SYN/SYN,ACK\". implies filter-proto tcp")
 	flag.StringVar(&f.FilterSrcIP, "filter-src-ip", "", "filter source IP addr")
 	flag.StringVar(&f.FilterDstIP, "filter-dst-ip", "", "filter destination IP addr")
 	flag.Uint32Var(&f.FilterNetns, "filter-netns", 0, "filter netns inode")

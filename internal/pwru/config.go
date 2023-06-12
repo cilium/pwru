@@ -99,15 +99,23 @@ func GetConfig(flags *Flags) FilterCfg {
 
 	if flags.FilterTcpFlags != "" {
 		split := strings.Split(flags.FilterTcpFlags, "/")
-		if len(split) != 2 {
+		switch len(split) {
+		case 1:
+			flags := split[0]
+			for _, flag := range strings.Split(flags, ",") {
+				cfg.FilterTcpFlags |= name2flag(flag)
+			}
+			cfg.FilterTcpFlagsMask = 0xff
+		case 2:
+			flags, mask := split[0], split[1]
+			for _, flag := range strings.Split(flags, ",") {
+				cfg.FilterTcpFlags |= name2flag(flag)
+			}
+			for _, flag := range strings.Split(mask, ",") {
+				cfg.FilterTcpFlagsMask |= name2flag(flag)
+			}
+		default:
 			log.Fatalf("Invalid --filter-tcp-flags format")
-		}
-		flags, mask := split[0], split[1]
-		for _, flag := range strings.Split(flags, ",") {
-			cfg.FilterTcpFlags |= name2flag(flag)
-		}
-		for _, flag := range strings.Split(mask, ",") {
-			cfg.FilterTcpFlagsMask |= name2flag(flag)
 		}
 		cfg.FilterProto = syscall.IPPROTO_TCP
 	}
