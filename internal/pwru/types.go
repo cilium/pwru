@@ -24,15 +24,16 @@ type Flags struct {
 
 	KernelBTF string
 
-	FilterNetns   uint32
-	FilterMark    uint32
-	FilterFunc    string
-	FilterProto   string
-	FilterSrcIP   string
-	FilterDstIP   string
-	FilterSrcPort uint16
-	FilterDstPort uint16
-	FilterPort    uint16
+	FilterNetns    uint32
+	FilterMark     uint32
+	FilterFunc     string
+	FilterProto    string
+	FilterSrcIP    string
+	FilterDstIP    string
+	FilterSrcPort  uint16
+	FilterDstPort  uint16
+	FilterPort     uint16
+	FilterTrackSkb bool
 
 	OutputTS         string
 	OutputMeta       bool
@@ -72,6 +73,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
 	flag.IntVar(&f.PerCPUBuffer, "per-cpu-buffer", os.Getpagesize(), "per CPU buffer in bytes")
+	flag.BoolVar(&f.FilterTrackSkb, "filter-track-skb", false, "trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)")
 
 	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
 

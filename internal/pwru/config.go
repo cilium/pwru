@@ -127,5 +127,9 @@ func GetConfig(flags *Flags) FilterCfg {
 		}
 	}
 
+	if flags.FilterTrackSkb {
+		cfg.TrackSkb = 1
+	}
+
 	return cfg
 }
