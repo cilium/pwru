@@ -5,21 +5,19 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	pb "github.com/cheggaaa/pb/v3"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/link"
-	"github.com/cilium/ebpf/perf"
 	flag "github.com/spf13/pflag"
 	"golang.org/x/sys/unix"
 
@@ -237,20 +235,6 @@ func main() {
 	bar.Finish()
 	log.Printf("Attached (ignored %d)\n", ignored)
 
-	rd, err := perf.NewReader(events, flags.PerCPUBuffer)
-	if err != nil {
-		log.Fatalf("Creating perf event reader: %s", err)
-	}
-	defer rd.Close()
-
-	go func() {
-		<-ctx.Done()
-
-		if err := rd.Close(); err != nil {
-			log.Fatalf("Closing perf event reader: %s", err)
-		}
-	}()
-
 	log.Println("Listening for events..")
 
 	if flags.ReadyFile != "" {
@@ -279,22 +263,16 @@ func main() {
 	var event pwru.Event
 	runForever := flags.OutputLimitLines == 0
 	for i := flags.OutputLimitLines; i > 0 || runForever; i-- {
-		record, err := rd.Read()
-		if err != nil {
-			if errors.Is(err, perf.ErrClosed) {
-				return
+		for {
+			if err := events.LookupAndDelete(nil, &event); err == nil {
+				break
 			}
-			log.Printf("Reading from perf event reader: %s", err)
-		}
-
-		if record.LostSamples != 0 {
-			log.Printf("Perf event ring buffer full, dropped %d samples", record.LostSamples)
-			continue
-		}
-
-		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
-			log.Printf("Parsing perf event: %s", err)
-			continue
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Microsecond):
+				continue
+			}
 		}
 
 		output.Print(&event)
