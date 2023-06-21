@@ -38,7 +38,8 @@ type FilterCfg struct {
 	OutputSkb        uint8
 	OutputStack      uint8
 
-	IsSet byte
+	IsSet    byte
+	TrackSkb byte
 }
 
 func GetConfig(flags *Flags) FilterCfg {

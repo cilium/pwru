@@ -22,6 +22,8 @@
 #define ETH_P_IP              0x800
 #define ETH_P_IPV6            0x86dd
 
+const static bool TRUE = true;
+
 union addr {
 	u32 v4addr;
 	struct {
@@ -73,6 +75,14 @@ struct {
 	__uint(max_entries, MAX_QUEUE_ENTRIES);
 } events SEC(".maps");
 
+#define MAX_TRACK_SIZE 1024
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64);
+	__type(value, bool);
+	__uint(max_entries, MAX_TRACK_SIZE);
+} skb_addresses SEC(".maps");
+
 struct config {
 	u32 netns;
 	u32 mark;
@@ -89,6 +99,7 @@ struct config {
 	u8 output_skb;
 	u8 output_stack;
 	u8 is_set;
+	u8 track_skb;
 } __attribute__((packed));
 
 static volatile const struct config CFG;
@@ -339,19 +350,30 @@ set_output(struct pt_regs *ctx, struct sk_buff *skb, struct event_t *event) {
 
 static __noinline int
 handle_everything(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip) {
+	bool tracked = false;
 	struct event_t event = {};
+	event.skb_addr = (u64) skb;
 
 	if (cfg->is_set) {
+		if (cfg->track_skb && bpf_map_lookup_elem(&skb_addresses, &event.skb_addr)) {
+			tracked = true;
+			goto cont;
+		}
+
 		if (!filter(skb)) {
 			return 0;
 		}
 
+cont:
 		set_output(ctx, skb, &event);
+	}
+
+	if (cfg->track_skb && !tracked) {
+		bpf_map_update_elem(&skb_addresses, &event.skb_addr, &TRUE, BPF_ANY);
 	}
 
 	event.pid = bpf_get_current_pid_tgid();
 	event.addr = has_get_func_ip ? bpf_get_func_ip(ctx) : PT_REGS_IP(ctx);
-	event.skb_addr = (u64) skb;
 	event.ts = bpf_ktime_get_ns();
 	event.cpu_id = bpf_get_smp_processor_id();
 	event.param_second = PT_REGS_PARM2(ctx);
