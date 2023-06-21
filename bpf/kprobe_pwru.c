@@ -66,8 +66,11 @@ struct event_t {
 	u32 cpu_id;
 } __attribute__((packed));
 
+#define MAX_QUEUE_ENTRIES 10000
 struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(type, BPF_MAP_TYPE_QUEUE);
+	__type(value, struct event_t);
+	__uint(max_entries, MAX_QUEUE_ENTRIES);
 } events SEC(".maps");
 
 struct config {
@@ -353,7 +356,7 @@ handle_everything(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip
 	event.cpu_id = bpf_get_smp_processor_id();
 	event.param_second = PT_REGS_PARM2(ctx);
 
-	bpf_perf_event_output(ctx, &events, BPF_F_CURRENT_CPU, &event, sizeof(event));
+	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
 	return 0;
 }
