@@ -111,6 +111,7 @@ jobs:
               grep "kfree_skb" /tmp/pwru-\$i.log | grep -F "\${url}:\${port}"
 
               echo "!!!!!!!!!!!!!!!!!!!!!!! \$i"
+              cat /tmp/pwru-\$i.status 
               cat /tmp/pwru-\$i.log
             done
 
