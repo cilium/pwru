@@ -109,6 +109,9 @@ jobs:
               wait \$PWRU_PID
 
               grep "kfree_skb" /tmp/pwru-\$i.log | grep -F "\${url}:\${port}"
+
+              echo "!!!!!!!!!!!!!!!!!!!!!!! \$i"
+              cat /tmp/pwru-\$i.log
             done
 
       - name: Fetch artifacts
