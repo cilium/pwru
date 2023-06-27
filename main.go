@@ -23,6 +23,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/cilium/pwru/internal/pwru"
+	"github.com/cilium/pwru/libpcap"
 )
 
 func main() {
@@ -100,6 +101,8 @@ func main() {
 
 	var opts ebpf.CollectionOptions
 	opts.Programs.KernelTypes = btfSpec
+	opts.Programs.LogLevel = ebpf.LogLevelInstruction
+	opts.Programs.LogSize = ebpf.DefaultVerifierLogSize * 100
 
 	var bpfSpec *ebpf.CollectionSpec
 	var objs pwru.KProbeObjects
@@ -121,6 +124,12 @@ func main() {
 		log.Fatalf("Failed to load bpf spec: %v", err)
 	}
 
+	for name, program := range bpfSpec.Programs {
+		if err = libpcap.InjectFilter(program, flags.FilterPcap); err != nil {
+			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
+		}
+	}
+
 	if err := bpfSpec.RewriteConstants(map[string]interface{}{
 		"CFG": pwru.GetConfig(&flags),
 	}); err != nil {
@@ -128,7 +137,15 @@ func main() {
 	}
 
 	if err := bpfSpec.LoadAndAssign(objs, &opts); err != nil {
-		log.Fatalf("Failed to load objects: %v", err)
+		var (
+			ve          *ebpf.VerifierError
+			verifierLog string
+		)
+		if errors.As(err, &ve) {
+			verifierLog = fmt.Sprintf("Verifier error: %+v\n", ve)
+		}
+
+		log.Fatalf("Failed to load objects: %s\n%+v", verifierLog, err)
 	}
 	defer objs.Close()
 
