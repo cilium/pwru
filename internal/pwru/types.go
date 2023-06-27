@@ -34,6 +34,7 @@ type Flags struct {
 	FilterDstPort  uint16
 	FilterPort     uint16
 	FilterTrackSkb bool
+	FilterPcap     string
 
 	OutputTS         string
 	OutputMeta       bool
@@ -66,6 +67,7 @@ func (f *Flags) SetFlags() {
 	flag.Uint16Var(&f.FilterSrcPort, "filter-src-port", 0, "filter source port")
 	flag.Uint16Var(&f.FilterDstPort, "filter-dst-port", 0, "filter destination port")
 	flag.Uint16Var(&f.FilterPort, "filter-port", 0, "filter either destination or source port")
+	flag.StringVar(&f.FilterPcap, "filter-pcap", "", "filter by pcap-filter expression")
 	flag.StringVar(&f.OutputTS, "timestamp", "none", "print timestamp per skb (\"current\", \"relative\", \"absolute\", \"none\")")
 	flag.BoolVar(&f.OutputMeta, "output-meta", false, "print skb metadata")
 	flag.BoolVar(&f.OutputTuple, "output-tuple", false, "print L4 tuple")
