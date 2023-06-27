@@ -12,6 +12,14 @@
  * Currently it is assumed that there are no ipv6 extension headers.
  */
 
+/*
+ * WARNING: `bpf_printk()` has special intention in this program: it is used for
+ * pcap-filter ebpf injection, please see the comment in the `filter_pcap()`. So
+ * if you want to add additional `bpf_printk()` for debugging, it is likely to
+ * break the injection and fail the bpf verifier. In this case, it is
+ * recommended to use perf_output for debugging.
+ */
+
 #include "vmlinux.h"
 #include "bpf/bpf_helpers.h"
 #include "bpf/bpf_core_read.h"
@@ -172,93 +180,33 @@ config_tuple_empty() {
 	return true;
 }
 
-/*
- * Filter by packet tuple, return true when the tuple is empty, return false
- * if one of the other fields does not match.
- */
 static __always_inline bool
-filter_l3_and_l4(struct sk_buff *skb) {
-	if (config_tuple_empty()) {
-		return true;
-	}
-
+filter_pcap(struct sk_buff *skb) {
+	BPF_CORE_READ(skb, head);
 	void *skb_head = BPF_CORE_READ(skb, head);
 	u16 l3_off = BPF_CORE_READ(skb, network_header);
+	void *data = skb_head + l3_off;
 	u16 l4_off = BPF_CORE_READ(skb, transport_header);
-
-	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + l3_off);
-	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
-
-	u16 l4_proto;
-
-	if (cfg->ipv6 == 0 && ip_vsn == 4) {
-		struct iphdr *ip4 = (struct iphdr *) l3_hdr;
-
-		if (!addr_empty(cfg->saddr) && BPF_CORE_READ(ip4, saddr) != cfg->saddr.v4addr) {
-			return false;
-		}
-
-		if (!addr_empty(cfg->daddr) && BPF_CORE_READ(ip4, daddr) != cfg->daddr.v4addr) {
-			return false;
-		}
-
-		l4_proto = BPF_CORE_READ(ip4, protocol);
-	} else if (cfg->ipv6 == 1 && ip_vsn == 6) {
-		struct ipv6hdr *ip6 = (struct ipv6hdr *) l3_hdr;
-
-		if (!addr_empty(cfg->saddr) && !v6addr_equal(cfg->saddr, BPF_CORE_READ(ip6, saddr.in6_u.u6_addr8))) {
-			return false;
-		}
-
-		if (!addr_empty(cfg->daddr) && !v6addr_equal(cfg->daddr, BPF_CORE_READ(ip6, daddr.in6_u.u6_addr8))) {
-			return false;
-		}
-
-		l4_proto = BPF_CORE_READ(ip6, nexthdr); // TODO: ipv6 l4 protocol
-	} else {
-		// currently ignore network layer protocols other than ipv4/ipv6
-		return false;
-	}
-
-	if (cfg->l4_proto && l4_proto != cfg->l4_proto) {
-		return false;
-	}
-
-	if (cfg->dport || cfg->sport || cfg->port) {
-		u16 sport, dport;
-
-		if (l4_proto == IPPROTO_TCP) {
-			struct tcphdr *tcp = (struct tcphdr *) (skb_head + l4_off);
-			sport = BPF_CORE_READ(tcp, source);
-			dport = BPF_CORE_READ(tcp, dest);
-		} else if (l4_proto == IPPROTO_UDP) {
-			struct udphdr *udp = (struct udphdr *) (skb_head + l4_off);
-			sport = BPF_CORE_READ(udp, source);
-			dport = BPF_CORE_READ(udp, dest);
-		} else {
-			return false;
-		}
-
-		if (cfg->sport && sport != cfg->sport) {
-			return false;
-		}
-
-		if (cfg->dport && dport != cfg->dport) {
-			return false;
-		}
-
-		if (cfg->port && (dport != cfg->port && sport != cfg->port)) {
-			return false;
-		}
-	}
-
-
-	return true;
+	u16 len = BPF_CORE_READ(skb, len);
+	void *data_end = skb_head + l4_off + len;
+	/*
+	 * The next two lines of code won't be executed; they will be replaced
+	 * by ebpf instructions compiled from pcap-filter expression before
+	 * loading to kernel.
+	 * However they are important placeholders to:
+	 * 1. let us know the registers holding data and data_end, which are
+	 * needed to convert cbpf to ebpf;
+	 * 2. leave r0, r1, r2, r3, r4 available for pcap filter ebpf
+	 * instructions;
+	 * 3. mark the position to inject pcap filter ebpf instructions;
+	 */
+	bpf_printk("%d %d", data, data_end);
+	return data < data_end;
 }
 
 static __always_inline bool
 filter(struct sk_buff *skb) {
-	return filter_meta(skb) && filter_l3_and_l4(skb);
+	return filter_pcap(skb) && filter_meta(skb);
 }
 
 static __always_inline void
@@ -350,12 +298,12 @@ set_output(struct pt_regs *ctx, struct sk_buff *skb, struct event_t *event) {
 
 static __noinline int
 handle_everything(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip) {
-	bool tracked = false;
 	struct event_t event = {};
-	event.skb_addr = (u64) skb;
+	bool tracked = false;
+	u64 skb_addr = (u64) skb;
 
 	if (cfg->is_set) {
-		if (cfg->track_skb && bpf_map_lookup_elem(&skb_addresses, &event.skb_addr)) {
+		if (cfg->track_skb && bpf_map_lookup_elem(&skb_addresses, &skb_addr)) {
 			tracked = true;
 			goto cont;
 		}
@@ -369,9 +317,10 @@ cont:
 	}
 
 	if (cfg->track_skb && !tracked) {
-		bpf_map_update_elem(&skb_addresses, &event.skb_addr, &TRUE, BPF_ANY);
+		bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
 	}
 
+	event.skb_addr = (u64) skb;
 	event.pid = bpf_get_current_pid_tgid();
 	event.addr = has_get_func_ip ? bpf_get_func_ip(ctx) : PT_REGS_IP(ctx);
 	event.ts = bpf_ktime_get_ns();
