@@ -40,11 +40,11 @@ jobs:
         directory: $HOME/.clang
         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
-    - name: Generate
-      run: go generate .
+    - name: Compile libpcap.a
+      run: sudo make libpcap.a
 
-    - name: Build
-      run: go build .
+    - name: Generate and build
+      run: make pwru
 
     - name: Store executable
       uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce
