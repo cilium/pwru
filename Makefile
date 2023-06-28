@@ -1,5 +1,5 @@
 GO := go
-GO_BUILD = CGO_ENABLED=0 $(GO) build
+GO_BUILD = CGO_ENABLED=1 $(GO) build
 GO_GENERATE = $(GO) generate
 GO_TAGS ?=
 TARGET=pwru
@@ -15,13 +15,25 @@ $(TARGET):
 		-ldflags "-w -s \
 		-X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'"
 
+libpcap.a:
+	apt update && apt-get install -y curl unzip gcc flex bison make && \
+        curl https://github.com/the-tcpdump-group/libpcap/archive/refs/tags/libpcap-1.10.4.zip -OL && \
+        unzip -o libpcap-1.10.4.zip && \
+        cd libpcap-libpcap-1.10.4/ && \
+	./configure --enable-dbus=no && \
+	make && \
+	make install
+
+
 release:
 	docker run \
 		--rm \
 		--workdir /pwru \
-		--volume `pwd`:/pwru docker.io/library/golang:1.18.3-alpine3.16 \
-		sh -c "apk add --no-cache make git clang llvm && \
+		--volume `pwd`:/pwru docker.io/library/golang:1.18.3 \
+		sh -c "apt update && apt install -y make git clang-13 llvm && \
+			ln -s $(which clang-13) /usr/bin/clang && \
 			git config --global --add safe.directory /pwru && \
+			make libpcap.a && \
 			make local-release VERSION=${VERSION}"
 
 local-release: clean
@@ -30,7 +42,7 @@ local-release: clean
 	for ARCH in $$ARCHS; do \
 		echo Building release binary for $$OS/$$ARCH...; \
 		test -d release/$$OS/$$ARCH|| mkdir -p release/$$OS/$$ARCH; \
-		$(GO_GENERATE) main_$$ARCH.go; \
+		env GOARCH=$$ARCH $(GO_GENERATE) build.go; \
 		env GOOS=$$OS GOARCH=$$ARCH $(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) -ldflags "-w -s -X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'" -o release/$$OS/$$ARCH/$(TARGET) ; \
 		tar -czf release/$(TARGET)-$$OS-$$ARCH.tar.gz -C release/$$OS/$$ARCH $(TARGET); \
 		(cd release && sha256sum $(TARGET)-$$OS-$$ARCH.tar.gz > $(TARGET)-$$OS-$$ARCH.tar.gz.sha256sum); \
