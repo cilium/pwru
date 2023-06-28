@@ -48,7 +48,7 @@ func CompileCbpf(expr string) (insts []bpf.Instruction, err error) {
 
 	var bpfProg pcapBpfProgram
 	if C.pcap_compile(pcap, (*C.struct_bpf_program)(&bpfProg), cexpr, 1, C.PCAP_NETMASK_UNKNOWN) < 0 {
-		return nil, fmt.Errorf("failed to pcap_compile: %+v", C.GoString(C.pcap_geterr(pcap)))
+		return nil, fmt.Errorf("failed to pcap_compile '%s': %+v", expr, C.GoString(C.pcap_geterr(pcap)))
 	}
 	defer C.pcap_freecode((*C.struct_bpf_program)(&bpfProg))
 

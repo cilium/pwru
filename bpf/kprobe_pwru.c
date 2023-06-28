@@ -94,13 +94,6 @@ struct {
 struct config {
 	u32 netns;
 	u32 mark;
-	u8 ipv6;
-	union addr saddr;
-	union addr daddr;
-	u8 l4_proto;
-	u16 sport;
-	u16 dport;
-	u16 port;
 	u8 output_timestamp;
 	u8 output_meta;
 	u8 output_tuple;
@@ -168,17 +161,6 @@ filter_meta(struct sk_buff *skb) {
 		is_equal = (addr).v6addr.d1 == *u64p && (addr).v6addr.d2 == *(u64p + 1);    \
 		is_equal;                                                                   \
 	})
-
-static __always_inline bool
-config_tuple_empty() {
-	if (!addr_empty(cfg->saddr) || !addr_empty(cfg->daddr)) {
-		return false;
-	}
-	if (cfg->l4_proto || cfg->sport || cfg->dport || cfg->port) {
-		return false;
-	}
-	return true;
-}
 
 static __always_inline bool
 filter_pcap(struct sk_buff *skb) {
