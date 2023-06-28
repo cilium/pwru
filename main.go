@@ -125,7 +125,7 @@ func main() {
 	}
 
 	for name, program := range bpfSpec.Programs {
-		if err = libpcap.InjectFilter(program, flags.FilterPcap); err != nil {
+		if err = libpcap.InjectFilter(program, pwru.GetPcapFilter(&flags)); err != nil {
 			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
 		}
 	}
