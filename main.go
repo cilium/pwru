@@ -18,6 +18,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/link"
+	"github.com/cilium/ebpf/rlimit"
 	flag "github.com/spf13/pflag"
 	"golang.org/x/sys/unix"
 
@@ -40,10 +41,7 @@ func main() {
 	}); err != nil {
 		log.Fatalf("failed to set temporary rlimit: %s", err)
 	}
-	if err := unix.Setrlimit(unix.RLIMIT_MEMLOCK, &unix.Rlimit{
-		Cur: unix.RLIM_INFINITY,
-		Max: unix.RLIM_INFINITY,
-	}); err != nil {
+	if err := rlimit.RemoveMemlock(); err != nil {
 		log.Fatalf("Failed to set temporary rlimit: %s", err)
 	}
 
