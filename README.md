@@ -54,10 +54,12 @@ Usage of ./pwru:
       --filter-func string        filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
       --filter-mark uint32        filter skb mark
       --filter-netns uint32       filter netns inode
+      --filter-pcap string        filter by pcap-filter expression
       --filter-port uint16        filter either destination or source port
       --filter-proto string       filter L4 protocol (tcp, udp, icmp, icmp6)
       --filter-src-ip string      filter source IP addr
       --filter-src-port uint16    filter source port
+      --filter-track-skb          trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)
       --kernel-btf string         specify kernel BTF file
       --kmods strings             list of kernel modules names to attach to
       --output-file string        write traces to file
