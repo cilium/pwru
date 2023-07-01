@@ -4,11 +4,6 @@
 
 package pwru
 
-import (
-	"fmt"
-	"strings"
-)
-
 // Version is the pwru version and is set at compile time via LDFLAGS-
 var Version string = "version unknown"
 
@@ -51,40 +46,4 @@ func GetConfig(flags *Flags) FilterCfg {
 	}
 
 	return cfg
-}
-
-func GetPcapFilter(flags *Flags) string {
-	filters := []string{}
-	if flags.FilterPcap != "" {
-		filters = append(filters, flags.FilterPcap)
-	}
-
-	if flags.FilterProto != "" {
-		filters = append(filters, strings.ToLower(flags.FilterProto))
-	}
-
-	if flags.FilterSrcIP != "" {
-		filters = append(filters, "src host "+flags.FilterSrcIP)
-	}
-
-	if flags.FilterDstIP != "" {
-		filters = append(filters, "dst host "+flags.FilterDstIP)
-	}
-
-	if flags.FilterSrcPort != 0 {
-		filters = append(filters, fmt.Sprintf("src port %d", flags.FilterSrcPort))
-	}
-
-	if flags.FilterDstPort != 0 {
-		filters = append(filters, fmt.Sprintf("dst port %d", flags.FilterDstPort))
-	}
-
-	if flags.FilterPort != 0 {
-		filters = append(filters, fmt.Sprintf("port %d", flags.FilterPort))
-	}
-
-	for i, filter := range filters {
-		filters[i] = "(" + filter + ")"
-	}
-	return strings.Join(filters, " and ")
 }

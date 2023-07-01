@@ -19,7 +19,6 @@ import (
 	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
-	flag "github.com/spf13/pflag"
 	"golang.org/x/sys/unix"
 
 	"github.com/cilium/pwru/internal/pwru"
@@ -29,7 +28,7 @@ import (
 func main() {
 	flags := pwru.Flags{}
 	flags.SetFlags()
-	flag.Parse()
+	flags.Parse()
 
 	if flags.ShowVersion {
 		fmt.Printf("pwru %s\n", pwru.Version)
@@ -125,7 +124,7 @@ func main() {
 	}
 
 	for name, program := range bpfSpec.Programs {
-		if err = libpcap.InjectFilter(program, pwru.GetPcapFilter(&flags)); err != nil {
+		if err = libpcap.InjectFilter(program, flags.FilterPcap); err != nil {
 			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
 		}
 	}

@@ -46,19 +46,14 @@ You can download the statically linked executable for x86\_64 and arm64 from the
 
 ```
 $ ./pwru --help
-Usage of ./pwru:
+Usage: pwru [options] [pcap-filter]
+    Availble pcap-filter: see "man 7 pcap-filter"
+    Availble options:
       --all-kmods                 attach to all available kernel modules
       --backend string            Tracing backend('kprobe', 'kprobe-multi'). Will auto-detect if not specified.
-      --filter-dst-ip string      filter destination IP addr
-      --filter-dst-port uint16    filter destination port
       --filter-func string        filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
       --filter-mark uint32        filter skb mark
       --filter-netns uint32       filter netns inode
-      --filter-pcap string        filter by pcap-filter expression
-      --filter-port uint16        filter either destination or source port
-      --filter-proto string       filter L4 protocol (tcp, udp, icmp, icmp6)
-      --filter-src-ip string      filter source IP addr
-      --filter-src-port uint16    filter source port
       --filter-track-skb          trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)
       --kernel-btf string         specify kernel BTF file
       --kmods strings             list of kernel modules names to attach to
@@ -71,6 +66,7 @@ Usage of ./pwru:
       --per-cpu-buffer int        per CPU buffer in bytes (default 4096)
       --timestamp string          print timestamp per skb ("current", "relative", "absolute", "none") (default "none")
       --version                   show pwru version and exit
+
 ```
 
 If multiple filters are specified, all of them have to match in order for a
@@ -87,7 +83,7 @@ Docker images for `pwru` are published at https://hub.docker.com/r/cilium/pwru.
 An example how to run `pwru` with Docker:
 
 ```
-docker run --privileged --rm -t --pid=host -v /sys/kernel/debug/:/sys/kernel/debug/ cilium/pwru --filter-dst-ip=1.1.1.1
+docker run --privileged --rm -t --pid=host -v /sys/kernel/debug/:/sys/kernel/debug/ cilium/pwru 'dst host 1.1.1.1'
 ```
 
 ### Running on Kubernetes
@@ -100,7 +96,7 @@ kubectl run pwru \
     --privileged=true \
     --attach=true -i=true --tty=true --rm=true \
     --overrides='{"apiVersion":"v1","spec":{"nodeSelector":{"kubernetes.io/hostname":"'$NODE'"}, "hostNetwork": true, "hostPID": true}}' \
-    -- --filter-dst-ip=1.1.1.1 --output-tuple
+    -- --output-tuple 'dst host 1.1.1.1'
 ```
 
 Note: You may need to create a volume for `/sys/kernel/debug/` and mount it for the`pwru` pod.

@@ -22,7 +22,7 @@ above example with the following commands.
 
 4. Run `pwru`:
    ```console
-   $ sudo ./pwru --filter-dst-ip=1.1.1.1 --filter-dst-port=80 --filter-proto=tcp --output-tuple
+   $ sudo ./pwru --output-tuple 'dst host 1.1.1.1 and dst port 80 and tcp'
    ```
 
 5. In a new terminal (terminal 2), connect to the Vagrant box:
