@@ -92,9 +92,10 @@ jobs:
             for addr in '1.0.0.1' '2606:4700:4700::1001'; do
               i=\$((i+1))
               port=8080
-              /host/pwru/pwru --filter-dst-ip="\$addr" --filter-port="\$port" --output-tuple \
+              /host/pwru/pwru --output-tuple \
                 --output-file=/tmp/pwru-\$i.log \
-                --ready-file=/tmp/pwru-\$i.ready 2>/tmp/pwru-\$i.status &
+                --ready-file=/tmp/pwru-\$i.ready \
+                "dst host \$addr and port \$port" 2>/tmp/pwru-\$i.status &
               PWRU_PID=\$!
 
               while [ ! -f /tmp/pwru-\$i.ready ]; do sleep 1; done

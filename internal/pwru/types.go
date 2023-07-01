@@ -7,6 +7,7 @@ package pwru
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/cilium/ebpf"
 	flag "github.com/spf13/pflag"
@@ -27,12 +28,6 @@ type Flags struct {
 	FilterNetns    uint32
 	FilterMark     uint32
 	FilterFunc     string
-	FilterProto    string
-	FilterSrcIP    string
-	FilterDstIP    string
-	FilterSrcPort  uint16
-	FilterDstPort  uint16
-	FilterPort     uint16
 	FilterTrackSkb bool
 	FilterPcap     string
 
@@ -59,15 +54,8 @@ func (f *Flags) SetFlags() {
 	flag.StringSliceVar(&f.KMods, "kmods", nil, "list of kernel modules names to attach to")
 	flag.BoolVar(&f.AllKMods, "all-kmods", false, "attach to all available kernel modules")
 	flag.StringVar(&f.FilterFunc, "filter-func", "", "filter kernel functions to be probed by name (exact match, supports RE2 regular expression)")
-	flag.StringVar(&f.FilterProto, "filter-proto", "", "filter L4 protocol (tcp, udp, icmp, icmp6)")
-	flag.StringVar(&f.FilterSrcIP, "filter-src-ip", "", "filter source IP addr")
-	flag.StringVar(&f.FilterDstIP, "filter-dst-ip", "", "filter destination IP addr")
 	flag.Uint32Var(&f.FilterNetns, "filter-netns", 0, "filter netns inode")
 	flag.Uint32Var(&f.FilterMark, "filter-mark", 0, "filter skb mark")
-	flag.Uint16Var(&f.FilterSrcPort, "filter-src-port", 0, "filter source port")
-	flag.Uint16Var(&f.FilterDstPort, "filter-dst-port", 0, "filter destination port")
-	flag.Uint16Var(&f.FilterPort, "filter-port", 0, "filter either destination or source port")
-	flag.StringVar(&f.FilterPcap, "filter-pcap", "", "filter by pcap-filter expression")
 	flag.StringVar(&f.OutputTS, "timestamp", "none", "print timestamp per skb (\"current\", \"relative\", \"absolute\", \"none\")")
 	flag.BoolVar(&f.OutputMeta, "output-meta", false, "print skb metadata")
 	flag.BoolVar(&f.OutputTuple, "output-tuple", false, "print L4 tuple")
@@ -84,6 +72,18 @@ func (f *Flags) SetFlags() {
 
 	flag.StringVar(&f.Backend, "backend", "",
 		fmt.Sprintf("Tracing backend('%s', '%s'). Will auto-detect if not specified.", BackendKprobe, BackendKprobeMulti))
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [options] [pcap-filter]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "    Availble pcap-filter: see \"man 7 pcap-filter\"\n")
+		fmt.Fprintf(os.Stderr, "    Availble options:\n")
+		flag.PrintDefaults()
+	}
+}
+
+func (f *Flags) Parse() {
+	flag.Parse()
+	f.FilterPcap = strings.Join(flag.Args(), " ")
 }
 
 type Tuple struct {

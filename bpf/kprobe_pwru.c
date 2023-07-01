@@ -3,16 +3,6 @@
 /* Copyright (C) 2021 Authors of Cilium */
 
 /*
- * TODO: ipv6 l4 protocol
- * According to https://www.rfc-editor.org/rfc/rfc2460, in ipv6 header, the
- * transport layer protocol is represented by the Next Header field. However
- * ipv6 supports extension headers and recommends to place the transport layer
- * protocol at last. So if we want to parse out the transport layer protocol,
- * we have to identify all the extension headers, which is quite troublesome.
- * Currently it is assumed that there are no ipv6 extension headers.
- */
-
-/*
  * WARNING: `bpf_printk()` has special intention in this program: it is used for
  * pcap-filter ebpf injection, please see the comment in the `filter_pcap()`. So
  * if you want to add additional `bpf_printk()` for debugging, it is likely to
