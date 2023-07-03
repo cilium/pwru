@@ -33,7 +33,7 @@ jobs:
         key: llvm-12.0
 
     - name: Install LLVM and Clang
-      uses: KyleMayes/install-llvm-action@f8f2154d96f018dcb600739c4978bfc35f435422
+      uses: KyleMayes/install-llvm-action@b9261167e38b067d7df2d9a13dc78e0532776139
       with:
         ubuntu-version: "20.04"
         version: "12.0.0"
