@@ -12,7 +12,7 @@ RUN apt update -y -q && \
         git \
         llvm \
         clang && \
-    curl -s https://storage.googleapis.com/golang/go1.19.1.linux-amd64.tar.gz | tar -v -C /usr/local -xz
+    curl -s https://storage.googleapis.com/golang/go1.20.5.linux-amd64.tar.gz | tar -v -C /usr/local -xz
 
 WORKDIR /pwru
 COPY . .
