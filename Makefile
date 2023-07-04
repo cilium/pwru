@@ -16,14 +16,12 @@ $(TARGET):
 		-X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'"
 
 libpcap.a:
-	apt update && apt-get install -y curl unzip gcc flex bison make && \
-        curl https://github.com/the-tcpdump-group/libpcap/archive/refs/tags/libpcap-1.10.4.zip -OL && \
-        unzip -o libpcap-1.10.4.zip && \
-        cd libpcap-libpcap-1.10.4/ && \
-	./configure --enable-dbus=no && \
-	make && \
-	make install
-
+	curl https://github.com/the-tcpdump-group/libpcap/archive/refs/tags/libpcap-1.10.4.zip -OL
+	unzip -o libpcap-1.10.4.zip
+	cd libpcap-libpcap-1.10.4/ && \
+		./configure --disable-shared --disable-usb --disable-netmap --disable-bluetooth --disable-dbus --without-libnl && \
+		make && \
+		make install
 
 release:
 	docker run \
