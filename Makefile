@@ -30,8 +30,8 @@ release:
 		--rm \
 		--workdir /pwru \
 		--volume `pwd`:/pwru docker.io/library/golang:1.20.5 \
-		sh -c "apt update && apt install -y make git clang-13 llvm && \
-			ln -s $(which clang-13) /usr/bin/clang && \
+		sh -c "apt update && apt install -y make git clang-13 llvm curl unzip gcc flex bison && \
+			ln -s /usr/bin/clang-13 /usr/bin/clang && \
 			git config --global --add safe.directory /pwru && \
 			make libpcap.a && \
 			make local-release VERSION=${VERSION}"
