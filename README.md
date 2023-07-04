@@ -63,7 +63,6 @@ Usage: pwru [options] [pcap-filter]
       --output-skb                print skb
       --output-stack              print stack
       --output-tuple              print L4 tuple
-      --per-cpu-buffer int        per CPU buffer in bytes (default 4096)
       --timestamp string          print timestamp per skb ("current", "relative", "absolute", "none") (default "none")
       --version                   show pwru version and exit
 

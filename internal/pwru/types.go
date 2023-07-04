@@ -39,9 +39,8 @@ type Flags struct {
 	OutputLimitLines uint64
 	OutputFile       string
 
-	PerCPUBuffer int
-	KMods        []string
-	AllKMods     bool
+	KMods    []string
+	AllKMods bool
 
 	ReadyFile string
 
@@ -62,7 +61,6 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
-	flag.IntVar(&f.PerCPUBuffer, "per-cpu-buffer", os.Getpagesize(), "per CPU buffer in bytes")
 	flag.BoolVar(&f.FilterTrackSkb, "filter-track-skb", false, "trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)")
 
 	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
