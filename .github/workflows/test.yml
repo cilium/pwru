@@ -9,7 +9,7 @@ on:
 jobs:
 
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
 
@@ -35,7 +35,7 @@ jobs:
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@b9261167e38b067d7df2d9a13dc78e0532776139
       with:
-        ubuntu-version: "20.04"
+        ubuntu-version: "22.04"
         version: "12.0.0"
         directory: $HOME/.clang
         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
