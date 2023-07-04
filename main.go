@@ -161,8 +161,6 @@ func main() {
 		printSkbMap = objs.(pwru.KProbeMapsWithOutputSKB).GetPrintSkbMap()
 	}
 
-	log.Printf("Per cpu buffer size: %d bytes\n", flags.PerCPUBuffer)
-
 	var kprobes []link.Link
 	defer func() {
 		select {
