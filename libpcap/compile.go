@@ -194,7 +194,7 @@ func adjustEbpf(insts asm.Instructions, opts cbpfc.EBPFOpts) (newInsts asm.Instr
 	insts = append(insts,
 		asm.Mov.Imm(asm.R0, 0).WithSymbol("result"), // r0 = 0
 		asm.JNE.Imm(opts.Result, 0, "continue"),     // if %result != 0 (match): jump to continue
-		asm.Return().WithSymbol("return"),           // else return TC_ACT_OK
+		asm.Return().WithSymbol("return"),           // else return r0
 		asm.Mov.Imm(asm.R0, 0).WithSymbol("continue"),
 	)
 
