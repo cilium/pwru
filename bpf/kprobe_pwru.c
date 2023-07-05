@@ -14,6 +14,7 @@
 #include "bpf/bpf_helpers.h"
 #include "bpf/bpf_core_read.h"
 #include "bpf/bpf_tracing.h"
+#include "bpf/bpf_ipv6.h"
 
 #define PRINT_SKB_STR_SIZE    2048
 
@@ -140,18 +141,6 @@ filter_meta(struct sk_buff *skb) {
 	return true;
 }
 
-#define addr_empty(addr)                                \
-	((addr).v6addr.d1 == 0 && (addr).v6addr.d2 == 0)
-
-
-#define v6addr_equal(addr, bytes)                                                   \
-	({                                                                              \
-		bool is_equal;                                                              \
-		u64 *u64p = (u64 *) (bytes);                                                \
-		is_equal = (addr).v6addr.d1 == *u64p && (addr).v6addr.d2 == *(u64p + 1);    \
-		is_equal;                                                                   \
-	})
-
 static __always_inline bool
 filter_pcap(struct sk_buff *skb) {
 	BPF_CORE_READ(skb, head);
@@ -195,7 +184,7 @@ static __always_inline void
 set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 	void *skb_head = BPF_CORE_READ(skb, head);
 	u16 l3_off = BPF_CORE_READ(skb, network_header);
-	u16 l4_off = BPF_CORE_READ(skb, transport_header);
+	u16 l4_off;
 
 	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + l3_off);
 	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
@@ -206,12 +195,15 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 		BPF_CORE_READ_INTO(&tpl->daddr, ip4, daddr);
 		tpl->l4_proto = BPF_CORE_READ(ip4, protocol);
 		tpl->l3_proto = ETH_P_IP;
+		l4_off = l3_off + BPF_CORE_READ_BITFIELD_PROBED(ip4, ihl) * 4;
+
 	} else if (ip_vsn == 6) {
 		struct ipv6hdr *ip6 = (struct ipv6hdr *) l3_hdr;
 		BPF_CORE_READ_INTO(&tpl->saddr, ip6, saddr);
 		BPF_CORE_READ_INTO(&tpl->daddr, ip6, daddr);
 		tpl->l4_proto = BPF_CORE_READ(ip6, nexthdr); // TODO: ipv6 l4 protocol
 		tpl->l3_proto = ETH_P_IPV6;
+		l4_off = l3_off + ipv6_hdrlen(ip6);
 	}
 
 	if (tpl->l4_proto == IPPROTO_TCP) {
