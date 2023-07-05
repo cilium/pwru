@@ -1,0 +1,5 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# things that only make sense on github.com
+.github export-ignore
