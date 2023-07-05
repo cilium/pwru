@@ -2,6 +2,7 @@ GO := go
 GO_BUILD = CGO_ENABLED=1 $(GO) build
 GO_GENERATE = $(GO) generate
 GO_TAGS ?=
+TARGET_GOARCH ?= amd64
 TARGET=pwru
 INSTALL = $(QUIET)install
 BINDIR ?= /usr/local/bin
@@ -10,7 +11,7 @@ VERSION=$(shell git describe --tags --always)
 TEST_TIMEOUT ?= 5s
 
 $(TARGET): libpcap/libpcap.a
-	$(GO_GENERATE)
+	TARGET_GOARCH=$(TARGET_GOARCH) $(GO_GENERATE)
 	$(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) \
 		-ldflags "-w -s \
 		-X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'"
