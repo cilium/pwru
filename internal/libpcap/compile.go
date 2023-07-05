@@ -10,7 +10,8 @@ import (
 )
 
 /*
-#cgo LDFLAGS: -L/usr/local/lib -lpcap -static
+#cgo CFLAGS: -I${SRCDIR}/../../libpcap
+#cgo LDFLAGS: -L${SRCDIR}/../../libpcap -lpcap -static
 #include <stdlib.h>
 #include <pcap.h>
 */
