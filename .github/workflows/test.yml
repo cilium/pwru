@@ -41,7 +41,7 @@ jobs:
         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
     - name: Compile libpcap.a
-      run: sudo make libpcap.a
+      run: make libpcap/libpcap.a
 
     - name: Generate and build
       run: make pwru
