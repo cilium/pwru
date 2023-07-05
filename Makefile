@@ -30,24 +30,13 @@ release:
 		--rm \
 		--workdir /pwru \
 		--volume `pwd`:/pwru docker.io/library/golang:1.20.5 \
-		sh -c "apt update && apt install -y make git clang-13 llvm curl unzip gcc flex bison && \
+		sh -c "apt update && apt install -y make git clang-13 llvm curl unzip gcc flex bison gcc-aarch64* libc6-dev-arm64-cross && \
 			ln -s /usr/bin/clang-13 /usr/bin/clang && \
 			git config --global --add safe.directory /pwru && \
-			make libpcap.a && \
-			make local-release VERSION=${VERSION}"
+			make local-release"
 
 local-release: clean
-	OS=linux; \
-	ARCHS='amd64 arm64'; \
-	for ARCH in $$ARCHS; do \
-		echo Building release binary for $$OS/$$ARCH...; \
-		test -d release/$$OS/$$ARCH|| mkdir -p release/$$OS/$$ARCH; \
-		env GOARCH=$$ARCH $(GO_GENERATE) build.go; \
-		env GOOS=$$OS GOARCH=$$ARCH $(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) -ldflags "-w -s -X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'" -o release/$$OS/$$ARCH/$(TARGET) ; \
-		tar -czf release/$(TARGET)-$$OS-$$ARCH.tar.gz -C release/$$OS/$$ARCH $(TARGET); \
-		(cd release && sha256sum $(TARGET)-$$OS-$$ARCH.tar.gz > $(TARGET)-$$OS-$$ARCH.tar.gz.sha256sum); \
-		rm -r release/$$OS; \
-	done; \
+	ARCHS='amd64 arm64' ./local-release.sh
 
 install: $(TARGET)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
@@ -59,8 +48,7 @@ clean:
 	rm -f kprobemultipwru_bpf*
 	rm -f kprobepwruwithoutoutputskb_bpf*
 	rm -f kprobemultipwruwithoutoutputskb_bpf*
-	rm -rf ./release
-	cd libpcap/ && make clean
+	cd libpcap/ && make clean || true
 
 test:
 	$(GO) test -timeout=$(TEST_TIMEOUT) -race -cover $$($(GO) list ./...)
