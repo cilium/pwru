@@ -9,19 +9,16 @@ VERSION=$(shell git describe --tags --always)
 
 TEST_TIMEOUT ?= 5s
 
-$(TARGET):
+$(TARGET): libpcap/libpcap.a
 	$(GO_GENERATE)
 	$(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) \
 		-ldflags "-w -s \
 		-X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'"
 
-libpcap.a:
-	curl https://github.com/the-tcpdump-group/libpcap/archive/refs/tags/libpcap-1.10.4.zip -OL
-	unzip -o libpcap-1.10.4.zip
-	cd libpcap-libpcap-1.10.4/ && \
+libpcap/libpcap.a:
+	cd libpcap && \
 		./configure --disable-shared --disable-usb --disable-netmap --disable-bluetooth --disable-dbus --without-libnl && \
-		make && \
-		make install
+		make
 
 release:
 	docker run \
@@ -58,6 +55,7 @@ clean:
 	rm -f kprobepwruwithoutoutputskb_bpf*
 	rm -f kprobemultipwruwithoutoutputskb_bpf*
 	rm -rf ./release
+	cd libpcap/ && make clean
 
 test:
 	$(GO) test -timeout=$(TEST_TIMEOUT) -race -cover $$($(GO) list ./...)
