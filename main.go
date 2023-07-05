@@ -21,8 +21,8 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 	"golang.org/x/sys/unix"
 
+	"github.com/cilium/pwru/internal/libpcap"
 	"github.com/cilium/pwru/internal/pwru"
-	"github.com/cilium/pwru/libpcap"
 )
 
 func main() {
