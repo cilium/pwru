@@ -7,6 +7,8 @@ TARGET=pwru
 INSTALL = $(QUIET)install
 BINDIR ?= /usr/local/bin
 VERSION=$(shell git describe --tags --always)
+LIBPCAP_ARCH ?= x86_64-unknown-linux-gnu
+LIBPCAP_CC ?= gcc
 
 TEST_TIMEOUT ?= 5s
 
@@ -18,7 +20,7 @@ $(TARGET): libpcap/libpcap.a
 
 libpcap/libpcap.a:
 	cd libpcap && \
-		./configure --disable-shared --disable-usb --disable-netmap --disable-bluetooth --disable-dbus --without-libnl && \
+		CC=$(LIBPCAP_CC) ./configure --disable-shared --disable-usb --disable-netmap --disable-bluetooth --disable-dbus --without-libnl --host=$(LIBPCAP_ARCH) && \
 		make
 
 release:
