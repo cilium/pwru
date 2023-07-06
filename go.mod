@@ -8,9 +8,9 @@ require (
 	github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/spf13/pflag v1.0.5
-	golang.org/x/net v0.11.0
+	golang.org/x/net v0.12.0
 	golang.org/x/sys v0.10.0
-	golang.org/x/tools v0.10.0
+	golang.org/x/tools v0.11.0
 )
 
 require (
@@ -21,5 +21,5 @@ require (
 	github.com/mattn/go-runewidth v0.0.12 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	golang.org/x/mod v0.11.0 // indirect
+	golang.org/x/mod v0.12.0 // indirect
 )
