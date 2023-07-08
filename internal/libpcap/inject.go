@@ -162,7 +162,7 @@ func InjectFilter(program *ebpf.ProgramSpec, filterExpr string) (err error) {
 		// stack area is safe to use. Here we use stack from -40
 		// because -32, -24, -16 are reserved for pcap-filter ebpf, see
 		// the comments in compile.go
-		StackOffset: 40,
+		StackOffset: 32,
 	})
 	if err != nil {
 		return
