@@ -122,6 +122,8 @@ func (o *output) Print(event *Event) {
 		} else {
 			outFuncName = fmt.Sprintf("%s (%d)", funcName, event.ParamSecond)
 		}
+	} else {
+		outFuncName = fmt.Sprintf("%s (%d)", funcName, event.ParamSecond)
 	}
 
 	fmt.Fprintf(o.writer, "%18s %6s %16s %24s", fmt.Sprintf("0x%x", event.SAddr),
