@@ -68,9 +68,6 @@ Usage: pwru [options] [pcap-filter]
 
 ```
 
-If multiple filters are specified, all of them have to match in order for a
-packet to be traced.
-
 The `--filter-func` switch does an exact match on function names i.e.
 `--filter-func=foo` only matches `foo()`; for a wildcarded match, try
 `--filter-func=".*foo.*"` instead.
@@ -126,7 +123,7 @@ make release
 ## Contributing
 
 `pwru` is an open source project. The userspace code is licensed under
-[Apache-2.0](LICENSE), while the BPF under [BSD 2-Clause](bpf/LICENSE.BSD-2-Clause]
+[Apache-2.0](LICENSE), while the BPF under [BSD 2-Clause](bpf/LICENSE.BSD-2-Clause)
 and [GPL-2.0](bpf/LICENSE.GPL-2.0). Everybody is welcome to contribute.
 Contributors are required to follow the [Contributor Covenant Code of
 Conduct](https://www.contributor-covenant.org/version/1/4/code-of-conduct/) and
