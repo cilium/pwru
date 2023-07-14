@@ -22,7 +22,7 @@ $(TARGET): libpcap/libpcap.a
 
 libpcap/libpcap.a:
 	cd libpcap && \
-		CC=$(LIBPCAP_CC) ./configure --disable-shared --disable-usb --disable-netmap --disable-bluetooth --disable-dbus --without-libnl --host=$(LIBPCAP_ARCH) && \
+		CC=$(LIBPCAP_CC) ./configure --disable-rdma --disable-shared --disable-usb --disable-netmap --disable-bluetooth --disable-dbus --without-libnl --host=$(LIBPCAP_ARCH) && \
 		make
 
 release:
