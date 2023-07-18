@@ -79,7 +79,7 @@ Docker images for `pwru` are published at https://hub.docker.com/r/cilium/pwru.
 An example how to run `pwru` with Docker:
 
 ```
-docker run --privileged --rm -t --pid=host -v /sys/kernel/debug/:/sys/kernel/debug/ cilium/pwru 'dst host 1.1.1.1'
+docker run --privileged --rm -t --pid=host -v /sys/kernel/debug/:/sys/kernel/debug/ cilium/pwru pwru --output-tuple 'host 1.1.1.1'
 ```
 
 ### Running on Kubernetes

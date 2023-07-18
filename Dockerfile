@@ -20,6 +20,5 @@ COPY . .
 RUN make && \
     chmod a+x /pwru
 
-FROM scratch
+FROM busybox
 COPY --from=build /pwru/pwru /usr/local/bin/
-ENTRYPOINT ["/usr/local/bin/pwru"]
