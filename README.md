@@ -86,16 +86,39 @@ docker run --privileged --rm -t --pid=host -v /sys/kernel/debug/:/sys/kernel/deb
 
 The following example shows how to run `pwru` on a given node:
 ```
-NODE=node-foobar
-kubectl run pwru \
-    --image=cilium/pwru:latest \
-    --privileged=true \
-    --attach=true -i=true --tty=true --rm=true \
-    --overrides='{"apiVersion":"v1","spec":{"nodeSelector":{"kubernetes.io/hostname":"'$NODE'"}, "hostNetwork": true, "hostPID": true}}' \
-    -- --output-tuple 'dst host 1.1.1.1'
-```
+NODE=kind-control-plane
+PWRU_ARGS="--output-tuple 'host 1.1.1.1'"
 
-Note: You may need to create a volume for `/sys/kernel/debug/` and mount it for the`pwru` pod.
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pwru
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: ${NODE}
+  containers:
+  - image: docker.io/cilium/pwru:latest
+    name: pwru
+    volumeMounts:
+    - mountPath: /sys/kernel/debug
+      name: sys-kernel-debug
+    securityContext:
+      privileged: true
+    command: ["/bin/sh"]
+    args: ["-c", "pwru ${PWRU_ARGS}"]
+  volumes:
+  - name: sys-kernel-debug
+    hostPath:
+      path: /sys/kernel/debug
+      type: DirectoryOrCreate
+  hostNetwork: true
+  hostPID: true
+EOF
+
+kubectl logs -f pwru
+kubectl delete pod pwru
+```
 
 ### Running on Vagrant
 
