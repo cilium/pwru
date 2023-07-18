@@ -11,7 +11,8 @@ RUN apt update -y -q && \
         gnupg2 \
         git \
         llvm \
-        clang && \
+        clang \
+        gcc flex bison gcc-aarch64* libc6-dev-arm64-cross && \
     curl -s https://storage.googleapis.com/golang/go1.20.5.linux-amd64.tar.gz | tar -v -C /usr/local -xz
 
 WORKDIR /pwru
