@@ -68,7 +68,7 @@ jobs:
           path: pwru
 
       - name: Run tests
-        uses: cilium/little-vm-helper@6a3d1797af8fab1a49f1c3d09afe3230aea559b6
+        uses: cilium/little-vm-helper@908ab1ff8a596a03cd5221a1f8602dc44c3f906d
         with:
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
@@ -111,7 +111,7 @@ jobs:
 
       - name: Fetch artifacts
         if: ${{ !success() }}
-        uses: cilium/little-vm-helper@6a3d1797af8fab1a49f1c3d09afe3230aea559b6
+        uses: cilium/little-vm-helper@908ab1ff8a596a03cd5221a1f8602dc44c3f906d
         with:
           provision: 'false'
           cmd: |
