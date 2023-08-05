@@ -4,6 +4,8 @@
 #include "vmlinux-arm64.h"
 #elif defined(__TARGET_ARCH_loongarch)
 #include "vmlinux-loongarch.h"
+#elif defined(__TARGET_ARCH_riscv)
+#include "vmlinux-riscv.h"
 #else
 #error "Unknown architecture"
 #endif
