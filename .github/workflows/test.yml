@@ -30,13 +30,12 @@ jobs:
       uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8
       with:
         path: $HOME/.clang
-        key: llvm-12.0
+        key: llvm-15.0
 
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@c135b3937686fd69c2651507aabc9925a8f9eee8
       with:
-        ubuntu-version: "22.04"
-        version: "12.0.0"
+        version: "15.0"
         directory: $HOME/.clang
         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
