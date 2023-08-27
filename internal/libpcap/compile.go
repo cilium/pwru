@@ -191,12 +191,11 @@ func adjustEbpf(insts asm.Instructions, opts cbpfc.EBPFOpts) (newInsts asm.Instr
 		asm.Mov.Imm(asm.R3, 0),
 	}, insts...)
 
-	// Append instructions to implement "exit immediately if not matched"
 	insts = append(insts,
 		asm.Mov.Imm(asm.R0, 0).WithSymbol("result"), // r0 = 0
-		asm.JNE.Imm(opts.Result, 0, "continue"),     // if %result != 0 (match): jump to continue
-		asm.Return().WithSymbol("return"),           // else return r0
-		asm.Mov.Imm(asm.R0, 0).WithSymbol("continue"),
+		asm.Mov.Reg(opts.PacketStart, opts.Result),  // skb->data = $result
+		asm.Mov.Imm(opts.PacketEnd, 0),              // skb->data_end = 0
+
 	)
 
 	return insts, nil
