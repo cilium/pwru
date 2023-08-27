@@ -124,6 +124,9 @@ func main() {
 	}
 
 	for name, program := range bpfSpec.Programs {
+		if name == "kprobe_skb_lifetime_termination" {
+			continue
+		}
 		if err = libpcap.InjectFilter(program, flags.FilterPcap); err != nil {
 			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
 		}
@@ -153,6 +156,7 @@ func main() {
 	kprobe3 := objs.GetKprobeSkb3()
 	kprobe4 := objs.GetKprobeSkb4()
 	kprobe5 := objs.GetKprobeSkb5()
+	kprobeLifetimeTermination := objs.GetKprobeSkbLifetimeTermination()
 
 	events := objs.GetEvents()
 	printStackMap := objs.GetPrintStackMap()
@@ -187,6 +191,22 @@ func main() {
 	log.Printf("Attaching kprobes (via %s)...\n", msg)
 	ignored := 0
 	bar := pb.StartNew(len(funcs))
+
+	if flags.FilterTrackSkb {
+		kp, err := link.Kprobe("kfree_skbmem", kprobeLifetimeTermination, nil)
+		bar.Increment()
+		if err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				log.Fatalf("Opening kprobe kfree_skbmem: %s\n", err)
+			} else {
+				ignored += 1
+				log.Printf("Warn: kfree_skbmem not found, pwru is likely to mismatch skb due to lack of skb lifetime management\n")
+			}
+		} else {
+			kprobes = append(kprobes, kp)
+		}
+	}
+
 	funcsByPos := pwru.GetFuncsByPos(funcs)
 	for pos, fns := range funcsByPos {
 		var fn *ebpf.Program
