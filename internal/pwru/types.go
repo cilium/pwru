@@ -138,6 +138,7 @@ type KProbePrograms interface {
 	GetKprobeSkb3() *ebpf.Program
 	GetKprobeSkb4() *ebpf.Program
 	GetKprobeSkb5() *ebpf.Program
+	GetKprobeSkbLifetimeTermination() *ebpf.Program
 }
 
 type KProbeObjects interface {

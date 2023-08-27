@@ -321,4 +321,13 @@ PWRU_ADD_KPROBE(5)
 #undef PWRU_HAS_GET_FUNC_IP
 #undef PWRU_KPROBE_TYPE
 
+SEC("kprobe/skb_lifetime_termination")
+int kprobe_skb_lifetime_termination(struct pt_regs *ctx) {
+	u64 skb = (u64) PT_REGS_PARM1(ctx);
+	if (cfg->track_skb)
+		bpf_map_delete_elem(&skb_addresses, &skb);
+
+	return 0;
+}
+
 char __license[] SEC("license") = "Dual BSD/GPL";
