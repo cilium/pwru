@@ -174,15 +174,9 @@ func InjectFilter(program *ebpf.ProgramSpec, filterExpr string) (err error) {
 					    91:       r3 = r9
 					    92:       r4 = r8
 		    injectIdx ->	    93:       call 6
-					;       return filter_pcap(skb) && filter_meta(skb);
-		    injectIdx+1 ->	    94:       if r9 >= r8 goto +384 <LBB1_39>
-
-		    [injectIdx-4:injectIdx] is compiled from bpf_printk();
-		    [injectIdx+1] is from `return data < data_end` statement;
-		    both statements shall be replaced by pcap filter instructions.
 	*/
 	program.Instructions = append(program.Instructions[:injectIdx-4],
-		append(filterEbpf, program.Instructions[injectIdx+2:]...)...,
+		append(filterEbpf, program.Instructions[injectIdx+1:]...)...,
 	)
 
 	return nil

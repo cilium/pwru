@@ -162,7 +162,7 @@ filter_pcap(struct sk_buff *skb) {
 	 * 3. mark the position to inject pcap filter ebpf instructions;
 	 */
 	bpf_printk("%d %d", data, data_end);
-	return data < data_end;
+	return data != data_end;
 }
 
 static __always_inline bool
