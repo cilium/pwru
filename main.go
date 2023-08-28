@@ -36,8 +36,8 @@ func main() {
 	}
 
 	if err := unix.Setrlimit(unix.RLIMIT_NOFILE, &unix.Rlimit{
-		Cur: 4096,
-		Max: 4096,
+		Cur: 8192,
+		Max: 8192,
 	}); err != nil {
 		log.Fatalf("failed to set temporary rlimit: %s", err)
 	}
