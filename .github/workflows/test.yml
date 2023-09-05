@@ -25,22 +25,10 @@ jobs:
         go mod verify
         test -z "$(git status --porcelain)" || (echo "please run 'go mod tidy && go mod vendor', and submit your changes"; exit 1)
 
-    - name: Cache LLVM and Clang
-      id: cache-llvm
-      uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8
-      with:
-        path: $HOME/.clang
-        key: llvm-15.0
-
-    - name: Install LLVM and Clang
-      uses: KyleMayes/install-llvm-action@c135b3937686fd69c2651507aabc9925a8f9eee8
-      with:
-        version: "15.0"
-        directory: $HOME/.clang
-        cached: ${{ steps.cache-llvm.outputs.cache-hit }}
-
     - name: Generate and build
-      run: make pwru
+      run: |
+        make release
+        tar xfv release/pwru-linux-amd64.tar.gz
 
     - name: Store executable
       uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce
