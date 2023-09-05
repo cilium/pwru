@@ -30,12 +30,15 @@ release:
 		--rm \
 		--workdir /pwru \
 		--volume `pwd`:/pwru docker.io/library/golang:1.20.5 \
-		sh -c "apt update && apt install -y make git clang-13 llvm curl gcc flex bison gcc-aarch64* libc6-dev-arm64-cross && \
-			ln -s /usr/bin/clang-13 /usr/bin/clang && \
+		sh -c "apt update && apt install -y make git clang-15 llvm curl gcc flex bison gcc-aarch64* libc6-dev-arm64-cross && \
+			ln -s /usr/bin/clang-15 /usr/bin/clang && \
 			git config --global --add safe.directory /pwru && \
 			make local-release"
 
 local-release: clean
+	# TODO(brb) remove once https://github.com/cilium/pwru/issues/246 is resolved
+	clang --version
+	gcc --version
 	ARCHS='amd64 arm64' ./local-release.sh
 
 install: $(TARGET)
