@@ -86,8 +86,11 @@ docker run --privileged --rm -t --pid=host -v /sys/kernel/debug/:/sys/kernel/deb
 
 The following example shows how to run `pwru` on a given node:
 ```
+#!/usr/bin/env bash
 NODE=kind-control-plane
 PWRU_ARGS="--output-tuple 'host 1.1.1.1'"
+
+trap " kubectl delete --wait=false pod pwru " EXIT
 
 kubectl apply -f - <<EOF
 apiVersion: v1
@@ -116,8 +119,8 @@ spec:
   hostPID: true
 EOF
 
+kubectl wait pod pwru --for condition=Ready --timeout=90s
 kubectl logs -f pwru
-kubectl delete pod pwru
 ```
 
 ### Running on Vagrant
