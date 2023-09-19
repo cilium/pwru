@@ -35,13 +35,7 @@ func InjectFilter(program *ebpf.ProgramSpec, filterExpr string) (err error) {
 		// R0-R3 are also safe to use thanks to the placeholder parameters _skb, __skb, ___skb.
 		Working:     [4]asm.Register{asm.R0, asm.R1, asm.R2, asm.R3},
 		LabelPrefix: "filter",
-		// In the kprobe_pwru.c:handle_everything, the first line of
-		// code `struct event_t event = {}` initializes stack [r10-136,
-		// r10-16] with zero value, so during the filtering stage, this
-		// stack area is safe to use. Here we use stack from -40
-		// because -32, -24, -16 are reserved for pcap-filter ebpf, see
-		// the comments in compile.go
-		StackOffset: 48,
+		StackOffset: -int(AvailableOffset),
 	})
 	if err != nil {
 		return
