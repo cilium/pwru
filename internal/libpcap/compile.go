@@ -25,6 +25,18 @@ const (
 	MAXIMUM_SNAPLEN          = 262144
 )
 
+type StackOffset int
+
+const (
+	BpfReadKernelOffset StackOffset = -8*(iota+1) - 80
+	R1Offset
+	R2Offset
+	R3Offset
+	R4Offset
+	R5Offset
+	AvailableOffset
+)
+
 func CompileCbpf(expr string) (insts []bpf.Instruction, err error) {
 	if len(expr) == 0 {
 		return
@@ -113,50 +125,32 @@ func adjustEbpf(insts asm.Instructions, opts cbpfc.EBPFOpts) (newInsts asm.Instr
 			replaceIdx = append(replaceIdx, idx)
 			replaceInsts[idx] = append(replaceInsts[idx],
 
-				/*
-				   Store R1, R2, R3 on stack. Offsets -16, -24,
-				   -32 are used to store R1, R2, R3
-				   respectively, we consider these stack area
-				   safe to write for now, because:
-
-				   1. bpf_probe_read_kernel uses offset -8 as
-				   R1, our choice of -16, -24, and -32 doesn't
-				   overlap that;
-
-				   2. [r10-32, r10] stack area has been
-				   initialized by "struct event_t event = {}"
-				   in the very first of handle_everything(),
-				   with nothing set on that so far, so we can
-				   borrow this stack temporarily.
-				*/
-				asm.StoreMem(asm.RFP, -16, asm.R1, asm.DWord),
-				asm.StoreMem(asm.RFP, -24, asm.R2, asm.DWord),
-				asm.StoreMem(asm.RFP, -32, asm.R3, asm.DWord),
+				// Store R1, R2, R3 on stack.
+				asm.StoreMem(asm.RFP, int16(R1Offset), asm.R1, asm.DWord),
+				asm.StoreMem(asm.RFP, int16(R2Offset), asm.R2, asm.DWord),
+				asm.StoreMem(asm.RFP, int16(R3Offset), asm.R3, asm.DWord),
 
 				// bpf_probe_read_kernel(RFP-8, size, inst.Src)
 				asm.Mov.Reg(asm.R1, asm.RFP),
-				asm.Add.Imm(asm.R1, -8),
+				asm.Add.Imm(asm.R1, int32(BpfReadKernelOffset)),
 				asm.Mov.Imm(asm.R2, int32(inst.OpCode.Size().Sizeof())),
 				asm.Mov.Reg(asm.R3, inst.Src),
 				asm.Add.Imm(asm.R3, int32(inst.Offset)),
 				asm.FnProbeReadKernel.Call(),
 
 				// inst.Dst = *(RFP-8)
-				asm.LoadMem(inst.Dst, asm.RFP, -8, inst.OpCode.Size()),
+				asm.LoadMem(inst.Dst, asm.RFP, int16(BpfReadKernelOffset), inst.OpCode.Size()),
 
-				asm.LoadMem(asm.R4, asm.RFP, -40, asm.DWord),
-				asm.LoadMem(asm.R5, asm.RFP, -48, asm.DWord),
+				// Restore R4, R5 from stack. This is needed because bpf_probe_read_kernel always resets R4 and R5 even if they are not used by bpf_probe_read_kernel.
+				asm.LoadMem(asm.R4, asm.RFP, int16(R4Offset), asm.DWord),
+				asm.LoadMem(asm.R5, asm.RFP, int16(R5Offset), asm.DWord),
 			)
 
-			/*
-			 Restore R1, R2, R3 from stack, special handling when
-			 inst.Dst is R1, R2 or R3, as we don't want to overwrite
-			 its value by mistake.
-			*/
+			// Restore R1, R2, R3 from stack
 			restoreInsts := asm.Instructions{
-				asm.LoadMem(asm.R1, asm.RFP, -16, asm.DWord),
-				asm.LoadMem(asm.R2, asm.RFP, -24, asm.DWord),
-				asm.LoadMem(asm.R3, asm.RFP, -32, asm.DWord),
+				asm.LoadMem(asm.R1, asm.RFP, int16(R1Offset), asm.DWord),
+				asm.LoadMem(asm.R2, asm.RFP, int16(R2Offset), asm.DWord),
+				asm.LoadMem(asm.R3, asm.RFP, int16(R3Offset), asm.DWord),
 			}
 			switch inst.Dst {
 			case asm.R1, asm.R2, asm.R3:
@@ -180,9 +174,10 @@ func adjustEbpf(insts asm.Instructions, opts cbpfc.EBPFOpts) (newInsts asm.Instr
 		insts = append(insts[:idx], append(replaceInsts[idx], insts[idx+1:]...)...)
 	}
 
+	// Store R4, R5 on stack.
 	insts = append([]asm.Instruction{
-		asm.StoreMem(asm.RFP, -40, asm.R4, asm.DWord),
-		asm.StoreMem(asm.RFP, -48, asm.R5, asm.DWord),
+		asm.StoreMem(asm.RFP, int16(R4Offset), asm.R4, asm.DWord),
+		asm.StoreMem(asm.RFP, int16(R5Offset), asm.R5, asm.DWord),
 	}, insts...)
 
 	insts = append(insts,
