@@ -2,14 +2,6 @@
 /* Copyright Martynas Pumputis */
 /* Copyright Authors of Cilium */
 
-/*
- * WARNING: `bpf_printk()` has special intention in this program: it is used for
- * pcap-filter ebpf injection, please see the comment in the `filter_pcap()`. So
- * if you want to add additional `bpf_printk()` for debugging, it is likely to
- * break the injection and fail the bpf verifier. In this case, it is
- * recommended to use perf_output for debugging.
- */
-
 #include "vmlinux.h"
 #include "bpf/bpf_helpers.h"
 #include "bpf/bpf_core_read.h"
@@ -141,6 +133,12 @@ filter_meta(struct sk_buff *skb) {
 	return true;
 }
 
+static __noinline bool
+filter_pcap_ebpf(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
+{
+	return data != data_end && _skb == __skb && __skb == ___skb;
+}
+
 static __always_inline bool
 filter_pcap(struct sk_buff *skb) {
 	BPF_CORE_READ(skb, head);
@@ -150,19 +148,7 @@ filter_pcap(struct sk_buff *skb) {
 	u16 l4_off = BPF_CORE_READ(skb, transport_header);
 	u16 len = BPF_CORE_READ(skb, len);
 	void *data_end = skb_head + l4_off + len;
-	/*
-	 * The next two lines of code won't be executed; they will be replaced
-	 * by ebpf instructions compiled from pcap-filter expression before
-	 * loading to kernel.
-	 * However they are important placeholders to:
-	 * 1. let us know the registers holding data and data_end, which are
-	 * needed to convert cbpf to ebpf;
-	 * 2. leave r0, r1, r2, r3, r4 available for pcap filter ebpf
-	 * instructions;
-	 * 3. mark the position to inject pcap filter ebpf instructions;
-	 */
-	bpf_printk("%d %d", data, data_end);
-	return data != data_end;
+	return filter_pcap_ebpf((void *)skb, (void *)skb, (void *)skb, data, data_end);
 }
 
 static __always_inline bool
