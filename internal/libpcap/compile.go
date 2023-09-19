@@ -34,9 +34,7 @@ func CompileCbpf(expr string) (insts []bpf.Instruction, err error) {
 		DLT_RAW linktype tells pcap_compile() to generate cbpf instructions for
 		skb without link layer. This is because kernel doesn't supply L2 data
 		for many of functions, where skb->mac_len == 0, while the default
-		pcap_compile mode only works for a complete frame data, so we have to
-		specify this linktype to tell pcap that the data starts from L3 network
-		header.
+		pcap_compile mode only works for a complete frame data.
 	*/
 	pcap := C.pcap_open_dead(C.DLT_RAW, MAXIMUM_SNAPLEN)
 	if pcap == nil {
@@ -91,23 +89,21 @@ func CompileEbpf(expr string, opts cbpfc.EBPFOpts) (insts asm.Instructions, err 
 
 /*
 We have to adjust the ebpf instructions because verifier prevents us from
-directly loading data from memory. For example, the instruction "r0 = *(u8 *)(r9 +0)"
-will break verifier with error "R9 invalid mem access 'scalar", we therefore
+directly loading data from memory. For example, the instruction "r0 = *(u8 *)(r4 +0)"
+will break verifier with error "R4 invalid mem access 'scalar", we therefore
 need to convert this direct memory load to bpf_probe_read_kernel function call:
 
 - r1 = r10  // r10 is stack top
 - r1 += -8  // r1 = r10-8
 - r2 = 1    // r2 = sizeof(u8)
-- r3 = r9   // r9 is start of packet data, aka L3 header
-- r3 += 0   // r3 = r9+0
-- call bpf_probe_read_kernel  // *(r10-8) = *(u8 *)(r9+0)
+- r3 = r4   // r4 is start of packet data, aka L3 header
+- r3 += 0   // r3 = r4+0
+- call bpf_probe_read_kernel  // *(r10-8) = *(u8 *)(r4+0)
 - r0 = *(u8 *)(r10 -8)  // r0 = *(r10-8)
 
 To safely borrow R1, R2 and R3 for setting up the arguments for
 bpf_probe_read_kernel(), we need to save the original values of R1, R2 and R3
 on stack, and restore them after the function call.
-
-More details in the comments below.
 */
 func adjustEbpf(insts asm.Instructions, opts cbpfc.EBPFOpts) (newInsts asm.Instructions, err error) {
 	replaceIdx := []int{}
@@ -147,6 +143,9 @@ func adjustEbpf(insts asm.Instructions, opts cbpfc.EBPFOpts) (newInsts asm.Instr
 
 				// inst.Dst = *(RFP-8)
 				asm.LoadMem(inst.Dst, asm.RFP, -8, inst.OpCode.Size()),
+
+				asm.LoadMem(asm.R4, asm.RFP, -40, asm.DWord),
+				asm.LoadMem(asm.R5, asm.RFP, -48, asm.DWord),
 			)
 
 			/*
@@ -181,21 +180,17 @@ func adjustEbpf(insts asm.Instructions, opts cbpfc.EBPFOpts) (newInsts asm.Instr
 		insts = append(insts[:idx], append(replaceInsts[idx], insts[idx+1:]...)...)
 	}
 
-	/*
-	 Prepend instructions to init R1, R2, R3 so as to avoid verifier error:
-	 permission denied: *(u64 *)(r10 -24) = r2: R2 !read_ok
-	*/
 	insts = append([]asm.Instruction{
-		asm.Mov.Imm(asm.R1, 0),
-		asm.Mov.Imm(asm.R2, 0),
-		asm.Mov.Imm(asm.R3, 0),
+		asm.StoreMem(asm.RFP, -40, asm.R4, asm.DWord),
+		asm.StoreMem(asm.RFP, -48, asm.R5, asm.DWord),
 	}, insts...)
 
 	insts = append(insts,
-		asm.Mov.Imm(asm.R0, 0).WithSymbol("result"), // r0 = 0
-		asm.Mov.Reg(opts.PacketStart, opts.Result),  // skb->data = $result
-		asm.Mov.Imm(opts.PacketEnd, 0),              // skb->data_end = 0
-
+		asm.Mov.Imm(asm.R1, 0).WithSymbol("result"), // r1 = 0 (_skb)
+		asm.Mov.Imm(asm.R2, 0),                      // r2 = 0 (__skb)
+		asm.Mov.Imm(asm.R3, 0),                      // r3 = 0 (___skb)
+		asm.Mov.Reg(asm.R4, opts.Result),            // r4 = $result (data)
+		asm.Mov.Imm(asm.R5, 0),                      // r5 = 0 (data_end)
 	)
 
 	return insts, nil
