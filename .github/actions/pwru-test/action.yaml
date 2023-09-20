@@ -1,0 +1,46 @@
+name: PWRU Test
+
+inputs:
+  test-name:
+    required: true
+    type: string
+  pwru-flags:
+    required: false
+    type: string
+  pwru-pcap-filter:
+    required: false
+    type: string
+  traffic-setup:
+    required: false
+    type: string
+  expected-output-pattern:
+    required: true
+    type: string
+
+runs:
+  using: composite
+  steps:
+    - name: PWRU test
+      uses: cilium/little-vm-helper@908ab1ff8a596a03cd5221a1f8602dc44c3f906d # v0.0.12
+      with:
+        provision: 'false'
+        cmd: |
+          set -x
+
+          /host/pwru/pwru \
+            --output-tuple \
+            --output-file=/tmp/pwru-${{ inputs.test-name }}.log \
+            --ready-file=/tmp/pwru-${{ inputs.test-name }}.ready \
+            ${{ inputs.pwru-flags }} \
+            '${{ inputs.pwru-pcap-filter }}' \
+            2>/tmp/pwru-${{ inputs.test-name }}.status &
+          PWRU_PID=\$!
+
+          while [ ! -f /tmp/pwru-${{ inputs.test-name }}.ready ]; do sleep 1; done
+
+          ${{ inputs.traffic-setup }}
+
+          kill \$PWRU_PID
+          wait \$PWRU_PID
+
+          grep -P '${{ inputs.expected-output-pattern }}' /tmp/pwru-${{ inputs.test-name }}.log
