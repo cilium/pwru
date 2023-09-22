@@ -134,18 +134,40 @@ filter_meta(struct sk_buff *skb) {
 }
 
 static __noinline bool
-filter_pcap_ebpf(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
+filter_pcap_ebpf_l3(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
 {
 	return data != data_end && _skb == __skb && __skb == ___skb;
 }
 
 static __always_inline bool
-filter_pcap(struct sk_buff *skb)
+filter_pcap_l3(struct sk_buff *skb)
 {
 	void *skb_head = BPF_CORE_READ(skb, head);
 	void *data = skb_head + BPF_CORE_READ(skb, network_header);
 	void *data_end = skb_head + BPF_CORE_READ(skb, tail);
-	return filter_pcap_ebpf((void *)skb, (void *)skb, (void *)skb, data, data_end);
+	return filter_pcap_ebpf_l3((void *)skb, (void *)skb, (void *)skb, data, data_end);
+}
+
+static __noinline bool
+filter_pcap_ebpf_l2(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
+{
+	return data != data_end && _skb == __skb && __skb == ___skb;
+}
+
+static __always_inline bool
+filter_pcap_l2(struct sk_buff *skb)
+{
+	void *skb_head = BPF_CORE_READ(skb, head);
+	void *data = skb_head + BPF_CORE_READ(skb, mac_header);
+	void *data_end = skb_head + BPF_CORE_READ(skb, tail);
+	return filter_pcap_ebpf_l2((void *)skb, (void *)skb, (void *)skb, data, data_end);
+}
+
+static __always_inline bool
+filter_pcap(struct sk_buff *skb) {
+	if (BPF_CORE_READ(skb, mac_len) == 0)
+		return filter_pcap_l3(skb);
+	return filter_pcap_l2(skb);
 }
 
 static __always_inline bool
