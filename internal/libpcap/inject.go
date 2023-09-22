@@ -2,6 +2,7 @@ package libpcap
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
@@ -9,10 +10,17 @@ import (
 )
 
 func InjectFilters(program *ebpf.ProgramSpec, filterExpr string) (err error) {
-	if err = injectFilter(program, filterExpr, true); err != nil {
+	if err = injectFilter(program, filterExpr, false); err != nil {
 		return
 	}
-	return injectFilter(program, filterExpr, false)
+	if err = injectFilter(program, filterExpr, true); err != nil {
+		// This could happen for l2 only filters such as "arp". In this
+		// case we don't want to exit with an error, but instead inject
+		// a deny-all filter to reject all l3 skbs.
+		fmt.Printf("L3 filter injection failed while L2 filter injection succeeded, injecting a deny-all L3 filter: %+v\n", err)
+		return injectFilter(program, "src host 0.0.0.0 and dst host 0.0.0.0 and tcp", true)
+	}
+	return
 }
 
 func injectFilter(program *ebpf.ProgramSpec, filterExpr string, l3 bool) (err error) {
