@@ -140,14 +140,11 @@ filter_pcap_ebpf(void *_skb, void *__skb, void *___skb, void *data, void* data_e
 }
 
 static __always_inline bool
-filter_pcap(struct sk_buff *skb) {
-	BPF_CORE_READ(skb, head);
+filter_pcap(struct sk_buff *skb)
+{
 	void *skb_head = BPF_CORE_READ(skb, head);
-	u16 l3_off = BPF_CORE_READ(skb, network_header);
-	void *data = skb_head + l3_off;
-	u16 l4_off = BPF_CORE_READ(skb, transport_header);
-	u16 len = BPF_CORE_READ(skb, len);
-	void *data_end = skb_head + l4_off + len;
+	void *data = skb_head + BPF_CORE_READ(skb, network_header);
+	void *data_end = skb_head + BPF_CORE_READ(skb, tail);
 	return filter_pcap_ebpf((void *)skb, (void *)skb, (void *)skb, data, data_end);
 }
 
