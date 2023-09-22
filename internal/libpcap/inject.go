@@ -8,14 +8,25 @@ import (
 	"github.com/cloudflare/cbpfc"
 )
 
-func InjectFilter(program *ebpf.ProgramSpec, filterExpr string) (err error) {
+func InjectFilters(program *ebpf.ProgramSpec, filterExpr string) (err error) {
+	if err = injectFilter(program, filterExpr, true); err != nil {
+		return
+	}
+	return injectFilter(program, filterExpr, false)
+}
+
+func injectFilter(program *ebpf.ProgramSpec, filterExpr string, l3 bool) (err error) {
 	if filterExpr == "" {
 		return
 	}
 
+	suffix := "_l2"
+	if l3 {
+		suffix = "_l3"
+	}
 	injectIdx := -1
 	for idx, inst := range program.Instructions {
-		if inst.Symbol() == "filter_pcap_ebpf" {
+		if inst.Symbol() == "filter_pcap_ebpf"+suffix {
 			injectIdx = idx
 			break
 		}
@@ -31,12 +42,12 @@ func InjectFilter(program *ebpf.ProgramSpec, filterExpr string) (err error) {
 		PacketStart: asm.R4,
 		PacketEnd:   asm.R5,
 		Result:      asm.R0,
-		ResultLabel: "result",
+		ResultLabel: "result" + suffix,
 		// R0-R3 are also safe to use thanks to the placeholder parameters _skb, __skb, ___skb.
 		Working:     [4]asm.Register{asm.R0, asm.R1, asm.R2, asm.R3},
-		LabelPrefix: "filter",
+		LabelPrefix: "filter" + suffix,
 		StackOffset: -int(AvailableOffset),
-	})
+	}, l3)
 	if err != nil {
 		return
 	}

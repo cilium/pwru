@@ -37,18 +37,15 @@ const (
 	AvailableOffset
 )
 
-func CompileCbpf(expr string) (insts []bpf.Instruction, err error) {
+func CompileCbpf(expr string, l3 bool) (insts []bpf.Instruction, err error) {
 	if len(expr) == 0 {
 		return
 	}
 
-	/*
-		DLT_RAW linktype tells pcap_compile() to generate cbpf instructions for
-		skb without link layer. This is because kernel doesn't supply L2 data
-		for many of functions, where skb->mac_len == 0, while the default
-		pcap_compile mode only works for a complete frame data.
-	*/
-	pcap := C.pcap_open_dead(C.DLT_RAW, MAXIMUM_SNAPLEN)
+	pcap := C.pcap_open_dead(C.DLT_EN10MB, MAXIMUM_SNAPLEN)
+	if l3 {
+		pcap = C.pcap_open_dead(C.DLT_RAW, MAXIMUM_SNAPLEN)
+	}
 	if pcap == nil {
 		return nil, fmt.Errorf("failed to pcap_open_dead: %+v\n", C.PCAP_ERROR)
 	}
@@ -85,8 +82,8 @@ end of the packet data. As we mentioned in the comment of DLT_RAW,
 packet data starts from L3 network header, rather than L2 ethernet
 header, caller should make sure to pass the correct arguments.
 */
-func CompileEbpf(expr string, opts cbpfc.EBPFOpts) (insts asm.Instructions, err error) {
-	cbpfInsts, err := CompileCbpf(expr)
+func CompileEbpf(expr string, opts cbpfc.EBPFOpts, l3 bool) (insts asm.Instructions, err error) {
+	cbpfInsts, err := CompileCbpf(expr, l3)
 	if err != nil {
 		return
 	}
@@ -181,11 +178,11 @@ func adjustEbpf(insts asm.Instructions, opts cbpfc.EBPFOpts) (newInsts asm.Instr
 	}, insts...)
 
 	insts = append(insts,
-		asm.Mov.Imm(asm.R1, 0).WithSymbol("result"), // r1 = 0 (_skb)
-		asm.Mov.Imm(asm.R2, 0),                      // r2 = 0 (__skb)
-		asm.Mov.Imm(asm.R3, 0),                      // r3 = 0 (___skb)
-		asm.Mov.Reg(asm.R4, opts.Result),            // r4 = $result (data)
-		asm.Mov.Imm(asm.R5, 0),                      // r5 = 0 (data_end)
+		asm.Mov.Imm(asm.R1, 0).WithSymbol(opts.ResultLabel), // r1 = 0 (_skb)
+		asm.Mov.Imm(asm.R2, 0),                              // r2 = 0 (__skb)
+		asm.Mov.Imm(asm.R3, 0),                              // r3 = 0 (___skb)
+		asm.Mov.Reg(asm.R4, opts.Result),                    // r4 = $result (data)
+		asm.Mov.Imm(asm.R5, 0),                              // r5 = 0 (data_end)
 	)
 
 	return insts, nil

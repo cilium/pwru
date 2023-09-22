@@ -127,7 +127,7 @@ func main() {
 		if name == "kprobe_skb_lifetime_termination" {
 			continue
 		}
-		if err = libpcap.InjectFilter(program, flags.FilterPcap); err != nil {
+		if err = libpcap.InjectFilters(program, flags.FilterPcap); err != nil {
 			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
 		}
 	}
