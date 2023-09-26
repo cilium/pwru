@@ -132,8 +132,12 @@ func main() {
 		}
 	}
 
+	pwruConfig, err := pwru.GetConfig(&flags)
+	if err != nil {
+		log.Fatalf("Failed to get pwru config: %v", err)
+	}
 	if err := bpfSpec.RewriteConstants(map[string]interface{}{
-		"CFG": pwru.GetConfig(&flags),
+		"CFG": pwruConfig,
 	}); err != nil {
 		log.Fatalf("Failed to rewrite config: %v", err)
 	}
