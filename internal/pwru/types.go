@@ -25,10 +25,11 @@ type Flags struct {
 
 	KernelBTF string
 
-	FilterNetns    uint32
+	FilterNetns    string
 	FilterMark     uint32
 	FilterFunc     string
 	FilterTrackSkb bool
+	FilterIfname   string
 	FilterPcap     string
 
 	OutputTS         string
@@ -53,15 +54,16 @@ func (f *Flags) SetFlags() {
 	flag.StringSliceVar(&f.KMods, "kmods", nil, "list of kernel modules names to attach to")
 	flag.BoolVar(&f.AllKMods, "all-kmods", false, "attach to all available kernel modules")
 	flag.StringVar(&f.FilterFunc, "filter-func", "", "filter kernel functions to be probed by name (exact match, supports RE2 regular expression)")
-	flag.Uint32Var(&f.FilterNetns, "filter-netns", 0, "filter netns inode")
+	flag.StringVar(&f.FilterNetns, "filter-netns", "", "filter netns (\"/proc/<pid>/ns/net\", \"inode:<inode>\")")
 	flag.Uint32Var(&f.FilterMark, "filter-mark", 0, "filter skb mark")
+	flag.BoolVar(&f.FilterTrackSkb, "filter-track-skb", false, "trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)")
+	flag.StringVar(&f.FilterIfname, "filter-ifname", "", "filter skb ifname in --filter-netns (if not specified, use current netns)")
 	flag.StringVar(&f.OutputTS, "timestamp", "none", "print timestamp per skb (\"current\", \"relative\", \"absolute\", \"none\")")
 	flag.BoolVar(&f.OutputMeta, "output-meta", false, "print skb metadata")
 	flag.BoolVar(&f.OutputTuple, "output-tuple", false, "print L4 tuple")
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
-	flag.BoolVar(&f.FilterTrackSkb, "filter-track-skb", false, "trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)")
 
 	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
 

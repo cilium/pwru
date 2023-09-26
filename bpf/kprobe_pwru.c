@@ -77,6 +77,7 @@ struct {
 struct config {
 	u32 netns;
 	u32 mark;
+	u32 ifindex;
 	u8 output_timestamp;
 	u8 output_meta;
 	u8 output_tuple;
@@ -106,7 +107,6 @@ struct {
 } print_skb_map SEC(".maps");
 #endif
 
-
 static __always_inline u32
 get_netns(struct sk_buff *skb) {
 	u32 netns = BPF_CORE_READ(skb, dev, nd_net.net, ns.inum);
@@ -128,6 +128,9 @@ filter_meta(struct sk_buff *skb) {
 			return false;
 	}
 	if (cfg->mark && BPF_CORE_READ(skb, mark) != cfg->mark) {
+		return false;
+	}
+	if (cfg->ifindex != 0 && BPF_CORE_READ(skb, dev, ifindex) != cfg->ifindex) {
 		return false;
 	}
 	return true;
