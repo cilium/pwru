@@ -143,6 +143,16 @@ jobs:
             ping -W1 -c1 10.0.0.1 || true
           expected-output-pattern: 'arp_rcv'
 
+      - name: Test --filter-ifname
+        uses: ./.github/actions/pwru-test
+        with:
+          test-name: filter-ifname
+          pwru-flags: --filter-ifname lo
+          pwru-pcap-filter: icmp
+          traffic-setup: |
+            ping -W1 -c1 127.0.0.1 || true
+          expected-output-pattern: 'icmp'
+
       - name: Fetch artifacts
         if: ${{ !success() }}
         uses: cilium/little-vm-helper@908ab1ff8a596a03cd5221a1f8602dc44c3f906d
