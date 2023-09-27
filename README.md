@@ -53,7 +53,7 @@ Usage: pwru [options] [pcap-filter]
       --backend string            Tracing backend('kprobe', 'kprobe-multi'). Will auto-detect if not specified.
       --filter-func string        filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
       --filter-mark uint32        filter skb mark
-      --filter-netns uint32       filter netns inode
+      --filter-netns string       filter netns ("/proc/<pid>/ns/net", "inode:<inode>")
       --filter-track-skb          trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)
       --kernel-btf string         specify kernel BTF file
       --kmods strings             list of kernel modules names to attach to
