@@ -42,10 +42,11 @@ func CompileCbpf(expr string, l3 bool) (insts []bpf.Instruction, err error) {
 		return
 	}
 
-	pcap := C.pcap_open_dead(C.DLT_EN10MB, MAXIMUM_SNAPLEN)
+	pcapType := C.DLT_EN10MB
 	if l3 {
-		pcap = C.pcap_open_dead(C.DLT_RAW, MAXIMUM_SNAPLEN)
+		pcapType = C.DLT_RAW
 	}
+	pcap := C.pcap_open_dead(C.int(pcapType), MAXIMUM_SNAPLEN)
 	if pcap == nil {
 		return nil, fmt.Errorf("failed to pcap_open_dead: %+v\n", C.PCAP_ERROR)
 	}

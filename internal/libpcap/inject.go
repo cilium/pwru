@@ -2,7 +2,6 @@ package libpcap
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
@@ -17,8 +16,7 @@ func InjectFilters(program *ebpf.ProgramSpec, filterExpr string) (err error) {
 		// This could happen for l2 only filters such as "arp". In this
 		// case we don't want to exit with an error, but instead inject
 		// a deny-all filter to reject all l3 skbs.
-		fmt.Printf("L3 filter injection failed while L2 filter injection succeeded, injecting a deny-all L3 filter: %+v\n", err)
-		return injectFilter(program, "src host 0.0.0.0 and dst host 0.0.0.0 and tcp", true)
+		return injectFilter(program, "__pwru_reject_all__", true)
 	}
 	return
 }
@@ -43,19 +41,27 @@ func injectFilter(program *ebpf.ProgramSpec, filterExpr string, l3 bool) (err er
 		return errors.New("Cannot find the injection position")
 	}
 
-	filterEbpf, err := CompileEbpf(filterExpr, cbpfc.EBPFOpts{
-		// The rejection position is in the beginning of the `filter_pcap_ebpf` function:
-		// filter_pcap_ebpf(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
-		// So we can confidently say, skb->data is at r4, skb->data_end is at r5.
-		PacketStart: asm.R4,
-		PacketEnd:   asm.R5,
-		Result:      asm.R0,
-		ResultLabel: "result" + suffix,
-		// R0-R3 are also safe to use thanks to the placeholder parameters _skb, __skb, ___skb.
-		Working:     [4]asm.Register{asm.R0, asm.R1, asm.R2, asm.R3},
-		LabelPrefix: "filter" + suffix,
-		StackOffset: -int(AvailableOffset),
-	}, l3)
+	var filterEbpf asm.Instructions
+	if filterExpr == "__pwru_reject_all__" {
+		// let data = data_end, so kprobe_pwru.c:filter_pcap_ebpf_l3() always returns false
+		filterEbpf = asm.Instructions{
+			asm.Mov.Reg(asm.R4, asm.R5), // r4 = r5 (data = data_end)
+		}
+	} else {
+		filterEbpf, err = CompileEbpf(filterExpr, cbpfc.EBPFOpts{
+			// The rejection position is in the beginning of the `filter_pcap_ebpf` function:
+			// filter_pcap_ebpf(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
+			// So we can confidently say, skb->data is at r4, skb->data_end is at r5.
+			PacketStart: asm.R4,
+			PacketEnd:   asm.R5,
+			Result:      asm.R0,
+			ResultLabel: "result" + suffix,
+			// R0-R3 are also safe to use thanks to the placeholder parameters _skb, __skb, ___skb.
+			Working:     [4]asm.Register{asm.R0, asm.R1, asm.R2, asm.R3},
+			LabelPrefix: "filter" + suffix,
+			StackOffset: -int(AvailableOffset),
+		}, l3)
+	}
 	if err != nil {
 		return
 	}
