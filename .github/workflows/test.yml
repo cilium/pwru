@@ -114,7 +114,6 @@ jobs:
           expected-output-pattern: '1.1.1.1:80'
 
       - name: Test --filter-track-skb
-        # DNAT
         uses: ./.github/actions/pwru-test
         with:
           test-name: filter-track-skb
@@ -124,6 +123,25 @@ jobs:
             iptables -t nat -I OUTPUT 1 -d 10.10.20.99/32 -j DNAT --to-destination 10.10.14.2
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://10.10.20.99:80 || true
           expected-output-pattern: '10.10.14.2:80'
+
+      - name: Test ARP filter
+        uses: ./.github/actions/pwru-test
+        with:
+          test-name: filter-arp
+          pwru-pcap-filter: 'arp and arp[7] = 1 and arp[24]= 169 and arp[25] = 254 and arp[26] = 0 and arp[27] = 1'
+          traffic-setup: |
+            ip net a pwru
+            ip l a pwru-veth type veth peer name pwru-veth-peer
+            ip l s pwru-veth-peer up
+            ip l s pwru-veth netns pwru
+            ip net e pwru ip l s pwru-veth up
+            ip r a 10.0.0.1 dev pwru-veth-peer
+            ip net e pwru ip a a 10.0.0.1 dev pwru-veth
+            ip net e pwru ip r a 169.254.0.1 dev pwru-veth
+            ip net e pwru ip r a default via 169.254.0.1 dev pwru-veth
+
+            ping -W1 -c1 10.0.0.1 || true
+          expected-output-pattern: 'arp_rcv'
 
       - name: Fetch artifacts
         if: ${{ !success() }}
