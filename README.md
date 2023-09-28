@@ -52,6 +52,7 @@ Usage: pwru [options] [pcap-filter]
       --all-kmods                 attach to all available kernel modules
       --backend string            Tracing backend('kprobe', 'kprobe-multi'). Will auto-detect if not specified.
       --filter-func string        filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
+      --filter-ifname string      filter skb ifname in --filter-netns (if not specified, use current netns)
       --filter-mark uint32        filter skb mark
       --filter-netns string       filter netns ("/proc/<pid>/ns/net", "inode:<inode>")
       --filter-track-skb          trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)
@@ -65,7 +66,6 @@ Usage: pwru [options] [pcap-filter]
       --output-tuple              print L4 tuple
       --timestamp string          print timestamp per skb ("current", "relative", "absolute", "none") (default "none")
       --version                   show pwru version and exit
-
 ```
 
 The `--filter-func` switch does an exact match on function names i.e.
