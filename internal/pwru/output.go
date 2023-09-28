@@ -5,18 +5,24 @@
 package pwru
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
+	"github.com/jsimonetti/rtnetlink"
 	ps "github.com/mitchellh/go-ps"
+	"github.com/vishvananda/netns"
+	"golang.org/x/sys/unix"
 
 	"github.com/cilium/pwru/internal/byteorder"
 )
@@ -32,6 +38,7 @@ type output struct {
 	writer        io.Writer
 	kprobeMulti   bool
 	kfreeReasons  map[uint64]string
+	ifaceCache    map[uint64]map[uint32]string
 }
 
 func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
@@ -52,6 +59,14 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
 		log.Printf("Unable to load packet drop reaons: %v", err)
 	}
 
+	var ifs map[uint64]map[uint32]string
+	if flags.OutputMeta {
+		ifs, err = getIfaces()
+		if err != nil {
+			log.Printf("Failed to retrieve all ifaces from all network namespaces: %v. Some iface names might be not shown.", err)
+		}
+	}
+
 	return &output{
 		flags:         flags,
 		lastSeenSkb:   map[uint64]uint64{},
@@ -61,6 +76,7 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
 		writer:        writer,
 		kprobeMulti:   kprobeMulti,
 		kfreeReasons:  reasons,
+		ifaceCache:    ifs,
 	}, nil
 }
 
@@ -132,7 +148,10 @@ func (o *output) Print(event *Event) {
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
-		fmt.Fprintf(o.writer, " netns=%d mark=0x%x ifindex=%d proto=%x mtu=%d len=%d", event.Meta.Netns, event.Meta.Mark, event.Meta.Ifindex, event.Meta.Proto, event.Meta.MTU, event.Meta.Len)
+		fmt.Fprintf(o.writer, " netns=%d mark=0x%x iface=%s proto=%x mtu=%d len=%d",
+			event.Meta.Netns, event.Meta.Mark,
+			o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex),
+			event.Meta.Proto, event.Meta.MTU, event.Meta.Len)
 	}
 
 	if o.flags.OutputTuple {
@@ -163,6 +182,15 @@ func (o *output) Print(event *Event) {
 	}
 
 	fmt.Fprintln(o.writer)
+}
+
+func (o *output) getIfaceName(netnsInode, ifindex uint32) string {
+	if ifaces, ok := o.ifaceCache[uint64(netnsInode)]; ok {
+		if name, ok := ifaces[ifindex]; ok {
+			return fmt.Sprintf("%d(%s)", ifindex, name)
+		}
+	}
+	return fmt.Sprintf("%d", ifindex)
 }
 
 func protoToStr(proto uint8) string {
@@ -211,4 +239,98 @@ func getKFreeSKBReasons(spec *btf.Spec) (map[uint64]string, error) {
 	}
 
 	return ret, nil
+}
+
+func getIfaces() (map[uint64]map[uint32]string, error) {
+	var err error
+	procPath := "/proc"
+
+	ifaceCache := make(map[uint64]map[uint32]string)
+
+	dirs, err := os.ReadDir(procPath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, d := range dirs {
+		if !d.IsDir() {
+			continue
+		}
+
+		// skip non-process dirs
+		if _, err := strconv.Atoi(d.Name()); err != nil {
+			continue
+		}
+
+		// get inode of netns
+		path := filepath.Join(procPath, d.Name(), "ns", "net")
+		fd, err0 := os.Open(path)
+		if err0 != nil {
+			err = errors.Join(err, err0)
+			continue
+		}
+		var stat unix.Stat_t
+		if err0 := unix.Fstat(int(fd.Fd()), &stat); err != nil {
+			err = errors.Join(err, err0)
+			continue
+		}
+		inode := stat.Ino
+
+		if _, exists := ifaceCache[inode]; exists {
+			continue // we already checked that netns
+		} else {
+			ifaceCache[inode] = make(map[uint32]string)
+		}
+
+		ifaces, err0 := getIfacesInNetNs(path)
+		if err0 != nil {
+			err = errors.Join(err, err0)
+			continue
+		}
+
+		ifaceCache[inode] = ifaces
+
+	}
+
+	return ifaceCache, err
+
+}
+
+func getIfacesInNetNs(path string) (map[uint32]string, error) {
+	current, err := netns.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	remote, err := netns.GetFromPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	if err := netns.Set(remote); err != nil {
+		return nil, err
+	}
+
+	defer netns.Set(current)
+
+	conn, err := rtnetlink.Dial(nil)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	msg, err := conn.Link.List()
+	if err != nil {
+		return nil, err
+	}
+
+	ifaces := make(map[uint32]string)
+	for _, link := range msg {
+		ifaces[link.Index] = link.Attributes.Name
+	}
+
+	return ifaces, nil
 }
