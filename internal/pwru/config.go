@@ -57,6 +57,7 @@ func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 
 	netnsID, ns, err := parseNetns(flags.FilterNetns)
 	if err != nil {
+		err = fmt.Errorf("Failed to retrieve netns %s: %w", flags.FilterNetns, err)
 		return
 	}
 	if flags.FilterIfname != "" || flags.FilterNetns != "" {
