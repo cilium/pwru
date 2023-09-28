@@ -24,6 +24,20 @@ github.com/cloudflare/cbpfc
 # github.com/fatih/color v1.15.0
 ## explicit; go 1.17
 github.com/fatih/color
+# github.com/google/go-cmp v0.5.9
+## explicit; go 1.13
+github.com/google/go-cmp/cmp
+github.com/google/go-cmp/cmp/internal/diff
+github.com/google/go-cmp/cmp/internal/flags
+github.com/google/go-cmp/cmp/internal/function
+github.com/google/go-cmp/cmp/internal/value
+# github.com/josharian/native v1.1.0
+## explicit; go 1.13
+github.com/josharian/native
+# github.com/jsimonetti/rtnetlink v1.3.5
+## explicit; go 1.18
+github.com/jsimonetti/rtnetlink
+github.com/jsimonetti/rtnetlink/internal/unix
 # github.com/mattn/go-colorable v0.1.13
 ## explicit; go 1.15
 github.com/mattn/go-colorable
@@ -33,6 +47,13 @@ github.com/mattn/go-isatty
 # github.com/mattn/go-runewidth v0.0.14
 ## explicit; go 1.9
 github.com/mattn/go-runewidth
+# github.com/mdlayher/netlink v1.7.2
+## explicit; go 1.18
+github.com/mdlayher/netlink
+github.com/mdlayher/netlink/nlenc
+# github.com/mdlayher/socket v0.4.1
+## explicit; go 1.20
+github.com/mdlayher/socket
 # github.com/mitchellh/go-ps v1.0.0
 ## explicit; go 1.13
 github.com/mitchellh/go-ps
@@ -61,6 +82,9 @@ golang.org/x/mod/semver
 # golang.org/x/net v0.15.0
 ## explicit; go 1.17
 golang.org/x/net/bpf
+# golang.org/x/sync v0.3.0
+## explicit; go 1.17
+golang.org/x/sync/errgroup
 # golang.org/x/sys v0.12.0
 ## explicit; go 1.17
 golang.org/x/sys/execabs
