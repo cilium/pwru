@@ -140,7 +140,7 @@ func (o *output) Print(event *Event) {
 		}
 	}
 
-	fmt.Fprintf(o.writer, "%18s %6s %16s %24s", fmt.Sprintf("0x%x", event.SAddr),
+	fmt.Fprintf(o.writer, "%18s %6s %16s %24s", fmt.Sprintf("%#x", event.SAddr),
 		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName), outFuncName)
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %16d", ts)
@@ -148,7 +148,7 @@ func (o *output) Print(event *Event) {
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
-		fmt.Fprintf(o.writer, " netns=%d mark=0x%x iface=%s proto=%x mtu=%d len=%d",
+		fmt.Fprintf(o.writer, " netns=%d mark=%#x iface=%s proto=%#x mtu=%d len=%d",
 			event.Meta.Netns, event.Meta.Mark,
 			o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex),
 			event.Meta.Proto, event.Meta.MTU, event.Meta.Len)
