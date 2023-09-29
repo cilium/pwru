@@ -148,10 +148,10 @@ func (o *output) Print(event *Event) {
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
-		fmt.Fprintf(o.writer, " netns=%d mark=%#x iface=%s proto=%#x mtu=%d len=%d",
+		fmt.Fprintf(o.writer, " netns=%d mark=%#x iface=%s proto=%#04x mtu=%d len=%d",
 			event.Meta.Netns, event.Meta.Mark,
 			o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex),
-			event.Meta.Proto, event.Meta.MTU, event.Meta.Len)
+			byteorder.NetworkToHost16(event.Meta.Proto), event.Meta.MTU, event.Meta.Len)
 	}
 
 	if o.flags.OutputTuple {
