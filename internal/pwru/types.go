@@ -74,8 +74,8 @@ func (f *Flags) SetFlags() {
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [pcap-filter]\n", os.Args[0])
-		fmt.Fprintf(os.Stderr, "    Availble pcap-filter: see \"man 7 pcap-filter\"\n")
-		fmt.Fprintf(os.Stderr, "    Availble options:\n")
+		fmt.Fprintf(os.Stderr, "    Available pcap-filter: see \"man 7 pcap-filter\"\n")
+		fmt.Fprintf(os.Stderr, "    Available options:\n")
 		flag.PrintDefaults()
 	}
 }

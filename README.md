@@ -50,8 +50,8 @@ You can download the statically linked executable for x86\_64 and arm64 from the
 ```
 $ ./pwru --help
 Usage: pwru [options] [pcap-filter]
-    Availble pcap-filter: see "man 7 pcap-filter"
-    Availble options:
+    Available pcap-filter: see "man 7 pcap-filter"
+    Available options:
       --all-kmods                 attach to all available kernel modules
       --backend string            Tracing backend('kprobe', 'kprobe-multi'). Will auto-detect if not specified.
       --filter-func string        filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
