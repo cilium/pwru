@@ -12,7 +12,6 @@ require (
 	github.com/vishvananda/netns v0.0.4
 	golang.org/x/net v0.15.0
 	golang.org/x/sys v0.12.0
-	golang.org/x/tools v0.13.0
 )
 
 require (
@@ -28,6 +27,5 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2 // indirect
-	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 )
