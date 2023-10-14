@@ -9,7 +9,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cilium/ebpf"
 	flag "github.com/spf13/pflag"
 )
 
@@ -122,29 +121,4 @@ type Event struct {
 	PrintStackId int64
 	ParamSecond  uint64
 	CPU          uint32
-}
-
-type KProbeMaps interface {
-	GetEvents() *ebpf.Map
-	GetPrintStackMap() *ebpf.Map
-}
-
-type KProbeMapsWithOutputSKB interface {
-	KProbeMaps
-	GetPrintSkbMap() *ebpf.Map
-}
-
-type KProbePrograms interface {
-	GetKprobeSkb1() *ebpf.Program
-	GetKprobeSkb2() *ebpf.Program
-	GetKprobeSkb3() *ebpf.Program
-	GetKprobeSkb4() *ebpf.Program
-	GetKprobeSkb5() *ebpf.Program
-	GetKprobeSkbLifetimeTermination() *ebpf.Program
-}
-
-type KProbeObjects interface {
-	KProbeMaps
-	KProbePrograms
-	Close() error
 }
