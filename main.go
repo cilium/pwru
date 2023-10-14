@@ -104,20 +104,15 @@ func main() {
 	opts.Programs.LogSize = ebpf.DefaultVerifierLogSize * 100
 
 	var bpfSpec *ebpf.CollectionSpec
-	var objs pwru.KProbeObjects
 	switch {
 	case flags.OutputSkb && useKprobeMulti:
 		bpfSpec, err = LoadKProbeMultiPWRU()
-		objs = &KProbeMultiPWRUObjects{}
 	case flags.OutputSkb:
 		bpfSpec, err = LoadKProbePWRU()
-		objs = &KProbePWRUObjects{}
 	case useKprobeMulti:
 		bpfSpec, err = LoadKProbeMultiPWRUWithoutOutputSKB()
-		objs = &KProbeMultiPWRUWithoutOutputSKBObjects{}
 	default:
 		bpfSpec, err = LoadKProbePWRUWithoutOutputSKB()
-		objs = &KProbeMultiPWRUWithoutOutputSKBObjects{}
 	}
 	if err != nil {
 		log.Fatalf("Failed to load bpf spec: %v", err)
@@ -142,7 +137,8 @@ func main() {
 		log.Fatalf("Failed to rewrite config: %v", err)
 	}
 
-	if err := bpfSpec.LoadAndAssign(objs, &opts); err != nil {
+	coll, err := ebpf.NewCollectionWithOptions(bpfSpec, opts)
+	if err != nil {
 		var (
 			ve          *ebpf.VerifierError
 			verifierLog string
@@ -153,21 +149,18 @@ func main() {
 
 		log.Fatalf("Failed to load objects: %s\n%+v", verifierLog, err)
 	}
-	defer objs.Close()
+	defer coll.Close()
 
-	kprobe1 := objs.GetKprobeSkb1()
-	kprobe2 := objs.GetKprobeSkb2()
-	kprobe3 := objs.GetKprobeSkb3()
-	kprobe4 := objs.GetKprobeSkb4()
-	kprobe5 := objs.GetKprobeSkb5()
-	kprobeLifetimeTermination := objs.GetKprobeSkbLifetimeTermination()
+	kprobe1 := coll.Programs["kprobe_skb_1"]
+	kprobe2 := coll.Programs["kprobe_skb_2"]
+	kprobe3 := coll.Programs["kprobe_skb_3"]
+	kprobe4 := coll.Programs["kprobe_skb_4"]
+	kprobe5 := coll.Programs["kprobe_skb_5"]
+	kprobeLifetimeTermination := coll.Programs["kprobe_skb_lifetime_termination"]
 
-	events := objs.GetEvents()
-	printStackMap := objs.GetPrintStackMap()
-	var printSkbMap *ebpf.Map
-	if flags.OutputSkb {
-		printSkbMap = objs.(pwru.KProbeMapsWithOutputSKB).GetPrintSkbMap()
-	}
+	events := coll.Maps["events"]
+	printStackMap := coll.Maps["print_stack_map"]
+	printSkbMap := coll.Maps["print_skb_map"]
 
 	var kprobes []link.Link
 	defer func() {
