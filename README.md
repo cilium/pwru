@@ -136,12 +136,21 @@ See [docs/vagrant.md](docs/vagrant.md)
 
 * Go >= 1.16
 * LLVM/clang >= 1.12
+* Bison 
+* Lex/Flex >= 2.5.31
 
 ### Building
 
+
+Build libpcap before building pwru:
 ```
-make
+make libpcap/libpcap.a
 ```
+
+Now you can build pwru:
+```
+make 
+``````
 
 Alternatively, you can build in the Docker container:
 
