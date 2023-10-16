@@ -20,11 +20,13 @@ $(TARGET): libpcap/libpcap.a
 		-ldflags "-w -s \
 		-X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'"
 
+## Build libpcap for static linking
 libpcap/libpcap.a:
 	cd libpcap && \
 		CC=$(LIBPCAP_CC) ./configure --disable-rdma --disable-shared --disable-usb --disable-netmap --disable-bluetooth --disable-dbus --without-libnl --host=$(LIBPCAP_ARCH) && \
 		make
 
+## Spin up a docker container to build a new release
 release:
 	docker run \
 		--rm \
@@ -35,16 +37,19 @@ release:
 			git config --global --add safe.directory /pwru && \
 			make local-release"
 
+## Build a new release
 local-release: clean
 	# TODO(brb) remove once https://github.com/cilium/pwru/issues/246 is resolved
 	clang --version
 	gcc --version
 	ARCHS='amd64 arm64' ./local-release.sh
 
+## Install the binary locally
 install: $(TARGET)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m 0755 $(TARGET) $(DESTDIR)$(BINDIR)
 
+## Clean up build artifacts
 clean:
 	rm -f $(TARGET)
 	rm -f kprobepwru_bpf*
@@ -53,7 +58,32 @@ clean:
 	rm -f kprobemultipwruwithoutoutputskb_bpf*
 	cd libpcap/ && make clean || true
 
+## Run GO tests
 test:
 	$(GO) test -timeout=$(TEST_TIMEOUT) -race -cover $$($(GO) list ./...)
+
+# COLORS
+GREEN  := $(shell tput -Txterm setaf 2)
+YELLOW := $(shell tput -Txterm setaf 3)
+WHITE  := $(shell tput -Txterm setaf 7)
+RESET  := $(shell tput -Txterm sgr0)
+
+TARGET_MAX_CHAR_NUM=20
+## Show this help
+help:
+	@echo ''
+	@echo 'Usage:'
+	@echo '  ${YELLOW}make${RESET} ${GREEN}<target>${RESET}'
+	@echo ''
+	@echo 'Targets:'
+	@awk '/^[a-zA-Z\-\_0-9]+:/ { \
+		helpMessage = match(lastLine, /^## (.*)/); \
+		if (helpMessage) { \
+			helpCommand = substr($$1, 0, index($$1, ":")-1); \
+			helpMessage = substr(lastLine, RSTART + 3, RLENGTH); \
+			printf "  ${YELLOW}%-$(TARGET_MAX_CHAR_NUM)s${RESET} ${GREEN}%s${RESET}\n", helpCommand, helpMessage; \
+		} \
+	} \
+	{ lastLine = $$0 }' $(MAKEFILE_LIST)
 
 .PHONY: $(TARGET) release local-release install clean test
