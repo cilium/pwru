@@ -93,7 +93,9 @@ func main() {
 	if len(funcs) <= 0 {
 		log.Fatalf("Cannot find a matching kernel function")
 	}
-	addr2name, err := pwru.GetAddrs(funcs, flags.OutputStack || len(flags.KMods) != 0)
+	// If --filter-trace-tc, it's to retrieve and print bpf prog's name.
+	addr2name, err := pwru.GetAddrs(funcs, flags.OutputStack ||
+		len(flags.KMods) != 0 || flags.FilterTraceTc)
 	if err != nil {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}
@@ -137,6 +139,19 @@ func main() {
 		log.Fatalf("Failed to rewrite config: %v", err)
 	}
 
+	// As we know, for every fentry tracing program, there is a corresponding
+	// bpf prog spec with attaching target and attaching function. So, we can
+	// just copy the spec and keep the fentry_tc program spec only in the copied
+	// spec.
+	bpfSpecFentry := bpfSpec.Copy()
+	bpfSpecFentry.Programs = map[string]*ebpf.ProgramSpec{
+		"fentry_tc": bpfSpec.Programs["fentry_tc"],
+	}
+
+	// fentry_tc is not used in the kprobe/kprobe-multi cases. So, it should be
+	// deleted from the spec.
+	delete(bpfSpec.Programs, "fentry_tc")
+
 	coll, err := ebpf.NewCollectionWithOptions(bpfSpec, opts)
 	if err != nil {
 		var (
@@ -161,6 +176,14 @@ func main() {
 	events := coll.Maps["events"]
 	printStackMap := coll.Maps["print_stack_map"]
 	printSkbMap := coll.Maps["print_skb_map"]
+
+	if flags.FilterTraceTc {
+		close, err := pwru.TraceTC(coll, bpfSpecFentry, &opts, flags.OutputSkb)
+		if err != nil {
+			log.Fatalf("Failed to trace TC: %v", err)
+		}
+		defer close()
+	}
 
 	var kprobes []link.Link
 	defer func() {
