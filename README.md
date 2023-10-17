@@ -141,16 +141,9 @@ See [docs/vagrant.md](docs/vagrant.md)
 
 ### Building
 
-
-Build libpcap before building pwru:
 ```
-make libpcap/libpcap.a
+make
 ```
-
-Now you can build pwru:
-```
-make 
-``````
 
 Alternatively, you can build in the Docker container:
 
