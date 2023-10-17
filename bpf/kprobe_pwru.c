@@ -250,7 +250,7 @@ set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
 }
 
 static __always_inline void
-set_output(struct pt_regs *ctx, struct sk_buff *skb, struct event_t *event) {
+set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 	if (cfg->output_meta) {
 		set_meta(skb, &event->meta);
 	}
@@ -268,9 +268,8 @@ set_output(struct pt_regs *ctx, struct sk_buff *skb, struct event_t *event) {
 	}
 }
 
-static __noinline int
-handle_everything(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip) {
-	struct event_t event = {};
+static __noinline bool
+handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event) {
 	bool tracked = false;
 	u64 skb_addr = (u64) skb;
 
@@ -281,27 +280,37 @@ handle_everything(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip
 		}
 
 		if (!filter(skb)) {
-			return 0;
+			return false;
 		}
 
 cont:
-		set_output(ctx, skb, &event);
+		set_output(ctx, skb, event);
 	}
 
 	if (cfg->track_skb && !tracked) {
 		bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
 	}
 
-	event.skb_addr = (u64) skb;
-	event.pid = bpf_get_current_pid_tgid();
-	event.addr = has_get_func_ip ? bpf_get_func_ip(ctx) : PT_REGS_IP(ctx);
-	event.ts = bpf_ktime_get_ns();
-	event.cpu_id = bpf_get_smp_processor_id();
-	event.param_second = PT_REGS_PARM2(ctx);
+	event->pid = bpf_get_current_pid_tgid();
+	event->ts = bpf_ktime_get_ns();
+	event->cpu_id = bpf_get_smp_processor_id();
 
+	return true;
+}
+
+static __always_inline int
+kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip) {
+	struct event_t event = {};
+
+	if (!handle_everything(skb, ctx, &event))
+		return BPF_OK;
+
+	event.skb_addr = (u64) skb;
+	event.addr = has_get_func_ip ? bpf_get_func_ip(ctx) : PT_REGS_IP(ctx);
+	event.param_second = PT_REGS_PARM2(ctx);
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
-	return 0;
+	return BPF_OK;
 }
 
 #ifdef HAS_KPROBE_MULTI
@@ -316,7 +325,7 @@ cont:
   SEC(PWRU_KPROBE_TYPE "/skb-" #X)                                             \
   int kprobe_skb_##X(struct pt_regs *ctx) {                                    \
     struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM##X(ctx);             \
-    return handle_everything(skb, ctx, PWRU_HAS_GET_FUNC_IP);                  \
+    return kprobe_skb(skb, ctx, PWRU_HAS_GET_FUNC_IP);                         \
   }
 
 PWRU_ADD_KPROBE(1)
@@ -336,6 +345,20 @@ int kprobe_skb_lifetime_termination(struct pt_regs *ctx) {
 		bpf_map_delete_elem(&skb_addresses, &skb);
 
 	return 0;
+}
+
+SEC("fentry/tc")
+int BPF_PROG(fentry_tc, struct sk_buff *skb) {
+	struct event_t event = {};
+
+	if (!handle_everything(skb, ctx, &event))
+		return BPF_OK;
+
+	event.skb_addr = (u64) skb;
+	event.addr = bpf_get_func_ip(ctx);
+	bpf_map_push_elem(&events, &event, BPF_EXIST);
+
+	return BPF_OK;
 }
 
 char __license[] SEC("license") = "Dual BSD/GPL";
