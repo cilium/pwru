@@ -13,8 +13,10 @@ LIBPCAP_ARCH ?= x86_64-unknown-linux-gnu
 CC ?= gcc
 
 TEST_TIMEOUT ?= 5s
+.DEFAULT_GOAL := pwru
 
-$(TARGET): libpcap/libpcap.a
+## Build the GO binary
+pwru: libpcap/libpcap.a
 	TARGET_GOARCH=$(TARGET_GOARCH) $(GO_GENERATE)
 	CC=$(CC) GOARCH=$(TARGET_GOARCH) $(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) \
 		-ldflags "-w -s \
@@ -26,7 +28,7 @@ libpcap/libpcap.a:
 		CC=$(LIBPCAP_CC) ./configure --disable-rdma --disable-shared --disable-usb --disable-netmap --disable-bluetooth --disable-dbus --without-libnl --host=$(LIBPCAP_ARCH) && \
 		make
 
-## Spin up a docker container to build a new release
+## Build the GO binary within a Docker container
 release:
 	docker run \
 		--rm \
@@ -44,7 +46,7 @@ local-release: clean
 	gcc --version
 	ARCHS='amd64 arm64' ./local-release.sh
 
-## Install the binary locally
+## Install the GO Binary to the location specified by 'BINDIR'
 install: $(TARGET)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m 0755 $(TARGET) $(DESTDIR)$(BINDIR)
@@ -76,6 +78,7 @@ help:
 	@echo '  ${YELLOW}make${RESET} ${GREEN}<target>${RESET}'
 	@echo ''
 	@echo 'Targets:'
+
 	@awk '/^[a-zA-Z\-\_0-9]+:/ { \
 		helpMessage = match(lastLine, /^## (.*)/); \
 		if (helpMessage) { \
