@@ -58,7 +58,7 @@ var targetByGoArch = map[string]target{
 	"mips64le":    {"bpfel", ""},
 	"mips64p32le": {"bpfel", ""},
 	"ppc64le":     {"bpfel", "powerpc"},
-	"riscv64":     {"bpfel", ""},
+	"riscv64":     {"bpfel", "riscv"},
 	"armbe":       {"bpfeb", "arm"},
 	"arm64be":     {"bpfeb", "arm64"},
 	"mips":        {"bpfeb", ""},
@@ -105,7 +105,7 @@ type bpf2go struct {
 	// C flags passed to the compiler.
 	cFlags          []string
 	skipGlobalTypes bool
-	// C types to include in the generatd output.
+	// C types to include in the generated output.
 	cTypes cTypes
 	// Build tags to be included in the output.
 	tags buildTags
