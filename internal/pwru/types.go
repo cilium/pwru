@@ -41,6 +41,7 @@ type Flags struct {
 	OutputStack      bool
 	OutputLimitLines uint64
 	OutputFile       string
+	OutputJson       bool
 
 	KMods    []string
 	AllKMods bool
@@ -71,6 +72,8 @@ func (f *Flags) SetFlags() {
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
 
 	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
+
+	flag.BoolVar(&f.OutputJson, "output-json", false, "output traces in JSON format")
 
 	flag.StringVar(&f.ReadyFile, "ready-file", "", "create file after all BPF progs are attached")
 	flag.Lookup("ready-file").Hidden = true

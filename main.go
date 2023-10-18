@@ -298,6 +298,10 @@ func main() {
 	defer output.Close()
 	output.PrintHeader()
 
+	if !flags.OutputJson {
+		output.PrintHeader()
+	}
+
 	defer func() {
 		select {
 		case <-ctx.Done():
@@ -323,7 +327,11 @@ func main() {
 			}
 		}
 
-		output.Print(&event)
+		if flags.OutputJson {
+			output.PrintJson(&event)
+		} else {
+			output.Print(&event)
+		}
 
 		select {
 		case <-ctx.Done():
