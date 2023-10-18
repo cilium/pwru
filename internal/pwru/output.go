@@ -5,6 +5,7 @@
 package pwru
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -38,6 +39,32 @@ type output struct {
 	kprobeMulti   bool
 	kfreeReasons  map[uint64]string
 	ifaceCache    map[uint64]map[uint32]string
+}
+
+// outputStructured is a struct to hold the data for the json output
+type jsonPrinter struct {
+	Skb         string      `json:"skb,omitempty"`
+	Cpu         uint32      `json:"cpu,omitempty"`
+	Process     string      `json:"process,omitempty"`
+	Func        string      `json:"func,omitempty"`
+	Time        interface{} `json:"time,omitempty"`
+	Netns       uint32      `json:"netns,omitempty"`
+	Mark        uint32      `json:"mark,omitempty"`
+	Iface       string      `json:"iface,omitempty"`
+	Proto       uint16      `json:"proto,omitempty"`
+	Mtu         uint32      `json:"mtu,omitempty"`
+	Len         uint32      `json:"len,omitempty"`
+	Tuple       *jsonTuple  `json:"tuple,omitempty"`
+	Stack       interface{} `json:"stack,omitempty"`
+	SkbMetadata interface{} `json:"skb_metadata,omitempty"`
+}
+
+type jsonTuple struct {
+	Saddr string `json:"saddr,omitempty"`
+	Daddr string `json:"daddr,omitempty"`
+	Sport uint16 `json:"sport,omitempty"`
+	Dport uint16 `json:"dport,omitempty"`
+	Proto uint8  `json:"proto,omitempty"`
 }
 
 func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
@@ -97,25 +124,93 @@ func (o *output) PrintHeader() {
 	fmt.Fprintf(o.writer, "\n")
 }
 
-func (o *output) Print(event *Event) {
-	if o.flags.OutputTS == "absolute" {
-		fmt.Fprintf(o.writer, "%12s ", time.Now().Format(absoluteTS))
-	}
-	p, err := ps.FindProcess(int(event.PID))
-	execName := fmt.Sprintf("<empty>(%d)", event.PID)
-	if err == nil && p != nil {
-		execName = fmt.Sprintf("%s(%d)", p.ExecutablePath(), event.PID)
-	}
-	ts := event.Timestamp
-	if o.flags.OutputTS == "relative" {
-		if last, found := o.lastSeenSkb[event.SAddr]; found {
-			ts = ts - last
-		} else {
-			ts = 0
+// PrintJson prints the event in JSON format
+func (o *output) PrintJson(event *Event) {
+	// crate an instance of the outputStructured struct to hold the data
+	d := &jsonPrinter{}
+
+	// add the data to the struct
+	d.Skb = fmt.Sprintf("%#x", event.SAddr)
+	d.Cpu = event.CPU
+	d.Process = getExecName(int(event.PID))
+	d.Func = getOutFuncName(o, event, event.Addr)
+
+	o.lastSeenSkb[event.SAddr] = event.Timestamp
+
+	// add the timestamp to the struct if it is not set to none
+	if o.flags.OutputTS != "none" {
+		switch o.flags.OutputTS {
+		case "absolute":
+			d.Time = getAbsoluteTs()
+		case "relative":
+			d.Time = getRelativeTs(event, o)
+		case "current":
+			d.Time = event.Timestamp
 		}
 	}
-	var addr uint64
-	// XXX: not sure why the -1 offset is needed on x86 but not on arm64
+
+	if o.flags.OutputMeta {
+		d.Netns = event.Meta.Netns
+		d.Mark = event.Meta.Mark
+		d.Iface = o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex)
+		d.Proto = byteorder.NetworkToHost16(event.Meta.Proto)
+		d.Mtu = event.Meta.MTU
+		d.Len = event.Meta.Len
+	}
+
+	if o.flags.OutputTuple {
+		t := &jsonTuple{}
+		t.Saddr = addrToStr(event.Tuple.L3Proto, event.Tuple.Saddr)
+		t.Daddr = addrToStr(event.Tuple.L3Proto, event.Tuple.Daddr)
+		t.Sport = byteorder.NetworkToHost16(event.Tuple.Sport)
+		t.Dport = byteorder.NetworkToHost16(event.Tuple.Dport)
+		t.Proto = event.Tuple.L4Proto
+		d.Tuple = t
+	}
+
+	if o.flags.OutputStack && event.PrintStackId > 0 {
+		d.Stack = getStackData(event, o)
+	}
+
+	if o.flags.OutputSkb {
+		d.SkbMetadata = getSkbData(event, o)
+	}
+
+	// Create new encoder to write the json to stdout or file depending on the flags
+	encoder := json.NewEncoder(o.writer)
+	encoder.SetEscapeHTML(false)
+
+	err := encoder.Encode(d)
+
+	if err != nil {
+		log.Fatalf("Error encoding JSON: %s", err)
+	}
+}
+
+func getAbsoluteTs() string {
+	return time.Now().Format(absoluteTS)
+}
+
+func getRelativeTs(event *Event, o *output) uint64 {
+	ts := event.Timestamp
+	if last, found := o.lastSeenSkb[event.SAddr]; found {
+		ts = ts - last
+	} else {
+		ts = 0
+	}
+	return ts
+}
+
+func getExecName(pid int) string {
+	p, err := ps.FindProcess(pid)
+	execName := fmt.Sprintf("<empty>:(%d)", pid)
+	if err == nil && p != nil {
+		return fmt.Sprintf("%s:%d", p.ExecutablePath(), pid)
+	}
+	return execName
+}
+
+func getAddrByArch(event *Event, o *output) (addr uint64) {
 	switch runtime.GOARCH {
 	case "amd64":
 		addr = event.Addr
@@ -125,7 +220,50 @@ func (o *output) Print(event *Event) {
 	case "arm64":
 		addr = event.Addr
 	}
+	return addr
+}
+
+func getTupleData(event *Event) (tupleData string) {
+	tupleData = fmt.Sprintf("%s:%d->%s:%d(%s)",
+		addrToStr(event.Tuple.L3Proto, event.Tuple.Saddr), byteorder.NetworkToHost16(event.Tuple.Sport),
+		addrToStr(event.Tuple.L3Proto, event.Tuple.Daddr), byteorder.NetworkToHost16(event.Tuple.Dport),
+		protoToStr(event.Tuple.L4Proto))
+	return tupleData
+}
+
+func getStackData(event *Event, o *output) (stackData string) {
+	var stack StackData
+	id := uint32(event.PrintStackId)
+	if err := o.printStackMap.Lookup(&id, &stack); err == nil {
+		for _, ip := range stack.IPs {
+			if ip > 0 {
+				stackData += fmt.Sprintf("\n%s", o.addr2name.findNearestSym(ip))
+			}
+		}
+	}
+	_ = o.printStackMap.Delete(&id)
+	return stackData
+}
+
+func getSkbData(event *Event, o *output) (skbData string) {
+	id := uint32(event.PrintSkbId)
+	if str, err := o.printSkbMap.LookupBytes(&id); err == nil {
+		skbData = string(str)
+	}
+	return skbData
+}
+
+func getMetaData(event *Event, o *output) (metaData string) {
+	metaData = fmt.Sprintf("netns=%d mark=%#x iface=%s proto=%#04x mtu=%d len=%d",
+		event.Meta.Netns, event.Meta.Mark,
+		o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex),
+		byteorder.NetworkToHost16(event.Meta.Proto), event.Meta.MTU, event.Meta.Len)
+	return metaData
+}
+
+func getOutFuncName(o *output, event *Event, addr uint64) string {
 	var funcName string
+
 	if ksym, ok := o.addr2name.Addr2NameMap[addr]; ok {
 		funcName = ksym.name
 	} else if ksym, ok := o.addr2name.Addr2NameMap[addr-4]; runtime.GOARCH == "amd64" && ok {
@@ -146,6 +284,26 @@ func (o *output) Print(event *Event) {
 		}
 	}
 
+	return outFuncName
+}
+
+func (o *output) Print(event *Event) {
+	if o.flags.OutputTS == "absolute" {
+		fmt.Fprintf(o.writer, "%12s ", getAbsoluteTs())
+	}
+
+	execName := getExecName(int(event.PID))
+
+	ts := event.Timestamp
+	if o.flags.OutputTS == "relative" {
+		ts = getRelativeTs(event, o)
+	}
+
+	// XXX: not sure why the -1 offset is needed on x86 but not on arm64
+	addr := getAddrByArch(event, o)
+
+	outFuncName := getOutFuncName(o, event, addr)
+
 	fmt.Fprintf(o.writer, "%18s %6s %16s %24s", fmt.Sprintf("%#x", event.SAddr),
 		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName), outFuncName)
 	if o.flags.OutputTS != "none" {
@@ -154,37 +312,19 @@ func (o *output) Print(event *Event) {
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
-		fmt.Fprintf(o.writer, " netns=%d mark=%#x iface=%s proto=%#04x mtu=%d len=%d",
-			event.Meta.Netns, event.Meta.Mark,
-			o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex),
-			byteorder.NetworkToHost16(event.Meta.Proto), event.Meta.MTU, event.Meta.Len)
+		fmt.Fprintf(o.writer, " %s", getMetaData(event, o))
 	}
 
 	if o.flags.OutputTuple {
-		fmt.Fprintf(o.writer, " %s:%d->%s:%d(%s)",
-			addrToStr(event.Tuple.L3Proto, event.Tuple.Saddr), byteorder.NetworkToHost16(event.Tuple.Sport),
-			addrToStr(event.Tuple.L3Proto, event.Tuple.Daddr), byteorder.NetworkToHost16(event.Tuple.Dport),
-			protoToStr(event.Tuple.L4Proto))
+		fmt.Fprintf(o.writer, " %s", getTupleData(event))
 	}
 
 	if o.flags.OutputStack && event.PrintStackId > 0 {
-		var stack StackData
-		id := uint32(event.PrintStackId)
-		if err := o.printStackMap.Lookup(&id, &stack); err == nil {
-			for _, ip := range stack.IPs {
-				if ip > 0 {
-					fmt.Fprintf(o.writer, "\n%s", o.addr2name.findNearestSym(ip))
-				}
-			}
-		}
-		_ = o.printStackMap.Delete(&id)
+		fmt.Fprintf(o.writer, "%s", getStackData(event, o))
 	}
 
 	if o.flags.OutputSkb {
-		id := uint32(event.PrintSkbId)
-		if str, err := o.printSkbMap.LookupBytes(&id); err == nil {
-			fmt.Fprintf(o.writer, "\n%s", string(str))
-		}
+		fmt.Fprintf(o.writer, "%s", getSkbData(event, o))
 	}
 
 	fmt.Fprintln(o.writer)
