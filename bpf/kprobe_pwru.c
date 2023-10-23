@@ -341,10 +341,10 @@ PWRU_ADD_KPROBE(5)
 SEC("kprobe/skb_lifetime_termination")
 int kprobe_skb_lifetime_termination(struct pt_regs *ctx) {
 	u64 skb = (u64) PT_REGS_PARM1(ctx);
-	if (cfg->track_skb)
-		bpf_map_delete_elem(&skb_addresses, &skb);
 
-	return 0;
+	bpf_map_delete_elem(&skb_addresses, &skb);
+
+	return BPF_OK;
 }
 
 SEC("fentry/tc")
