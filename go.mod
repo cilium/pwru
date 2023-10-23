@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.4
-	github.com/cilium/ebpf v0.12.0
+	github.com/cilium/ebpf v0.12.2
 	github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
 	github.com/jsimonetti/rtnetlink v1.3.5
 	github.com/mitchellh/go-ps v1.0.0
