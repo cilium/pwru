@@ -152,6 +152,10 @@ func main() {
 	// deleted from the spec.
 	delete(bpfSpec.Programs, "fentry_tc")
 
+	if !flags.FilterTrackSkb {
+		delete(bpfSpec.Programs, "kprobe_skb_lifetime_termination")
+	}
+
 	coll, err := ebpf.NewCollectionWithOptions(bpfSpec, opts)
 	if err != nil {
 		var (
@@ -171,7 +175,6 @@ func main() {
 	kprobe3 := coll.Programs["kprobe_skb_3"]
 	kprobe4 := coll.Programs["kprobe_skb_4"]
 	kprobe5 := coll.Programs["kprobe_skb_5"]
-	kprobeLifetimeTermination := coll.Programs["kprobe_skb_lifetime_termination"]
 
 	events := coll.Maps["events"]
 	printStackMap := coll.Maps["print_stack_map"]
@@ -213,7 +216,7 @@ func main() {
 	bar := pb.StartNew(len(funcs))
 
 	if flags.FilterTrackSkb {
-		kp, err := link.Kprobe("kfree_skbmem", kprobeLifetimeTermination, nil)
+		kp, err := link.Kprobe("kfree_skbmem", coll.Programs["kprobe_skb_lifetime_termination"], nil)
 		bar.Increment()
 		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
