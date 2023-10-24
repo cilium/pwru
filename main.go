@@ -195,21 +195,19 @@ func main() {
 
 	var kprobes []link.Link
 	defer func() {
+		var showProgressBar bool
 		select {
 		case <-ctx.Done():
-			log.Println("Detaching kprobes...")
-			bar := pb.StartNew(len(kprobes))
-			for _, kp := range kprobes {
-				_ = kp.Close()
-				bar.Increment()
-			}
-			bar.Finish()
+			showProgressBar = true
 
 		default:
-			for _, kp := range kprobes {
-				_ = kp.Close()
-			}
 		}
+
+		batch := uint(1)
+		if !useKprobeMulti {
+			batch = flags.FilterKprobeBatch
+		}
+		pwru.DetachKprobes(kprobes, showProgressBar, batch)
 	}()
 
 	msg := "kprobe"
@@ -257,69 +255,32 @@ func main() {
 		}
 	}
 
+	pwruKprobes := make([]pwru.Kprobe, 0, len(funcs))
 	funcsByPos := pwru.GetFuncsByPos(funcs)
 	for pos, fns := range funcsByPos {
 		fn, ok := coll.Programs[fmt.Sprintf("kprobe_skb_%d", pos)]
-		if !ok {
+		if ok {
+			pwruKprobes = append(pwruKprobes, pwru.Kprobe{HookFuncs: fns, Prog: fn})
+		} else {
 			ignored += len(fns)
 			bar.Add(len(fns))
-			continue
-		}
-
-		if !useKprobeMulti {
-			for _, name := range fns {
-				select {
-				case <-ctx.Done():
-					bar.Finish()
-					return
-				default:
-				}
-
-				kp, err := link.Kprobe(name, fn, nil)
-				bar.Increment()
-				if err != nil {
-					if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, syscall.EADDRNOTAVAIL) {
-						log.Fatalf("Opening kprobe %s: %s\n", name, err)
-					} else {
-						ignored += 1
-					}
-				} else {
-					kprobes = append(kprobes, kp)
-				}
-			}
-		} else {
-			select {
-			case <-ctx.Done():
-				bar.Finish()
-				return
-			default:
-			}
-
-			addrs := make([]uintptr, 0, len(fns))
-			for _, fn := range fns {
-				if addr, ok := addr2name.Name2AddrMap[fn]; ok {
-					addrs = append(addrs, addr...)
-				} else {
-					ignored += 1
-					bar.Increment()
-					continue
-				}
-			}
-
-			if len(addrs) == 0 {
-				continue
-			}
-
-			opts := link.KprobeMultiOptions{Addresses: addrs}
-			kp, err := link.KprobeMulti(fn, opts)
-			bar.Add(len(fns))
-			if err != nil {
-				log.Fatalf("Opening kprobe-multi for pos %d: %s\n", pos, err)
-			}
-			kprobes = append(kprobes, kp)
 		}
 	}
+	if !useKprobeMulti {
+		l, i := pwru.AttachKprobes(ctx, bar, pwruKprobes, flags.FilterKprobeBatch)
+		kprobes = append(kprobes, l...)
+		ignored += i
+	} else {
+		l, i := pwru.AttachKprobeMulti(ctx, bar, pwruKprobes, addr2name)
+		kprobes = append(kprobes, l...)
+		ignored += i
+	}
 	bar.Finish()
+	select {
+	case <-ctx.Done():
+		return
+	default:
+	}
 	log.Printf("Attached (ignored %d)\n", ignored)
 
 	log.Println("Listening for events..")
