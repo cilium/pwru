@@ -25,13 +25,14 @@ type Flags struct {
 
 	KernelBTF string
 
-	FilterNetns    string
-	FilterMark     uint32
-	FilterFunc     string
-	FilterTrackSkb bool
-	FilterTraceTc  bool
-	FilterIfname   string
-	FilterPcap     string
+	FilterNetns       string
+	FilterMark        uint32
+	FilterFunc        string
+	FilterTrackSkb    bool
+	FilterTraceTc     bool
+	FilterIfname      string
+	FilterPcap        string
+	FilterKprobeBatch uint
 
 	OutputTS         string
 	OutputMeta       bool
@@ -61,6 +62,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.FilterTrackSkb, "filter-track-skb", false, "trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)")
 	flag.BoolVar(&f.FilterTraceTc, "filter-trace-tc", false, "trace TC bpf progs")
 	flag.StringVar(&f.FilterIfname, "filter-ifname", "", "filter skb ifname in --filter-netns (if not specified, use current netns)")
+	flag.UintVar(&f.FilterKprobeBatch, "filter-kprobe-batch", 10, "batch size for kprobe attaching/detaching")
 	flag.StringVar(&f.OutputTS, "timestamp", "none", "print timestamp per skb (\"current\", \"relative\", \"absolute\", \"none\")")
 	flag.BoolVar(&f.OutputMeta, "output-meta", false, "print skb metadata")
 	flag.BoolVar(&f.OutputTuple, "output-tuple", false, "print L4 tuple")

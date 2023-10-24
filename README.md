@@ -56,6 +56,7 @@ Usage: pwru [options] [pcap-filter]
       --backend string            Tracing backend('kprobe', 'kprobe-multi'). Will auto-detect if not specified.
       --filter-func string        filter kernel functions to be probed by name (exact match, supports RE2 regular expression)
       --filter-ifname string      filter skb ifname in --filter-netns (if not specified, use current netns)
+      --filter-kprobe-batch uint  batch size for kprobe attaching/detaching (default 10)
       --filter-mark uint32        filter skb mark
       --filter-netns string       filter netns ("/proc/<pid>/ns/net", "inode:<inode>")
       --filter-trace-tc           trace TC bpf progs
@@ -138,7 +139,7 @@ See [docs/vagrant.md](docs/vagrant.md)
 
 * Go >= 1.16
 * LLVM/clang >= 1.12
-* Bison 
+* Bison
 * Lex/Flex >= 2.5.31
 
 ### Building
