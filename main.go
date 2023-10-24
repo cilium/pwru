@@ -121,7 +121,10 @@ func main() {
 	}
 
 	for name, program := range bpfSpec.Programs {
-		if name == "kprobe_skb_lifetime_termination" {
+		// Skip the skb-tracking ones that should not inject pcap-filter.
+		if name == "kprobe_skb_lifetime_termination" ||
+			name == "fexit_skb_clone" ||
+			name == "fexit_skb_copy" {
 			continue
 		}
 		if err = libpcap.InjectFilters(program, flags.FilterPcap); err != nil {
@@ -152,8 +155,16 @@ func main() {
 	// deleted from the spec.
 	delete(bpfSpec.Programs, "fentry_tc")
 
+	// If not tracking skb, deleting the skb-tracking programs to reduce loading
+	// time.
 	if !flags.FilterTrackSkb {
 		delete(bpfSpec.Programs, "kprobe_skb_lifetime_termination")
+	}
+
+	haveFexit := pwru.HaveBPFLinkTracing()
+	if !flags.FilterTrackSkb || !haveFexit {
+		delete(bpfSpec.Programs, "fexit_skb_clone")
+		delete(bpfSpec.Programs, "fexit_skb_copy")
 	}
 
 	coll, err := ebpf.NewCollectionWithOptions(bpfSpec, opts)
@@ -227,6 +238,28 @@ func main() {
 			}
 		} else {
 			kprobes = append(kprobes, kp)
+		}
+
+		if haveFexit {
+			progs := []*ebpf.Program{
+				coll.Programs["fexit_skb_clone"],
+				coll.Programs["fexit_skb_copy"],
+			}
+			for _, prog := range progs {
+				fexit, err := link.AttachTracing(link.TracingOptions{
+					Program: prog,
+				})
+				bar.Increment()
+				if err != nil {
+					if !errors.Is(err, os.ErrNotExist) {
+						log.Fatalf("Opening tracing(%s): %s\n", prog, err)
+					} else {
+						ignored += 1
+					}
+				} else {
+					kprobes = append(kprobes, fexit)
+				}
+			}
 		}
 	}
 
