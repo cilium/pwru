@@ -347,6 +347,24 @@ int kprobe_skb_lifetime_termination(struct pt_regs *ctx) {
 	return BPF_OK;
 }
 
+static __always_inline int
+track_skb_clone(u64 old, u64 new) {
+	if (bpf_map_lookup_elem(&skb_addresses, &old))
+		bpf_map_update_elem(&skb_addresses, &new, &TRUE, BPF_ANY);
+
+	return BPF_OK;
+}
+
+SEC("fexit/skb_clone")
+int BPF_PROG(fexit_skb_clone, u64 old, gfp_t mask, u64 new) {
+	return track_skb_clone(old, new);
+}
+
+SEC("fexit/skb_copy")
+int BPF_PROG(fexit_skb_copy, u64 old, gfp_t mask, u64 new) {
+	return track_skb_clone(old, new);
+}
+
 SEC("fentry/tc")
 int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 	struct event_t event = {};
