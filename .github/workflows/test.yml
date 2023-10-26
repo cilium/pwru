@@ -159,6 +159,7 @@ jobs:
         with:
           provision: 'false'
           cmd: |
-            cat /tmp/pwru-*.status || true
-            cat /tmp/pwru-*.ready || true
-            cat /tmp/pwru-*.log || true
+            for i in /tmp/pwru-*.status /tmp/pwru-*.ready /tmp/pwru-*.log; do
+              echo "--- \$i ---"
+              cat \$i || true
+            done
