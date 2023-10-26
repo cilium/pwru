@@ -299,6 +299,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create outputer: %s", err)
 	}
+	defer output.Close()
 	output.PrintHeader()
 
 	defer func() {
