@@ -7,7 +7,6 @@ package pwru
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -36,7 +35,7 @@ type output struct {
 	printSkbMap   *ebpf.Map
 	printStackMap *ebpf.Map
 	addr2name     Addr2Name
-	writer        io.Writer
+	writer        *os.File
 	kprobeMulti   bool
 	kfreeReasons  map[uint64]string
 	ifaceCache    map[uint64]map[uint32]string
@@ -79,6 +78,13 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
 		kfreeReasons:  reasons,
 		ifaceCache:    ifs,
 	}, nil
+}
+
+func (o *output) Close() {
+	if o.writer != os.Stdout {
+		_ = o.writer.Sync()
+		_ = o.writer.Close()
+	}
 }
 
 func (o *output) PrintHeader() {
