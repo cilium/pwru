@@ -280,7 +280,7 @@ func getIfaces() (map[uint64]map[uint32]string, error) {
 			continue
 		}
 		var stat unix.Stat_t
-		if err0 := unix.Fstat(int(fd.Fd()), &stat); err != nil {
+		if err0 := unix.Fstat(int(fd.Fd()), &stat); err0 != nil {
 			err = errors.Join(err, err0)
 			continue
 		}
@@ -288,8 +288,6 @@ func getIfaces() (map[uint64]map[uint32]string, error) {
 
 		if _, exists := ifaceCache[inode]; exists {
 			continue // we already checked that netns
-		} else {
-			ifaceCache[inode] = make(map[uint32]string)
 		}
 
 		ifaces, err0 := getIfacesInNetNs(path)
