@@ -291,7 +291,7 @@ cont:
 		bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
 	}
 
-	event->pid = bpf_get_current_pid_tgid();
+	event->pid = bpf_get_current_pid_tgid() >> 32;
 	event->ts = bpf_ktime_get_ns();
 	event->cpu_id = bpf_get_smp_processor_id();
 
