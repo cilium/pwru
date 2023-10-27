@@ -97,9 +97,9 @@ func (o *output) Print(event *Event) {
 		fmt.Fprintf(o.writer, "%12s ", time.Now().Format(absoluteTS))
 	}
 	p, err := ps.FindProcess(int(event.PID))
-	execName := "<empty>"
+	execName := fmt.Sprintf("<empty>(%d)", event.PID)
 	if err == nil && p != nil {
-		execName = p.Executable()
+		execName = fmt.Sprintf("%s(%d)", p.Executable(), event.PID)
 	}
 	ts := event.Timestamp
 	if o.flags.OutputTS == "relative" {
