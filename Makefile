@@ -10,7 +10,7 @@ BINDIR ?= /usr/local/bin
 VERSION=$(shell git describe --tags --always)
 LIBPCAP_ARCH ?= x86_64-unknown-linux-gnu
 # For compiling libpcap and CGO
-CC ?= gcc
+CC ?= clang
 
 TEST_TIMEOUT ?= 5s
 .DEFAULT_GOAL := pwru
@@ -25,7 +25,7 @@ pwru: libpcap/libpcap.a
 ## Build libpcap for static linking
 libpcap/libpcap.a:
 	cd libpcap && \
-		CC=$(LIBPCAP_CC) ./configure --disable-rdma --disable-shared --disable-usb --disable-netmap --disable-bluetooth --disable-dbus --without-libnl --host=$(LIBPCAP_ARCH) && \
+		CC=$(CC) ./configure --disable-rdma --disable-shared --disable-usb --disable-netmap --disable-bluetooth --disable-dbus --without-libnl --host=$(LIBPCAP_ARCH) && \
 		make
 
 ## Build the GO binary within a Docker container
