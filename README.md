@@ -58,6 +58,7 @@ Usage: pwru [options] [pcap-filter]
       --filter-ifname string      filter skb ifname in --filter-netns (if not specified, use current netns)
       --filter-mark uint32        filter skb mark
       --filter-netns string       filter netns ("/proc/<pid>/ns/net", "inode:<inode>")
+      --filter-trace-tc           trace TC bpf progs
       --filter-track-skb          trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)
       --kernel-btf string         specify kernel BTF file
       --kmods strings             list of kernel modules names to attach to
