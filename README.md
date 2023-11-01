@@ -10,6 +10,7 @@ the Linux kernel with advanced filtering capabilities. It allows fine-grained
 introspection of kernel state to facilitate debugging network connectivity issues.
 
 The following example shows where the packets of a `curl` request are dropped
+
 after installing an IP tables rule:
 
 ![demo](demo.gif)
@@ -137,7 +138,7 @@ See [docs/vagrant.md](docs/vagrant.md)
 
 * Go >= 1.16
 * LLVM/clang >= 1.12
-* Bison 
+* Bison
 * Lex/Flex >= 2.5.31
 
 ### Building
