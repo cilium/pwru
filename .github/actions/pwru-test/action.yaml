@@ -29,11 +29,8 @@ runs:
 
           /host/pwru/pwru \
             --output-tuple \
-            --output-file=/tmp/pwru-${{ inputs.test-name }}.log \
-            --ready-file=/tmp/pwru-${{ inputs.test-name }}.ready \
             ${{ inputs.pwru-flags }} \
-            '${{ inputs.pwru-pcap-filter }}' \
-            2>/tmp/pwru-${{ inputs.test-name }}.status &
+            '${{ inputs.pwru-pcap-filter }}'
           PWRU_PID=\$!
 
           while [ ! -f /tmp/pwru-${{ inputs.test-name }}.ready ]; do sleep 1; done
