@@ -10,7 +10,7 @@ for ARCH in ${ARCHS}; do
         CC=aarch64-linux-gnu-gcc
     else
         LIBPCAP_ARCH=x86_64-unknown-linux-gnu
-        CC=gcc
+        CC=clang
     fi
 
     make clean
