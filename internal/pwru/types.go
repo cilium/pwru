@@ -21,6 +21,7 @@ const (
 
 type Flags struct {
 	ShowVersion bool
+	ShowHelp    bool
 
 	KernelBTF string
 
@@ -49,6 +50,7 @@ type Flags struct {
 }
 
 func (f *Flags) SetFlags() {
+	flag.BoolVarP(&f.ShowHelp, "help", "h", false, "display this message and exit")
 	flag.BoolVar(&f.ShowVersion, "version", false, "show pwru version and exit")
 	flag.StringVar(&f.KernelBTF, "kernel-btf", "", "specify kernel BTF file")
 	flag.StringSliceVar(&f.KMods, "kmods", nil, "list of kernel modules names to attach to")
@@ -80,6 +82,10 @@ func (f *Flags) SetFlags() {
 		fmt.Fprintf(os.Stderr, "    Available options:\n")
 		flag.PrintDefaults()
 	}
+}
+
+func (f *Flags) PrintHelp() {
+	flag.Usage()
 }
 
 func (f *Flags) Parse() {
