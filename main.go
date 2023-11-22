@@ -30,6 +30,10 @@ func main() {
 	flags.SetFlags()
 	flags.Parse()
 
+	if flags.ShowHelp {
+		flags.PrintHelp()
+		os.Exit(0)
+	}
 	if flags.ShowVersion {
 		fmt.Printf("pwru %s\n", pwru.Version)
 		os.Exit(0)
