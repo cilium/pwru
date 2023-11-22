@@ -41,9 +41,6 @@ release:
 
 ## Build a new release
 local-release: clean
-	# TODO(brb) remove once https://github.com/cilium/pwru/issues/246 is resolved
-	clang --version
-	gcc --version
 	ARCHS='amd64 arm64' ./local-release.sh
 
 ## Install the GO Binary to the location specified by 'BINDIR'
