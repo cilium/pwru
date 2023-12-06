@@ -42,26 +42,27 @@ func (a *Addr2Name) findNearestSym(ip uint64) string {
 	return a.Addr2NameSlice[i-1].name
 }
 
-func GetAddrs(funcs Funcs, all bool) (Addr2Name, error) {
+func ParseKallsyms(funcs Funcs, all bool) (Addr2Name, BpfProgName2Addr, error) {
 	a2n := Addr2Name{
 		Addr2NameMap: make(map[uint64]*ksym),
 		Name2AddrMap: make(map[string][]uintptr),
 	}
+	n2a := BpfProgName2Addr{}
 
 	file, err := os.Open("/proc/kallsyms")
 	if err != nil {
-		return a2n, err
+		return a2n, n2a, err
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.Split(scanner.Text(), " ")
-		name := line[2]
+		name, isBpfProg := extractBpfProgName(line[2])
 		if all || (funcs[name] > 0) {
 			addr, err := strconv.ParseUint(line[0], 16, 64)
 			if err != nil {
-				return a2n, err
+				return a2n, n2a, err
 			}
 			sym := &ksym{
 				addr: addr,
@@ -72,15 +73,35 @@ func GetAddrs(funcs Funcs, all bool) (Addr2Name, error) {
 			if all {
 				a2n.Addr2NameSlice = append(a2n.Addr2NameSlice, sym)
 			}
+			if isBpfProg {
+				n2a[name] = addr
+			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return a2n, err
+		return a2n, n2a, err
 	}
 
 	if all {
 		sort.Sort(byAddr(a2n.Addr2NameSlice))
 	}
 
-	return a2n, nil
+	return a2n, n2a, nil
+}
+
+func extractBpfProgName(name string) (string, bool) {
+	if !strings.HasPrefix(name, "bpf_prog_") || !strings.HasSuffix(name, "[bpf]") {
+		return name, false
+	}
+
+	// The symbol of bpf prog is "bpf_prog_<tag>_<name>\t[bpf]". We want
+	// to get the tag and the name.
+
+	items := strings.Split(name, "_")
+	if len(items) > 3 {
+		name = strings.Join(items[3:], "_")
+		name = strings.TrimSpace(name[:len(name)-5])
+	}
+
+	return name, true
 }

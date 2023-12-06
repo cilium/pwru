@@ -98,7 +98,7 @@ func main() {
 		log.Fatalf("Cannot find a matching kernel function")
 	}
 	// If --filter-trace-tc, it's to retrieve and print bpf prog's name.
-	addr2name, err := pwru.GetAddrs(funcs, flags.OutputStack ||
+	addr2name, name2addr, err := pwru.ParseKallsyms(funcs, flags.OutputStack ||
 		len(flags.KMods) != 0 || flags.FilterTraceTc)
 	if err != nil {
 		log.Fatalf("Failed to get function addrs: %s", err)
@@ -186,10 +186,7 @@ func main() {
 	defer coll.Close()
 
 	if flags.FilterTraceTc {
-		close, err := pwru.TraceTC(coll, bpfSpecFentry, &opts, flags.OutputSkb)
-		if err != nil {
-			log.Fatalf("Failed to trace TC: %v", err)
-		}
+		close := pwru.TraceTC(coll, bpfSpecFentry, &opts, flags.OutputSkb, name2addr)
 		defer close()
 	}
 
