@@ -14,6 +14,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+type BpfProgName2Addr map[string]uint64
+
 func listBpfProgs(typ ebpf.ProgramType) ([]*ebpf.Program, error) {
 	var (
 		id  ebpf.ProgramID
@@ -41,41 +43,41 @@ func listBpfProgs(typ ebpf.ProgramType) ([]*ebpf.Program, error) {
 	return progs, nil
 }
 
-func getEntryFuncName(prog *ebpf.Program) (string, error) {
+func getEntryFuncName(prog *ebpf.Program) (string, string, error) {
 	info, err := prog.Info()
 	if err != nil {
-		return "", fmt.Errorf("failed to get program info: %w", err)
+		return "", "", fmt.Errorf("failed to get program info: %w", err)
 	}
 
 	id, ok := info.BTFID()
 	if !ok {
-		return "", fmt.Errorf("bpf program %s does not have BTF", info.Name)
+		return "", "", fmt.Errorf("bpf program %s does not have BTF", info.Name)
 	}
 
 	handle, err := btf.NewHandleFromID(id)
 	if err != nil {
-		return "", fmt.Errorf("failed to get BTF handle: %w", err)
+		return "", "", fmt.Errorf("failed to get BTF handle: %w", err)
 	}
 	defer handle.Close()
 
 	spec, err := handle.Spec(nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to get BTF spec: %w", err)
+		return "", "", fmt.Errorf("failed to get BTF spec: %w", err)
 	}
 
 	iter := spec.Iterate()
 	for iter.Next() {
 		if fn, ok := iter.Type.(*btf.Func); ok {
-			return fn.Name, nil
+			return fn.Name, info.Name, nil
 		}
 	}
 
-	return "", fmt.Errorf("no function found in %s bpf prog", info.Name)
+	return "", "", fmt.Errorf("no function found in %s bpf prog", info.Name)
 }
 
 func TraceTC(prevColl *ebpf.Collection, spec *ebpf.CollectionSpec,
-	opts *ebpf.CollectionOptions, outputSkb bool,
-) (func(), error) {
+	opts *ebpf.CollectionOptions, outputSkb bool, name2addr BpfProgName2Addr,
+) func() {
 	progs, err := listBpfProgs(ebpf.SchedCLS)
 	if err != nil {
 		log.Fatalf("Failed to list TC bpf progs: %v", err)
@@ -94,11 +96,25 @@ func TraceTC(prevColl *ebpf.Collection, spec *ebpf.CollectionSpec,
 
 	tracings := make([]link.Link, 0, len(progs))
 	for _, prog := range progs {
-		entryFn, err := getEntryFuncName(prog)
+		entryFn, name, err := getEntryFuncName(prog)
 		if err != nil {
 			log.Fatalf("Failed to get entry function name: %v", err)
 		}
+		addr, ok := name2addr[entryFn]
+		if !ok {
+			addr, ok = name2addr[name]
+			if !ok {
+				log.Fatalf("Failed to find address for tag %s of bpf prog %s", name, prog)
+			}
+		}
+
 		spec := spec.Copy()
+		if err := spec.RewriteConstants(map[string]any{
+			"BPF_PROG_ADDR": addr,
+		}); err != nil {
+			log.Fatalf("Failed to rewrite bpf prog addr: %v", err)
+		}
+
 		spec.Programs["fentry_tc"].AttachTarget = prog
 		spec.Programs["fentry_tc"].AttachTo = entryFn
 		coll, err := ebpf.NewCollectionWithOptions(spec, *opts)
@@ -131,5 +147,5 @@ func TraceTC(prevColl *ebpf.Collection, spec *ebpf.CollectionSpec,
 		for _, prog := range progs {
 			_ = prog.Close()
 		}
-	}, nil
+	}
 }

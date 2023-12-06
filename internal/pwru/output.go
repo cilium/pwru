@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -136,16 +135,6 @@ func (o *output) Print(event *Event) {
 		funcName = ksym.name
 	} else {
 		funcName = fmt.Sprintf("0x%x", addr)
-	}
-
-	if strings.HasPrefix(funcName, "bpf_prog_") && strings.HasSuffix(funcName, "[bpf]") {
-		// The name of bpf prog is "bpf_prog_<id>_<name>  [bpf]". We want to
-		// print only the name.
-		items := strings.Split(funcName, "_")
-		if len(items) > 3 {
-			funcName = strings.Join(items[3:], "_")
-			funcName = strings.TrimSpace(funcName[:len(funcName)-5])
-		}
 	}
 
 	outFuncName := funcName

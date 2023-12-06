@@ -15,6 +15,8 @@
 
 const static bool TRUE = true;
 
+volatile const static __u64 BPF_PROG_ADDR = 0;
+
 union addr {
 	u32 v4addr;
 	struct {
@@ -372,7 +374,7 @@ int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 		return BPF_OK;
 
 	event.skb_addr = (u64) skb;
-	event.addr = bpf_get_func_ip(ctx);
+	event.addr = BPF_PROG_ADDR;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
 	return BPF_OK;
