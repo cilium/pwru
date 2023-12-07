@@ -146,13 +146,21 @@ func main() {
 		log.Fatalf("Failed to rewrite config: %v", err)
 	}
 
+	haveFexit := pwru.HaveBPFLinkTracing()
+	if flags.FilterTraceTc && !haveFexit {
+		log.Fatalf("Current kernel does not support fentry/fexit to run with --filter-trace-tc")
+	}
+
 	// As we know, for every fentry tracing program, there is a corresponding
 	// bpf prog spec with attaching target and attaching function. So, we can
 	// just copy the spec and keep the fentry_tc program spec only in the copied
 	// spec.
-	bpfSpecFentry := bpfSpec.Copy()
-	bpfSpecFentry.Programs = map[string]*ebpf.ProgramSpec{
-		"fentry_tc": bpfSpec.Programs["fentry_tc"],
+	var bpfSpecFentry *ebpf.CollectionSpec
+	if flags.FilterTraceTc {
+		bpfSpecFentry = bpfSpec.Copy()
+		bpfSpecFentry.Programs = map[string]*ebpf.ProgramSpec{
+			"fentry_tc": bpfSpec.Programs["fentry_tc"],
+		}
 	}
 
 	// fentry_tc is not used in the kprobe/kprobe-multi cases. So, it should be
@@ -165,7 +173,6 @@ func main() {
 		delete(bpfSpec.Programs, "kprobe_skb_lifetime_termination")
 	}
 
-	haveFexit := pwru.HaveBPFLinkTracing()
 	if !flags.FilterTrackSkb || !haveFexit {
 		delete(bpfSpec.Programs, "fexit_skb_clone")
 		delete(bpfSpec.Programs, "fexit_skb_copy")
