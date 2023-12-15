@@ -185,16 +185,6 @@ func main() {
 	}
 	defer coll.Close()
 
-	kprobe1 := coll.Programs["kprobe_skb_1"]
-	kprobe2 := coll.Programs["kprobe_skb_2"]
-	kprobe3 := coll.Programs["kprobe_skb_3"]
-	kprobe4 := coll.Programs["kprobe_skb_4"]
-	kprobe5 := coll.Programs["kprobe_skb_5"]
-
-	events := coll.Maps["events"]
-	printStackMap := coll.Maps["print_stack_map"]
-	printSkbMap := coll.Maps["print_skb_map"]
-
 	if flags.FilterTraceTc {
 		close, err := pwru.TraceTC(coll, bpfSpecFentry, &opts, flags.OutputSkb)
 		if err != nil {
@@ -269,20 +259,10 @@ func main() {
 
 	funcsByPos := pwru.GetFuncsByPos(funcs)
 	for pos, fns := range funcsByPos {
-		var fn *ebpf.Program
-		switch pos {
-		case 1:
-			fn = kprobe1
-		case 2:
-			fn = kprobe2
-		case 3:
-			fn = kprobe3
-		case 4:
-			fn = kprobe4
-		case 5:
-			fn = kprobe5
-		default:
-			ignored += 1
+		fn, ok := coll.Programs[fmt.Sprintf("kprobe_skb_%d", pos)]
+		if !ok {
+			ignored += len(fns)
+			bar.Add(len(fns))
 			continue
 		}
 
@@ -341,6 +321,8 @@ func main() {
 		file.Close()
 	}
 
+	printSkbMap := coll.Maps["print_skb_map"]
+	printStackMap := coll.Maps["print_stack_map"]
 	output, err := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name, useKprobeMulti, btfSpec)
 	if err != nil {
 		log.Fatalf("Failed to create outputer: %s", err)
@@ -357,6 +339,7 @@ func main() {
 	}()
 
 	var event pwru.Event
+	events := coll.Maps["events"]
 	runForever := flags.OutputLimitLines == 0
 	for i := flags.OutputLimitLines; i > 0 || runForever; i-- {
 		for {
