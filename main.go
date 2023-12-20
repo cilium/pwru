@@ -298,7 +298,7 @@ func main() {
 				kp, err := link.Kprobe(name, fn, nil)
 				bar.Increment()
 				if err != nil {
-					if !errors.Is(err, os.ErrNotExist) {
+					if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, syscall.EADDRNOTAVAIL) {
 						log.Fatalf("Opening kprobe %s: %s\n", name, err)
 					} else {
 						ignored += 1
@@ -319,6 +319,10 @@ func main() {
 			kp, err := link.KprobeMulti(fn, opts)
 			bar.Add(len(fns))
 			if err != nil {
+				if errors.Is(err, syscall.EADDRNOTAVAIL) {
+					log.Fatalf("Found duplicate function name in the kernel (%s). Set --backend=kprobe to fix the loading error until https://github.com/cilium/pwru/issues/284 has been fixed",
+						err)
+				}
 				log.Fatalf("Opening kprobe-multi for pos %d: %s\n", pos, err)
 			}
 			kprobes = append(kprobes, kp)
