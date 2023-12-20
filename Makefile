@@ -1,3 +1,4 @@
+include override.mk
 GO := go
 GO_BUILD = CGO_ENABLED=1 $(GO) build
 GO_GENERATE = $(GO) generate
