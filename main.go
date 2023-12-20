@@ -295,14 +295,25 @@ func main() {
 			default:
 			}
 
-			opts := link.KprobeMultiOptions{Symbols: funcsByPos[pos]}
+			addrs := make([]uintptr, 0, len(fns))
+			for _, fn := range fns {
+				if addr, ok := addr2name.Name2AddrMap[fn]; ok {
+					addrs = append(addrs, addr...)
+				} else {
+					ignored += 1
+					bar.Increment()
+					continue
+				}
+			}
+
+			if len(addrs) == 0 {
+				continue
+			}
+
+			opts := link.KprobeMultiOptions{Addresses: addrs}
 			kp, err := link.KprobeMulti(fn, opts)
 			bar.Add(len(fns))
 			if err != nil {
-				if errors.Is(err, syscall.EADDRNOTAVAIL) {
-					log.Fatalf("Found duplicate function name in the kernel (%s). Set --backend=kprobe to fix the loading error until https://github.com/cilium/pwru/issues/284 has been fixed",
-						err)
-				}
 				log.Fatalf("Opening kprobe-multi for pos %d: %s\n", pos, err)
 			}
 			kprobes = append(kprobes, kp)
