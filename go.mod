@@ -4,9 +4,9 @@ go 1.20
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.4
-	github.com/cilium/ebpf v0.12.2
+	github.com/cilium/ebpf v0.12.3
 	github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
-	github.com/jsimonetti/rtnetlink v1.3.5
+	github.com/jsimonetti/rtnetlink v1.4.0
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/vishvananda/netns v0.0.4
@@ -17,7 +17,7 @@ require (
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/fatih/color v1.15.0 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
