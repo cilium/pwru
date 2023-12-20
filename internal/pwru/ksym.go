@@ -22,6 +22,7 @@ func (a byAddr) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 type Addr2Name struct {
 	Addr2NameMap   map[uint64]*ksym
 	Addr2NameSlice []*ksym
+	Name2AddrMap   map[string][]uintptr
 }
 
 func (a *Addr2Name) findNearestSym(ip uint64) string {
@@ -44,6 +45,7 @@ func (a *Addr2Name) findNearestSym(ip uint64) string {
 func GetAddrs(funcs Funcs, all bool) (Addr2Name, error) {
 	a2n := Addr2Name{
 		Addr2NameMap: make(map[uint64]*ksym),
+		Name2AddrMap: make(map[string][]uintptr),
 	}
 
 	file, err := os.Open("/proc/kallsyms")
@@ -66,6 +68,7 @@ func GetAddrs(funcs Funcs, all bool) (Addr2Name, error) {
 				name: name,
 			}
 			a2n.Addr2NameMap[addr] = sym
+			a2n.Name2AddrMap[name] = append(a2n.Name2AddrMap[name], uintptr(addr))
 			if all {
 				a2n.Addr2NameSlice = append(a2n.Addr2NameSlice, sym)
 			}
