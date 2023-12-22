@@ -21,7 +21,7 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
 	"github.com/jsimonetti/rtnetlink"
-	ps "github.com/mitchellh/go-ps"
+	"github.com/tklauser/ps"
 	"github.com/vishvananda/netns"
 	"golang.org/x/sys/unix"
 
@@ -99,7 +99,7 @@ func (o *output) Print(event *Event) {
 	p, err := ps.FindProcess(int(event.PID))
 	execName := fmt.Sprintf("<empty>(%d)", event.PID)
 	if err == nil && p != nil {
-		execName = fmt.Sprintf("%s(%d)", p.Executable(), event.PID)
+		execName = fmt.Sprintf("%s(%d)", p.ExecutablePath(), event.PID)
 	}
 	ts := event.Timestamp
 	if o.flags.OutputTS == "relative" {

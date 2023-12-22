@@ -7,8 +7,8 @@ require (
 	github.com/cilium/ebpf v0.12.3
 	github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
 	github.com/jsimonetti/rtnetlink v1.4.0
-	github.com/mitchellh/go-ps v1.0.0
 	github.com/spf13/pflag v1.0.5
+	github.com/tklauser/ps v0.0.2
 	github.com/vishvananda/netns v0.0.4
 	golang.org/x/net v0.19.0
 	golang.org/x/sys v0.15.0
