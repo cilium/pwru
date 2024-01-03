@@ -1,0 +1,113 @@
+name: pwru-k8s
+description: 'Run PWRU inside Kubernetes'
+inputs:
+  pwru-flags:
+    required: false
+    type: string
+  pwru-pcap-filter:
+    required: false
+    type: string
+  nodename:
+    required: false
+    type: string
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare workload yaml
+      shell: bash
+      run: |
+
+        if [[ -z "${{ inputs.nodename }}" ]]; then
+          # DaemonSet
+          cat >workload.yaml <<!
+        apiVersion: apps/v1
+        kind: DaemonSet
+        metadata:
+          name: pwru
+        spec:
+          selector:
+            matchLabels:
+              name: pwru
+          template:
+            metadata:
+              labels:
+                name: pwru
+            spec:
+              containers:
+              - image: docker.io/cilium/pwru:latest
+                name: pwru
+                volumeMounts:
+                - mountPath: /sys/kernel/debug
+                  name: sys-kernel-debug
+                securityContext:
+                  privileged: true
+                command: ["/bin/sh"]
+                args: ["-c", "pwru --output-file /tmp/pwru.log --ready-file=/tmp/pwru.ready ${{ inputs.pwru-flags }} '${{ inputs.pwru-pcap-filter }}'"]
+                startupProbe:
+                  exec:
+                    command:
+                      - ls
+                      - /tmp/pwru.ready
+                  failureThreshold: 30
+                  periodSeconds: 10
+              volumes:
+              - name: sys-kernel-debug
+                hostPath:
+                  path: /sys/kernel/debug
+                  type: DirectoryOrCreate
+              hostNetwork: true
+              hostPID: true
+        !
+
+        else
+          # Pod
+          cat >workload.yaml <<!
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: pwru
+          labels:
+            name: pwru
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: ${{ inputs.nodename }}
+          containers:
+          - image: docker.io/cilium/pwru:latest
+            name: pwru
+            volumeMounts:
+            - mountPath: /sys/kernel/debug
+              name: sys-kernel-debug
+            securityContext:
+              privileged: true
+            command: ["/bin/sh"]
+            args: ["-c", "pwru --output-file /tmp/pwru.log --ready-file=/tmp/pwru.ready ${{ inputs.pwru-flags }} '${{ inputs.pwru-pcap-filter }}'"]
+            startupProbe:
+              exec:
+                command:
+                  - ls
+                  - /tmp/pwru.ready
+              failureThreshold: 30
+              periodSeconds: 10
+          volumes:
+          - name: sys-kernel-debug
+            hostPath:
+              path: /sys/kernel/debug
+              type: DirectoryOrCreate
+          hostNetwork: true
+          hostPID: true
+        !
+        fi
+
+        cat ./workload.yaml
+
+    - name: Deploy PWRU workload
+      shell: bash
+      run: |
+        kubectl apply -f ./workload.yaml
+
+        if [[ -z "${{ inputs.nodename }}" ]]; then
+          kubectl rollout status daemonset pwru --timeout=90s || (kubectl describe ds pwru; true)
+        else
+          kubectl wait pod pwru --for condition=Ready --timeout=90s || (kubectl describe po pwru; true)
+        fi
