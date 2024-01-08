@@ -55,9 +55,12 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 		return nil, fmt.Errorf("failed to compile regular expression %v", err)
 	}
 
-	availableFuncs, err := getAvailableFilterFunctions()
-	if err != nil {
-		log.Printf("Failed to retrieve available ftrace functions (is /sys/kernel/debug/tracing mounted?): %s", err)
+	var availableFuncs map[string]struct{}
+	if kprobeMulti {
+		availableFuncs, err = getAvailableFilterFunctions()
+		if err != nil {
+			log.Printf("Failed to retrieve available ftrace functions (is /sys/kernel/debug/tracing mounted?): %s", err)
+		}
 	}
 
 	iters := []iterator{{"", spec.Iterate()}}
@@ -90,12 +93,14 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 				continue
 			}
 
-			availableFnName := fnName
-			if it.kmod != "" {
-				availableFnName = fmt.Sprintf("%s [%s]", fnName, it.kmod)
-			}
-			if _, ok := availableFuncs[availableFnName]; !ok {
-				continue
+			if kprobeMulti {
+				availableFnName := fnName
+				if it.kmod != "" {
+					availableFnName = fmt.Sprintf("%s [%s]", fnName, it.kmod)
+				}
+				if _, ok := availableFuncs[availableFnName]; !ok {
+					continue
+				}
 			}
 
 			fnProto := fn.Type.(*btf.FuncProto)
