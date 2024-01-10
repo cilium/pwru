@@ -24,11 +24,10 @@ type FilterCfg struct {
 	FilterIfindex uint32
 
 	// TODO: if there are more options later, then you can consider using a bit map
-	OutputRelativeTS uint8
-	OutputMeta       uint8
-	OutputTuple      uint8
-	OutputSkb        uint8
-	OutputStack      uint8
+	OutputMeta  uint8
+	OutputTuple uint8
+	OutputSkb   uint8
+	OutputStack uint8
 
 	IsSet    byte
 	TrackSkb byte

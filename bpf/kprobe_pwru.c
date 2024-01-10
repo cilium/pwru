@@ -78,7 +78,6 @@ struct config {
 	u32 netns;
 	u32 mark;
 	u32 ifindex;
-	u8 output_timestamp;
 	u8 output_meta;
 	u8 output_tuple;
 	u8 output_skb;
