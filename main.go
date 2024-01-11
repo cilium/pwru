@@ -85,7 +85,7 @@ func main() {
 	// has been backported to the stable, kprobe-multi cannot be used when attaching
 	// to kmods.
 	if flags.Backend == "" && len(flags.KMods) == 0 {
-		useKprobeMulti = pwru.HaveBPFLinkKprobeMulti()
+		useKprobeMulti = pwru.HaveBPFLinkKprobeMulti() && pwru.HaveAvailableFilterFunctions()
 	} else if flags.Backend == pwru.BackendKprobeMulti {
 		useKprobeMulti = true
 	}

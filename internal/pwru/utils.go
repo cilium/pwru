@@ -189,3 +189,8 @@ func HaveBPFLinkTracing() bool {
 
 	return true
 }
+
+func HaveAvailableFilterFunctions() bool {
+	_, err := getAvailableFilterFunctions()
+	return err == nil
+}
