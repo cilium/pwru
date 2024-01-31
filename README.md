@@ -29,7 +29,7 @@ mount -t debugfs none /sys/kernel/debug
 The following kernel configuration is required.
 
 |           Option         | Backend      |                   Note                               |
-| ------------------------ | ------------------------------------------------------------------- |
+| ------------------------ | -------------|----------------------------------------------------- |
 | CONFIG_DEBUG_INFO_BTF=y  | both         | available since >= 5.3                               |
 | CONFIG_KPROBES=y         | both         |                                                      |
 | CONFIG_PERF_EVENTS=y     | both         |                                                      |
