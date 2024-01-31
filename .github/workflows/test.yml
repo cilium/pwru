@@ -55,7 +55,7 @@ jobs:
           path: pwru
 
       - name: Provision LVH VMs
-        uses: cilium/little-vm-helper@8410a93e544b7e180a2365e5fdab0724a39bc02a # v0.0.13
+        uses: cilium/little-vm-helper@e1c8135d459ee77c569f4586c1c7954244d9fa69 # v0.0.15
         with:
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
@@ -161,7 +161,7 @@ jobs:
 
       - name: Fetch artifacts
         if: ${{ !success() }}
-        uses: cilium/little-vm-helper@8410a93e544b7e180a2365e5fdab0724a39bc02a
+        uses: cilium/little-vm-helper@e1c8135d459ee77c569f4586c1c7954244d9fa69
         with:
           provision: 'false'
           cmd: |
