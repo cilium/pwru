@@ -21,7 +21,7 @@ runs:
   using: composite
   steps:
     - name: PWRU test
-      uses: cilium/little-vm-helper@908ab1ff8a596a03cd5221a1f8602dc44c3f906d # v0.0.12
+      uses: cilium/little-vm-helper@9d758b756305e83718a51b792a5aeabd022a39ec # v0.0.16
       with:
         provision: 'false'
         cmd: |
