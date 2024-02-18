@@ -13,6 +13,7 @@ require (
 	github.com/tklauser/ps v0.0.2
 	github.com/vishvananda/netns v0.0.4
 	golang.org/x/net v0.21.0
+	golang.org/x/sync v0.3.0
 	golang.org/x/sys v0.17.0
 )
 
@@ -29,5 +30,4 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a // indirect
-	golang.org/x/sync v0.3.0 // indirect
 )
