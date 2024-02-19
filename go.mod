@@ -1,12 +1,11 @@
 module github.com/cilium/pwru
 
 go 1.21
-
-toolchain go1.21.5
+toolchain go1.22.0
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.5
-	github.com/cilium/ebpf v0.12.3
+	github.com/cilium/ebpf v0.13.0
 	github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
 	github.com/jsimonetti/rtnetlink v1.4.1
 	github.com/spf13/pflag v1.0.5
