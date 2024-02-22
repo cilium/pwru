@@ -100,6 +100,14 @@ func TraceTC(prevColl *ebpf.Collection, spec *ebpf.CollectionSpec,
 		if err != nil {
 			log.Fatalf("Failed to get entry function name: %v", err)
 		}
+
+		// The addr may hold the wrong rip value, because two addresses could
+		// have one same symbol. As discussed before, that doesn't affect the
+		// symbol resolution because even a "wrong" rip can be matched to the
+		// right symbol. However, this could make a difference when we want to
+		// distinguish which exact bpf prog is called.
+		//   -- @jschwinger233
+
 		addr, ok := name2addr[entryFn]
 		if !ok {
 			addr, ok = name2addr[name]
