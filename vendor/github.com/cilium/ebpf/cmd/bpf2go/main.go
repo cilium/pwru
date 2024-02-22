@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 
@@ -47,32 +48,27 @@ Options:
 //
 // Targets without a Linux string can't be used directly and are only included
 // for the generic bpf, bpfel, bpfeb targets.
-var targetByGoArch = map[string]target{
-	"386":         {"bpfel", "x86"},
-	"amd64":       {"bpfel", "x86"},
-	"amd64p32":    {"bpfel", ""},
-	"arm":         {"bpfel", "arm"},
-	"arm64":       {"bpfel", "arm64"},
-	"loong64":     {"bpfel", ""},
-	"mipsle":      {"bpfel", ""},
-	"mips64le":    {"bpfel", ""},
-	"mips64p32le": {"bpfel", ""},
-	"ppc64le":     {"bpfel", "powerpc"},
-	"riscv64":     {"bpfel", "riscv"},
-	"armbe":       {"bpfeb", "arm"},
-	"arm64be":     {"bpfeb", "arm64"},
-	"mips":        {"bpfeb", ""},
-	"mips64":      {"bpfeb", ""},
-	"mips64p32":   {"bpfeb", ""},
-	"ppc64":       {"bpfeb", "powerpc"},
-	"s390":        {"bpfeb", "s390"},
-	"s390x":       {"bpfeb", "s390"},
-	"sparc":       {"bpfeb", "sparc"},
-	"sparc64":     {"bpfeb", "sparc"},
+//
+// See https://go.dev/doc/install/source#environment for valid GOARCHes when
+// GOOS=linux.
+var targetByGoArch = map[goarch]target{
+	"386":      {"bpfel", "x86"},
+	"amd64":    {"bpfel", "x86"},
+	"arm":      {"bpfel", "arm"},
+	"arm64":    {"bpfel", "arm64"},
+	"loong64":  {"bpfel", "loongarch"},
+	"mips":     {"bpfeb", "mips"},
+	"mipsle":   {"bpfel", ""},
+	"mips64":   {"bpfeb", ""},
+	"mips64le": {"bpfel", ""},
+	"ppc64":    {"bpfeb", "powerpc"},
+	"ppc64le":  {"bpfel", "powerpc"},
+	"riscv64":  {"bpfel", "riscv"},
+	"s390x":    {"bpfeb", "s390"},
 }
 
-func run(stdout io.Writer, pkg, outputDir string, args []string) (err error) {
-	b2g, err := newB2G(stdout, pkg, outputDir, args)
+func run(stdout io.Writer, args []string) (err error) {
+	b2g, err := newB2G(stdout, args)
 	switch {
 	case err == nil:
 		return b2g.convertAll()
@@ -96,7 +92,7 @@ type bpf2go struct {
 	// Valid go identifier.
 	identStem string
 	// Targets to build for.
-	targetArches map[target][]string
+	targetArches map[target][]goarch
 	// C compiler.
 	cc string
 	// Command used to strip DWARF.
@@ -114,11 +110,9 @@ type bpf2go struct {
 	makeBase string
 }
 
-func newB2G(stdout io.Writer, pkg, outputDir string, args []string) (*bpf2go, error) {
+func newB2G(stdout io.Writer, args []string) (*bpf2go, error) {
 	b2g := &bpf2go{
-		stdout:    stdout,
-		pkg:       pkg,
-		outputDir: outputDir,
+		stdout: stdout,
 	}
 
 	fs := flag.NewFlagSet("bpf2go", flag.ContinueOnError)
@@ -136,7 +130,8 @@ func newB2G(stdout io.Writer, pkg, outputDir string, args []string) (*bpf2go, er
 	fs.Var(&b2g.cTypes, "type", "`Name` of a type to generate a Go declaration for, may be repeated")
 	fs.BoolVar(&b2g.skipGlobalTypes, "no-global-types", false, "Skip generating types for map keys and values, etc.")
 	fs.StringVar(&b2g.outputStem, "output-stem", "", "alternative stem for names of generated files (defaults to ident)")
-
+	outDir := fs.String("output-dir", "", "target directory of generated files (defaults to current directory)")
+	outPkg := fs.String("go-package", "", "package for output go file (default as ENV GOPACKAGE)")
 	fs.SetOutput(b2g.stdout)
 	fs.Usage = func() {
 		fmt.Fprintf(fs.Output(), helpText, fs.Name())
@@ -148,8 +143,21 @@ func newB2G(stdout io.Writer, pkg, outputDir string, args []string) (*bpf2go, er
 		return nil, err
 	}
 
+	if *outDir == "" {
+		var err error
+		if *outDir, err = os.Getwd(); err != nil {
+			return nil, err
+		}
+	}
+	b2g.outputDir = *outDir
+
+	if *outPkg == "" {
+		*outPkg = os.Getenv(gopackageEnv)
+	}
+	b2g.pkg = *outPkg
+
 	if b2g.pkg == "" {
-		return nil, errors.New("missing package, are you running via go generate?")
+		return nil, errors.New("missing package, you should either set the go-package flag or the GOPACKAGE env")
 	}
 
 	if b2g.cc == "" {
@@ -298,7 +306,7 @@ func (b2g *bpf2go) convertAll() (err error) {
 	return nil
 }
 
-func (b2g *bpf2go) convert(tgt target, arches []string) (err error) {
+func (b2g *bpf2go) convert(tgt target, goarches []goarch) (err error) {
 	removeOnError := func(f *os.File) {
 		if err != nil {
 			os.Remove(f.Name())
@@ -310,12 +318,25 @@ func (b2g *bpf2go) convert(tgt target, arches []string) (err error) {
 	if outputStem == "" {
 		outputStem = strings.ToLower(b2g.identStem)
 	}
+
+	// The output filename must not match any of the following patterns:
+	//
+	//     *_GOOS
+	//     *_GOARCH
+	//     *_GOOS_GOARCH
+	//
+	// Otherwise it is interpreted as a build constraint by the Go toolchain.
 	stem := fmt.Sprintf("%s_%s", outputStem, tgt.clang)
 	if tgt.linux != "" {
-		stem = fmt.Sprintf("%s_%s_%s", outputStem, tgt.clang, tgt.linux)
+		stem = fmt.Sprintf("%s_%s_%s", outputStem, tgt.linux, tgt.clang)
 	}
 
-	objFileName := filepath.Join(b2g.outputDir, stem+".o")
+	absOutPath, err := filepath.Abs(b2g.outputDir)
+	if err != nil {
+		return err
+	}
+
+	objFileName := filepath.Join(absOutPath, stem+".o")
 
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -323,8 +344,8 @@ func (b2g *bpf2go) convert(tgt target, arches []string) (err error) {
 	}
 
 	var archConstraint constraint.Expr
-	for _, arch := range arches {
-		tag := &constraint.TagExpr{Tag: arch}
+	for _, goarch := range goarches {
+		tag := &constraint.TagExpr{Tag: string(goarch)}
 		archConstraint = orConstraints(archConstraint, tag)
 	}
 
@@ -334,6 +355,10 @@ func (b2g *bpf2go) convert(tgt target, arches []string) (err error) {
 	copy(cFlags, b2g.cFlags)
 	if tgt.linux != "" {
 		cFlags = append(cFlags, "-D__TARGET_ARCH_"+tgt.linux)
+	}
+
+	if err := b2g.removeOldOutputFiles(outputStem, tgt); err != nil {
+		return fmt.Errorf("remove obsolete output: %w", err)
 	}
 
 	var dep bytes.Buffer
@@ -370,7 +395,7 @@ func (b2g *bpf2go) convert(tgt target, arches []string) (err error) {
 	}
 
 	// Write out generated go
-	goFileName := filepath.Join(b2g.outputDir, stem+".go")
+	goFileName := filepath.Join(absOutPath, stem+".go")
 	goFile, err := os.Create(goFileName)
 	if err != nil {
 		return err
@@ -418,18 +443,49 @@ func (b2g *bpf2go) convert(tgt target, arches []string) (err error) {
 	return nil
 }
 
+// removeOldOutputFiles removes output files generated by an old naming scheme.
+//
+// In the old scheme some linux targets were interpreted as build constraints
+// by the go toolchain.
+func (b2g *bpf2go) removeOldOutputFiles(outputStem string, tgt target) error {
+	if tgt.linux == "" {
+		return nil
+	}
+
+	stem := fmt.Sprintf("%s_%s_%s", outputStem, tgt.clang, tgt.linux)
+	for _, ext := range []string{".o", ".go"} {
+		filename := filepath.Join(b2g.outputDir, stem+ext)
+
+		if err := os.Remove(filename); errors.Is(err, os.ErrNotExist) {
+			continue
+		} else if err != nil {
+			return err
+		}
+
+		fmt.Fprintln(b2g.stdout, "Removed obsolete", filename)
+	}
+
+	return nil
+}
+
 type target struct {
+	// Clang arch string, used to define the clang -target flag, as per
+	// "clang -print-targets".
 	clang string
+	// Linux arch string, used to define __TARGET_ARCH_xzy macros used by
+	// https://github.com/libbpf/libbpf/blob/master/src/bpf_tracing.h
 	linux string
 }
 
+type goarch string
+
 func printTargets(w io.Writer) {
 	var arches []string
-	for arch, archTarget := range targetByGoArch {
+	for goarch, archTarget := range targetByGoArch {
 		if archTarget.linux == "" {
 			continue
 		}
-		arches = append(arches, arch)
+		arches = append(arches, string(goarch))
 	}
 	sort.Strings(arches)
 
@@ -442,19 +498,19 @@ func printTargets(w io.Writer) {
 
 var errInvalidTarget = errors.New("unsupported target")
 
-func collectTargets(targets []string) (map[target][]string, error) {
-	result := make(map[target][]string)
+func collectTargets(targets []string) (map[target][]goarch, error) {
+	result := make(map[target][]goarch)
 	for _, tgt := range targets {
 		switch tgt {
 		case "bpf", "bpfel", "bpfeb":
-			var goarches []string
+			var goarches []goarch
 			for arch, archTarget := range targetByGoArch {
 				if archTarget.clang == tgt {
 					// Include tags for all goarches that have the same endianness.
 					goarches = append(goarches, arch)
 				}
 			}
-			sort.Strings(goarches)
+			slices.Sort(goarches)
 			result[target{tgt, ""}] = goarches
 
 		case "native":
@@ -462,12 +518,12 @@ func collectTargets(targets []string) (map[target][]string, error) {
 			fallthrough
 
 		default:
-			archTarget, ok := targetByGoArch[tgt]
+			archTarget, ok := targetByGoArch[goarch(tgt)]
 			if !ok || archTarget.linux == "" {
 				return nil, fmt.Errorf("%q: %w", tgt, errInvalidTarget)
 			}
 
-			var goarches []string
+			var goarches []goarch
 			for goarch, lt := range targetByGoArch {
 				if lt == archTarget {
 					// Include tags for all goarches that have the same
@@ -476,7 +532,7 @@ func collectTargets(targets []string) (map[target][]string, error) {
 				}
 			}
 
-			sort.Strings(goarches)
+			slices.Sort(goarches)
 			result[archTarget] = goarches
 		}
 	}
@@ -484,14 +540,10 @@ func collectTargets(targets []string) (map[target][]string, error) {
 	return result, nil
 }
 
-func main() {
-	outputDir, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1)
-	}
+const gopackageEnv = "GOPACKAGE"
 
-	if err := run(os.Stdout, os.Getenv("GOPACKAGE"), outputDir, os.Args[1:]); err != nil {
+func main() {
+	if err := run(os.Stdout, os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}

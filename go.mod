@@ -1,12 +1,12 @@
 module github.com/cilium/pwru
 
-go 1.21
+go 1.21.0
 
-toolchain go1.21.5
+toolchain go1.21.6
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.5
-	github.com/cilium/ebpf v0.12.3
+	github.com/cilium/ebpf v0.13.0
 	github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
 	github.com/jsimonetti/rtnetlink v1.4.1
 	github.com/spf13/pflag v1.0.5
@@ -28,6 +28,6 @@ require (
 	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
+	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a // indirect
 	golang.org/x/sync v0.3.0 // indirect
 )
