@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2023 Leon Hwang.
+/* Copyright Authors of Cilium */
 
 package pwru
 
