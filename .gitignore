@@ -2,8 +2,8 @@
 pwru
 release
 tags
-kprobepwru_bpf*
-kprobepwruwithoutoutputskb_bpf*
-kprobemultipwru_bpf*
-kprobemultipwruwithoutoutputskb_bpf*
+kprobepwru_*
+kprobepwruwithoutoutputskb_*
+kprobemultipwru_*
+kprobemultipwruwithoutoutputskb_*
 !pwru/
