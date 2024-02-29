@@ -115,44 +115,36 @@ func AttachKprobes(ctx context.Context, bar *pb.ProgressBar, kps []Kprobe, batch
 }
 
 // DetachKprobes detaches kprobes concurrently.
-func DetachKprobes(links []link.Link, showProgressBar bool, batch uint) {
+func DetachKprobes(links []link.Link, batch uint) {
 	log.Println("Detaching kprobes...")
 
-	if batch < 2 {
+	bar := pb.StartNew(len(links))
+	defer bar.Finish()
+
+	if batch == 0 || batch >= uint(len(links)) {
 		for _, l := range links {
 			_ = l.Close()
+			bar.Increment()
 		}
 
 		return
 	}
 
 	var errg errgroup.Group
-	var bar *pb.ProgressBar
-
-	if showProgressBar {
-		bar = pb.StartNew(len(links))
-		defer bar.Finish()
-	}
-	increment := func() {
-		if showProgressBar {
-			bar.Increment()
-		}
-	}
-
 	var i uint
 	for i = 0; i+batch < uint(len(links)); i += batch {
 		l := links[i : i+batch]
 		errg.Go(func() error {
 			for _, l := range l {
 				_ = l.Close()
-				increment()
+				bar.Increment()
 			}
 			return nil
 		})
 	}
 	for ; i < uint(len(links)); i++ {
 		_ = links[i].Close()
-		increment()
+		bar.Increment()
 	}
 
 	_ = errg.Wait()

@@ -199,19 +199,11 @@ func main() {
 
 	var kprobes []link.Link
 	defer func() {
-		var showProgressBar bool
-		select {
-		case <-ctx.Done():
-			showProgressBar = true
-
-		default:
-		}
-
-		batch := uint(1)
+		batch := uint(0)
 		if !useKprobeMulti {
 			batch = flags.FilterKprobeBatch
 		}
-		pwru.DetachKprobes(kprobes, showProgressBar, batch)
+		pwru.DetachKprobes(kprobes, batch)
 	}()
 
 	msg := "kprobe"
