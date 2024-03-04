@@ -29,6 +29,12 @@ import (
 
 const absoluteTS string = "15:04:05.000"
 
+const (
+	eventTypeKprobe     = 0
+	eventTypeTracingTc  = 1
+	eventTypeTracingXdp = 2
+)
+
 type output struct {
 	flags         *Flags
 	lastSeenSkb   map[uint64]uint64 // skb addr => last seen TS
@@ -273,6 +279,15 @@ func getOutFuncName(o *output, event *Event, addr uint64) string {
 		funcName = ksym.name
 	} else {
 		funcName = fmt.Sprintf("0x%x", addr)
+	}
+
+	if event.Type != eventTypeKprobe {
+		switch event.Type {
+		case eventTypeTracingTc:
+			funcName += "(tc)"
+		case eventTypeTracingXdp:
+			funcName += "(xdp)"
+		}
 	}
 
 	outFuncName := funcName

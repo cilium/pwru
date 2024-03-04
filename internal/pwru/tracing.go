@@ -14,29 +14,55 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type tcTracer struct {
+type tracing struct {
 	sync.Mutex
 	links []link.Link
+	progs []*ebpf.Program
 }
 
-func (t *tcTracer) close() {
+func (t *tracing) HaveTracing() bool {
 	t.Lock()
 	defer t.Unlock()
 
-	for _, l := range t.links {
-		_ = l.Close()
-	}
+	return len(t.links) > 0
 }
 
-func (t *tcTracer) addLink(l link.Link) {
+func (t *tracing) Close() {
+	t.Lock()
+	defer t.Unlock()
+
+	t.detach()
+
+	for _, p := range t.progs {
+		_ = p.Close()
+	}
+	t.progs = nil
+}
+
+func (t *tracing) detach() {
+	var errg errgroup.Group
+
+	for _, l := range t.links {
+		l := l
+		errg.Go(func() error {
+			_ = l.Close()
+			return nil
+		})
+	}
+
+	_ = errg.Wait()
+}
+
+func (t *tracing) addLink(l link.Link) {
 	t.Lock()
 	defer t.Unlock()
 
 	t.links = append(t.links, l)
 }
 
-func (t *tcTracer) trace(spec *ebpf.CollectionSpec,
+func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 	opts *ebpf.CollectionOptions, prog *ebpf.Program, n2a BpfProgName2Addr,
+	tracingName string,
 ) error {
 	entryFn, name, err := getEntryFuncName(prog)
 	if err != nil {
@@ -54,7 +80,7 @@ func (t *tcTracer) trace(spec *ebpf.CollectionSpec,
 	if !ok {
 		addr, ok = n2a[name]
 		if !ok {
-			return fmt.Errorf("failed to find address for function %s of bpf prog %s", name, prog)
+			return fmt.Errorf("failed to find address for function %s of bpf prog %v", name, prog)
 		}
 	}
 
@@ -65,8 +91,8 @@ func (t *tcTracer) trace(spec *ebpf.CollectionSpec,
 		return fmt.Errorf("failed to rewrite bpf prog addr: %w", err)
 	}
 
-	spec.Programs["fentry_tc"].AttachTarget = prog
-	spec.Programs["fentry_tc"].AttachTo = entryFn
+	spec.Programs[tracingName].AttachTarget = prog
+	spec.Programs[tracingName].AttachTo = entryFn
 	coll, err := ebpf.NewCollectionWithOptions(spec, *opts)
 	if err != nil {
 		var (
@@ -82,7 +108,7 @@ func (t *tcTracer) trace(spec *ebpf.CollectionSpec,
 	defer coll.Close()
 
 	tracing, err := link.AttachTracing(link.TracingOptions{
-		Program: coll.Programs["fentry_tc"],
+		Program: coll.Programs[tracingName],
 	})
 	if err != nil {
 		return fmt.Errorf("failed to attach tracing: %w", err)
@@ -93,12 +119,13 @@ func (t *tcTracer) trace(spec *ebpf.CollectionSpec,
 	return nil
 }
 
-func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
+func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	opts *ebpf.CollectionOptions, outputSkb bool, n2a BpfProgName2Addr,
-) func() {
-	progs, err := listBpfProgs(ebpf.SchedCLS)
+	progType ebpf.ProgramType, tracingName string,
+) error {
+	progs, err := listBpfProgs(progType)
 	if err != nil {
-		log.Fatalf("Failed to list TC bpf progs: %v", err)
+		return fmt.Errorf("failed to list bpf progs: %w", err)
 	}
 
 	// Reusing maps from previous collection is to handle the events together
@@ -112,27 +139,44 @@ func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	}
 	opts.MapReplacements = replacedMaps
 
-	var tt tcTracer
-	tt.links = make([]link.Link, 0, len(progs))
+	t.links = make([]link.Link, 0, len(progs))
+	t.progs = progs
 
 	var errg errgroup.Group
 
 	for _, prog := range progs {
 		prog := prog
 		errg.Go(func() error {
-			return tt.trace(spec, opts, prog, n2a)
+			return t.traceProg(spec, opts, prog, n2a, tracingName)
 		})
 	}
 
 	if err := errg.Wait(); err != nil {
-		log.Fatalf("Failed to trace TC: %v", err)
+		t.Close()
+		return fmt.Errorf("failed to trace bpf progs: %w", err)
 	}
 
-	return func() {
-		tt.close()
+	return nil
+}
 
-		for _, prog := range progs {
-			_ = prog.Close()
-		}
+func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
+	opts *ebpf.CollectionOptions, outputSkb bool, n2a BpfProgName2Addr,
+) *tracing {
+	var t tracing
+	if err := t.trace(coll, spec, opts, outputSkb, n2a, ebpf.SchedCLS, "fentry_tc"); err != nil {
+		log.Fatalf("failed to trace TC progs: %v", err)
 	}
+
+	return &t
+}
+
+func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
+	opts *ebpf.CollectionOptions, outputSkb bool, n2a BpfProgName2Addr,
+) *tracing {
+	var t tracing
+	if err := t.trace(coll, spec, opts, outputSkb, n2a, ebpf.XDP, "fentry_xdp"); err != nil {
+		log.Fatalf("failed to trace XDP progs: %v", err)
+	}
+
+	return &t
 }
