@@ -16,7 +16,6 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
-	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
 	"golang.org/x/sys/unix"
 
@@ -196,36 +195,9 @@ func main() {
 		defer close()
 	}
 
-	if flags.FilterTrackSkb {
-		kp, err := link.Kprobe("kfree_skbmem", coll.Programs["kprobe_skb_lifetime_termination"], nil)
-		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				log.Fatalf("Opening kprobe kfree_skbmem: %s\n", err)
-			} else {
-				log.Printf("Warn: kfree_skbmem not found, pwru is likely to mismatch skb due to lack of skb lifetime management\n")
-			}
-		} else {
-			defer kp.Close()
-		}
-
-		if haveFexit {
-			progs := []*ebpf.Program{
-				coll.Programs["fexit_skb_clone"],
-				coll.Programs["fexit_skb_copy"],
-			}
-			for _, prog := range progs {
-				fexit, err := link.AttachTracing(link.TracingOptions{
-					Program: prog,
-				})
-				if err != nil {
-					if !errors.Is(err, os.ErrNotExist) {
-						log.Fatalf("Opening tracing(%s): %s\n", prog, err)
-					}
-				} else {
-					defer fexit.Close()
-				}
-			}
-		}
+	if flags.FilterTrackSkb && len(funcs) != 0 {
+		t := pwru.TrackSkb(coll, haveFexit)
+		defer t.Close()
 	}
 
 	if len(funcs) != 0 {
