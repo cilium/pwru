@@ -97,7 +97,8 @@ func main() {
 	if len(funcs) == 0 && !flags.FilterTraceTc && !flags.FilterTraceXdp {
 		log.Fatalf("Cannot find a matching kernel function")
 	}
-	// If --filter-trace-tc, it's to retrieve and print bpf prog's name.
+	// If --filter-trace-tc/--filter-trace-xdp, it's to retrieve and print bpf
+	// prog's name.
 	addr2name, name2addr, err := pwru.ParseKallsyms(funcs, flags.OutputStack ||
 		len(flags.KMods) != 0 || flags.FilterTraceTc || flags.FilterTraceXdp)
 	if err != nil {
