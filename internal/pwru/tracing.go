@@ -66,6 +66,9 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 ) error {
 	entryFn, name, err := getEntryFuncName(prog)
 	if err != nil {
+		if errors.Is(err, errNotFound) {
+			return nil
+		}
 		return fmt.Errorf("failed to get entry function name: %w", err)
 	}
 
