@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+    - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
 
     - name: Set up Go
       uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491
@@ -46,7 +46,7 @@ jobs:
         kernel: [ '5.4-20240201.165956', '5.10-20240201.165956', '5.15-20240201.165956', '6.1-20240201.165956', 'bpf-next-20240204.012837' ]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - uses: actions/checkout@9bb56186c3b09b4f86b1c65136769dd318469633
 
       - name: Retrieve stored pwru executable
         uses: actions/download-artifact@c850b930e6ba138125429b7e5c93fc707a7f8427
