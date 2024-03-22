@@ -8,6 +8,10 @@ import (
 	"github.com/cloudflare/cbpfc"
 )
 
+func InjectL2Filter(program *ebpf.ProgramSpec, filterExpr string) (err error) {
+	return injectFilter(program, filterExpr, false)
+}
+
 func InjectFilters(program *ebpf.ProgramSpec, filterExpr string) (err error) {
 	if err = injectFilter(program, filterExpr, false); err != nil {
 		return

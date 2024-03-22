@@ -6,12 +6,14 @@
 #include "bpf/bpf_helpers.h"
 #include "bpf/bpf_core_read.h"
 #include "bpf/bpf_tracing.h"
+#include "bpf/bpf_endian.h"
 #include "bpf/bpf_ipv6.h"
 
 #define PRINT_SKB_STR_SIZE    2048
 
 #define ETH_P_IP              0x800
 #define ETH_P_IPV6            0x86dd
+#define ETH_P_8021Q           0x8100
 
 const static bool TRUE = true;
 
@@ -46,6 +48,12 @@ struct tuple {
 } __attribute__((packed));
 
 u64 print_skb_id = 0;
+
+enum event_type {
+    EVENT_TYPE_KPROBE = 0,
+    EVENT_TYPE_TC = 1,
+    EVENT_TYPE_XDP = 2,
+};
 
 struct event_t {
 	u32 pid;
@@ -190,24 +198,19 @@ set_meta(struct sk_buff *skb, struct skb_meta *meta) {
 }
 
 static __always_inline void
-set_tuple(struct sk_buff *skb, struct tuple *tpl) {
-	void *skb_head = BPF_CORE_READ(skb, head);
-	u16 l3_off = BPF_CORE_READ(skb, network_header);
+__set_tuple(struct tuple *tpl, void *data, u16 l3_off, bool is_ipv4) {
 	u16 l4_off;
 
-	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + l3_off);
-	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
-
-	if (ip_vsn == 4) {
-		struct iphdr *ip4 = (struct iphdr *) l3_hdr;
+	if (is_ipv4) {
+		struct iphdr *ip4 = (struct iphdr *) (data + l3_off);
 		BPF_CORE_READ_INTO(&tpl->saddr, ip4, saddr);
 		BPF_CORE_READ_INTO(&tpl->daddr, ip4, daddr);
 		tpl->l4_proto = BPF_CORE_READ(ip4, protocol);
 		tpl->l3_proto = ETH_P_IP;
 		l4_off = l3_off + BPF_CORE_READ_BITFIELD_PROBED(ip4, ihl) * 4;
 
-	} else if (ip_vsn == 6) {
-		struct ipv6hdr *ip6 = (struct ipv6hdr *) l3_hdr;
+	} else {
+		struct ipv6hdr *ip6 = (struct ipv6hdr *) (data + l3_off);
 		BPF_CORE_READ_INTO(&tpl->saddr, ip6, saddr);
 		BPF_CORE_READ_INTO(&tpl->daddr, ip6, daddr);
 		tpl->l4_proto = BPF_CORE_READ(ip6, nexthdr); // TODO: ipv6 l4 protocol
@@ -216,14 +219,29 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 	}
 
 	if (tpl->l4_proto == IPPROTO_TCP) {
-		struct tcphdr *tcp = (struct tcphdr *) (skb_head + l4_off);
+		struct tcphdr *tcp = (struct tcphdr *) (data + l4_off);
 		tpl->sport= BPF_CORE_READ(tcp, source);
 		tpl->dport= BPF_CORE_READ(tcp, dest);
 	} else if (tpl->l4_proto == IPPROTO_UDP) {
-		struct udphdr *udp = (struct udphdr *) (skb_head + l4_off);
+		struct udphdr *udp = (struct udphdr *) (data + l4_off);
 		tpl->sport= BPF_CORE_READ(udp, source);
 		tpl->dport= BPF_CORE_READ(udp, dest);
 	}
+}
+
+static __always_inline void
+set_tuple(struct sk_buff *skb, struct tuple *tpl) {
+	void *skb_head = BPF_CORE_READ(skb, head);
+	u16 l3_off = BPF_CORE_READ(skb, network_header);
+
+	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + l3_off);
+	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
+
+	if (ip_vsn !=4 && ip_vsn != 6)
+		return;
+
+	bool is_ipv4 = ip_vsn == 4;
+	__set_tuple(tpl, skb_head, l3_off, is_ipv4);
 }
 
 static __always_inline void
@@ -271,25 +289,22 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 
 static __noinline bool
 handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event) {
-	bool tracked = false;
-	u64 skb_addr = (u64) skb;
+	u64 skb_addr = (u64) BPF_CORE_READ(skb, head);
 
 	if (cfg->is_set) {
-		if (cfg->track_skb && bpf_map_lookup_elem(&skb_addresses, &skb_addr)) {
-			tracked = true;
-			goto cont;
-		}
+		if (cfg->track_skb) {
+			if (!bpf_map_lookup_elem(&skb_addresses, &skb_addr)) {
+				if (!filter(skb))
+					return false;
 
-		if (!filter(skb)) {
+				bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
+			}
+
+		} else if (!filter(skb)) {
 			return false;
 		}
 
-cont:
 		set_output(ctx, skb, event);
-	}
-
-	if (cfg->track_skb && !tracked) {
-		bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
 	}
 
 	event->pid = bpf_get_current_pid_tgid() >> 32;
@@ -306,7 +321,7 @@ kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip) {
 	if (!handle_everything(skb, ctx, &event))
 		return BPF_OK;
 
-	event.skb_addr = (u64) skb;
+	event.skb_addr = (u64) BPF_CORE_READ(skb, head);
 	event.addr = has_get_func_ip ? bpf_get_func_ip(ctx) : PT_REGS_IP(ctx);
 	event.param_second = PT_REGS_PARM2(ctx);
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
@@ -341,29 +356,38 @@ PWRU_ADD_KPROBE(5)
 
 SEC("kprobe/skb_lifetime_termination")
 int kprobe_skb_lifetime_termination(struct pt_regs *ctx) {
-	u64 skb = (u64) PT_REGS_PARM1(ctx);
+	struct sk_buff *skb = (void *) PT_REGS_PARM1(ctx);
+	u64 skb_addr = (u64) BPF_CORE_READ(skb, head);
 
-	bpf_map_delete_elem(&skb_addresses, &skb);
+	bpf_map_delete_elem(&skb_addresses, &skb_addr);
 
 	return BPF_OK;
 }
 
 static __always_inline int
-track_skb_clone(u64 old, u64 new) {
-	if (bpf_map_lookup_elem(&skb_addresses, &old))
-		bpf_map_update_elem(&skb_addresses, &new, &TRUE, BPF_ANY);
+track_skb_clone(struct sk_buff *old, struct sk_buff *new) {
+	u64 skb_addr_old = (u64) BPF_CORE_READ(old, head);
+	u64 skb_addr_new = (u64) BPF_CORE_READ(new, head);
+	if (bpf_map_lookup_elem(&skb_addresses, &skb_addr_old))
+		bpf_map_update_elem(&skb_addresses, &skb_addr_new, &TRUE, BPF_ANY);
 
 	return BPF_OK;
 }
 
 SEC("fexit/skb_clone")
-int BPF_PROG(fexit_skb_clone, u64 old, gfp_t mask, u64 new) {
-	return track_skb_clone(old, new);
+int BPF_PROG(fexit_skb_clone, struct sk_buff *old, gfp_t mask, struct sk_buff *new) {
+	if (new)
+		return track_skb_clone(old, new);
+
+	return BPF_OK;
 }
 
 SEC("fexit/skb_copy")
-int BPF_PROG(fexit_skb_copy, u64 old, gfp_t mask, u64 new) {
-	return track_skb_clone(old, new);
+int BPF_PROG(fexit_skb_copy, struct sk_buff *old, gfp_t mask, struct sk_buff *new) {
+	if (new)
+		return track_skb_clone(old, new);
+
+	return BPF_OK;
 }
 
 SEC("fentry/tc")
@@ -373,8 +397,116 @@ int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 	if (!handle_everything(skb, ctx, &event))
 		return BPF_OK;
 
-	event.skb_addr = (u64) skb;
+	event.skb_addr = (u64) BPF_CORE_READ(skb, head);
 	event.addr = BPF_PROG_ADDR;
+	event.type = EVENT_TYPE_TC;
+	bpf_map_push_elem(&events, &event, BPF_EXIST);
+
+	return BPF_OK;
+}
+
+static __always_inline bool
+filter_xdp_netns(struct xdp_buff *xdp) {
+	if (cfg->netns && BPF_CORE_READ(xdp, rxq, dev, nd_net.net, ns.inum) != cfg->netns)
+		return false;
+
+	return true;
+}
+
+static __always_inline bool
+filter_xdp_ifindex(struct xdp_buff *xdp) {
+	if (cfg->ifindex && BPF_CORE_READ(xdp, rxq, dev, ifindex) != cfg->ifindex)
+		return false;
+
+	return true;
+}
+
+static __always_inline bool
+filter_xdp_meta(struct xdp_buff *xdp) {
+	return filter_xdp_netns(xdp) && filter_xdp_ifindex(xdp);
+}
+
+static __always_inline bool
+filter_xdp_pcap(struct xdp_buff *xdp) {
+	void *data = (void *)(long) BPF_CORE_READ(xdp, data);
+	void *data_end = (void *)(long) BPF_CORE_READ(xdp, data_end);
+	return filter_pcap_ebpf_l2((void *)xdp, (void *)xdp, (void *)xdp, data, data_end);
+}
+
+static __always_inline bool
+filter_xdp(struct xdp_buff *xdp) {
+	return filter_xdp_pcap(xdp) && filter_xdp_meta(xdp);
+}
+
+static __always_inline void
+set_xdp_meta(struct xdp_buff *xdp, struct skb_meta *meta) {
+	struct net_device *dev = BPF_CORE_READ(xdp, rxq, dev);
+	meta->netns = BPF_CORE_READ(dev, nd_net.net, ns.inum);
+	meta->ifindex = BPF_CORE_READ(dev, ifindex);
+	meta->mtu = BPF_CORE_READ(dev, mtu);
+	meta->len = BPF_CORE_READ(xdp, data_end) - BPF_CORE_READ(xdp, data);
+}
+
+static __always_inline void
+set_xdp_tuple(struct xdp_buff *xdp, struct tuple *tpl) {
+	void *data = (void *)(long) BPF_CORE_READ(xdp, data);
+	void *data_end = (void *)(long) BPF_CORE_READ(xdp, data_end);
+	struct ethhdr *eth = (struct ethhdr *) data;
+	u16 l3_off = sizeof(*eth);
+	u16 l4_off;
+
+	__be16 proto = BPF_CORE_READ(eth, h_proto);
+	if (proto == bpf_htons(ETH_P_8021Q)) {
+		struct vlan_hdr *vlan = (struct vlan_hdr *) (eth + 1);
+		proto = BPF_CORE_READ(vlan, h_vlan_encapsulated_proto);
+		l3_off += sizeof(*vlan);
+	}
+	if (proto != bpf_htons(ETH_P_IP) && proto != bpf_htons(ETH_P_IPV6))
+		return;
+
+	bool is_ipv4 = proto == bpf_htons(ETH_P_IP);
+	__set_tuple(tpl, data, l3_off, is_ipv4);
+}
+
+static __always_inline void
+set_xdp_output(void *ctx, struct xdp_buff *xdp, struct event_t *event) {
+	if (cfg->output_meta)
+		set_xdp_meta(xdp, &event->meta);
+
+	if (cfg->output_tuple)
+		set_xdp_tuple(xdp, &event->tuple);
+
+	if (cfg->output_stack)
+		event->print_stack_id = bpf_get_stackid(ctx, &print_stack_map, BPF_F_FAST_STACK_CMP);
+}
+
+SEC("fentry/xdp")
+int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
+	u64 skb_addr = (u64) BPF_CORE_READ(xdp, data_hard_start);
+	struct event_t event = {};
+
+	if (cfg->is_set) {
+		if (cfg->track_skb) {
+			if (!bpf_map_lookup_elem(&skb_addresses, &skb_addr)) {
+				if (!filter_xdp(xdp))
+					return BPF_OK;
+
+				bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
+			}
+
+		} else if (!filter_xdp(xdp)) {
+			return BPF_OK;
+		}
+
+		set_xdp_output(ctx, xdp, &event);
+	}
+
+	event.pid = bpf_get_current_pid_tgid() >> 32;
+	event.ts = bpf_ktime_get_ns();
+	event.cpu_id = bpf_get_smp_processor_id();
+	event.skb_addr = (u64) skb_addr;
+	event.addr = BPF_PROG_ADDR;
+	event.type = EVENT_TYPE_XDP;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
 	return BPF_OK;
