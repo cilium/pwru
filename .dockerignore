@@ -1,4 +1,5 @@
 *.gif
 LICENSE
-README.md
+*.md
 *.png
+.git
