@@ -100,11 +100,15 @@ struct {
 } print_stack_map SEC(".maps");
 
 #ifdef OUTPUT_SKB
+struct print_skb_value {
+	u32 len;
+	char str[PRINT_SKB_STR_SIZE];
+};
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
 	__uint(max_entries, 256);
 	__type(key, u32);
-	__type(value, char[PRINT_SKB_STR_SIZE]);
+	__type(value, struct print_skb_value);
 } print_skb_map SEC(".maps");
 #endif
 
@@ -230,21 +234,25 @@ static __always_inline void
 set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
 #ifdef OUTPUT_SKB
 	static struct btf_ptr p = {};
+	struct print_skb_value *v;
 	typeof(print_skb_id) id;
-	char *str;
+	long n;
 
 	p.type_id = bpf_core_type_id_kernel(struct sk_buff);
 	p.ptr = skb;
 	id = __sync_fetch_and_add(&print_skb_id, 1) % 256;
 
-	str = bpf_map_lookup_elem(&print_skb_map, (u32 *) &id);
-	if (!str) {
+	v = bpf_map_lookup_elem(&print_skb_map, (u32 *) &id);
+	if (!v) {
 		return;
 	}
 
-	if (bpf_snprintf_btf(str, PRINT_SKB_STR_SIZE, &p, sizeof(p), 0) < 0) {
+	n = bpf_snprintf_btf(v->str, PRINT_SKB_STR_SIZE, &p, sizeof(p), 0);
+	if (n < 0) {
 		return;
 	}
+
+	v->len = n;
 
 	*event_id = id;
 #endif

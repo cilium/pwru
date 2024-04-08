@@ -5,6 +5,7 @@
 package pwru
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -247,10 +248,20 @@ func getStackData(event *Event, o *output) (stackData string) {
 
 func getSkbData(event *Event, o *output) (skbData string) {
 	id := uint32(event.PrintSkbId)
-	if str, err := o.printSkbMap.LookupBytes(&id); err == nil {
-		skbData = string(str)
+
+	b, err := o.printSkbMap.LookupBytes(&id)
+	if err != nil {
+		return ""
 	}
-	return skbData
+
+	length := binary.NativeEndian.Uint32(b[:4])
+
+	// Bounds check
+	if int(length+4) > len(b) {
+		return ""
+	}
+
+	return "\n" + string(b[4:4+length])
 }
 
 func getMetaData(event *Event, o *output) (metaData string) {
