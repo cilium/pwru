@@ -29,8 +29,9 @@ type FilterCfg struct {
 	OutputSkb   uint8
 	OutputStack uint8
 
-	IsSet    byte
-	TrackSkb byte
+	IsSet             byte
+	TrackSkb          byte
+	TrackSkbByStackid byte
 }
 
 func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
@@ -52,6 +53,9 @@ func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	}
 	if flags.FilterTrackSkb {
 		cfg.TrackSkb = 1
+	}
+	if flags.FilterTrackSkbByStackid {
+		cfg.TrackSkbByStackid = 1
 	}
 
 	netnsID, ns, err := parseNetns(flags.FilterNetns)

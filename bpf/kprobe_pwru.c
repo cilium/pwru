@@ -76,6 +76,20 @@ struct {
 	__uint(max_entries, MAX_TRACK_SIZE);
 } skb_addresses SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, struct sk_buff *);;
+	__type(value, __u64);
+	__uint(max_entries, MAX_TRACK_SIZE);
+} skb_stackid SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64);
+	__type(value, struct skb *);
+	__uint(max_entries, MAX_TRACK_SIZE);
+} stackid_skb SEC(".maps");
+
 struct config {
 	u32 netns;
 	u32 mark;
@@ -86,6 +100,7 @@ struct config {
 	u8 output_stack;
 	u8 is_set;
 	u8 track_skb;
+	u8 track_skb_by_stackid;
 } __attribute__((packed));
 
 static volatile const struct config CFG;
@@ -258,6 +273,22 @@ set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
 #endif
 }
 
+static __always_inline u64
+get_stackid(struct pt_regs *ctx) {
+	u64 caller_fp;
+	u64 fp = PT_REGS_FP(ctx);
+	for (int depth = 0; depth < MAX_STACK_DEPTH; depth++) {
+		if (bpf_probe_read_kernel(&caller_fp, sizeof(caller_fp), (void *)fp) < 0)
+			break;
+
+		if (caller_fp == 0)
+			break;
+
+		fp = caller_fp;
+	}
+	return fp;
+}
+
 static __always_inline void
 set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 	if (cfg->output_meta) {
@@ -279,12 +310,22 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 
 static __noinline bool
 handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event) {
-	bool tracked = false;
+	bool tracked_by_addr = false;
+	bool tracked_by_stackid = false;
 	u64 skb_addr = (u64) skb;
+	u64 stackid;
+
+	if (cfg->track_skb_by_stackid)
+		stackid = get_stackid(ctx);
 
 	if (cfg->is_set) {
 		if (cfg->track_skb && bpf_map_lookup_elem(&skb_addresses, &skb_addr)) {
-			tracked = true;
+			tracked_by_addr = true;
+			goto cont;
+		}
+
+		if (cfg->track_skb_by_stackid && bpf_map_lookup_elem(&stackid_skb, &stackid)) {
+			tracked_by_stackid = true;
 			goto cont;
 		}
 
@@ -296,8 +337,17 @@ cont:
 		set_output(ctx, skb, event);
 	}
 
-	if (cfg->track_skb && !tracked) {
+	if (cfg->track_skb && !tracked_by_addr) {
 		bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
+	}
+
+	if (cfg->track_skb_by_stackid) {
+		u64 *old_stackid = bpf_map_lookup_elem(&skb_stackid, &skb);
+		if (old_stackid && *old_stackid != stackid) {
+			bpf_map_delete_elem(&stackid_skb, old_stackid);
+		}
+		bpf_map_update_elem(&stackid_skb, &stackid, &skb, BPF_ANY);
+		bpf_map_update_elem(&skb_stackid, &skb, &stackid, BPF_ANY);
 	}
 
 	event->pid = bpf_get_current_pid_tgid() >> 32;
@@ -352,6 +402,12 @@ int kprobe_skb_lifetime_termination(struct pt_regs *ctx) {
 	u64 skb = (u64) PT_REGS_PARM1(ctx);
 
 	bpf_map_delete_elem(&skb_addresses, &skb);
+
+	if (cfg->track_skb_by_stackid) {
+		u64 stackid = get_stackid(ctx);
+		bpf_map_delete_elem(&stackid_skb, &stackid);
+		bpf_map_delete_elem(&skb_stackid, &skb);
+	}
 
 	return BPF_OK;
 }

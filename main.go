@@ -169,11 +169,11 @@ func main() {
 
 	// If not tracking skb, deleting the skb-tracking programs to reduce loading
 	// time.
-	if !flags.FilterTrackSkb {
+	if !flags.FilterTrackSkb && !flags.FilterTrackSkbByStackid {
 		delete(bpfSpec.Programs, "kprobe_skb_lifetime_termination")
 	}
 
-	if !flags.FilterTrackSkb || !haveFexit {
+	if (!flags.FilterTrackSkb && !flags.FilterTrackSkbByStackid) || !haveFexit {
 		delete(bpfSpec.Programs, "fexit_skb_clone")
 		delete(bpfSpec.Programs, "fexit_skb_copy")
 	}
@@ -214,7 +214,7 @@ func main() {
 	ignored := 0
 	bar := pb.StartNew(len(funcs))
 
-	if flags.FilterTrackSkb {
+	if flags.FilterTrackSkb || flags.FilterTrackSkbByStackid {
 		kp, err := link.Kprobe("kfree_skbmem", coll.Programs["kprobe_skb_lifetime_termination"], nil)
 		bar.Increment()
 		if err != nil {
