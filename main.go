@@ -296,7 +296,6 @@ func main() {
 		log.Fatalf("Failed to create outputer: %s", err)
 	}
 	defer output.Close()
-	output.PrintHeader()
 
 	if !flags.OutputJson {
 		output.PrintHeader()
