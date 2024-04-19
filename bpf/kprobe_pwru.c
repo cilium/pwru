@@ -78,7 +78,7 @@ struct {
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, struct sk_buff *);;
+	__type(key, struct sk_buff *);
 	__type(value, __u64);
 	__uint(max_entries, MAX_TRACK_SIZE);
 } skb_stackid SEC(".maps");
@@ -309,14 +309,13 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 }
 
 static __noinline bool
-handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event) {
+handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event, u64 *_stackid) {
 	bool tracked_by_addr = false;
-	bool tracked_by_stackid = false;
 	u64 skb_addr = (u64) skb;
 	u64 stackid;
 
 	if (cfg->track_skb_by_stackid)
-		stackid = get_stackid(ctx);
+		stackid = _stackid ? *_stackid : get_stackid(ctx);
 
 	if (cfg->is_set) {
 		if (cfg->track_skb && bpf_map_lookup_elem(&skb_addresses, &skb_addr)) {
@@ -325,7 +324,6 @@ handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event) {
 		}
 
 		if (cfg->track_skb_by_stackid && bpf_map_lookup_elem(&stackid_skb, &stackid)) {
-			tracked_by_stackid = true;
 			goto cont;
 		}
 
@@ -358,10 +356,10 @@ cont:
 }
 
 static __always_inline int
-kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip) {
+kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip, u64 *_stackid) {
 	struct event_t event = {};
 
-	if (!handle_everything(skb, ctx, &event))
+	if (!handle_everything(skb, ctx, &event, _stackid))
 		return BPF_OK;
 
 	event.skb_addr = (u64) skb;
@@ -384,7 +382,7 @@ kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip) {
   SEC(PWRU_KPROBE_TYPE "/skb-" #X)                                             \
   int kprobe_skb_##X(struct pt_regs *ctx) {                                    \
     struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM##X(ctx);             \
-    return kprobe_skb(skb, ctx, PWRU_HAS_GET_FUNC_IP);                         \
+    return kprobe_skb(skb, ctx, PWRU_HAS_GET_FUNC_IP, NULL);                         \
   }
 
 PWRU_ADD_KPROBE(1)
@@ -392,6 +390,17 @@ PWRU_ADD_KPROBE(2)
 PWRU_ADD_KPROBE(3)
 PWRU_ADD_KPROBE(4)
 PWRU_ADD_KPROBE(5)
+
+SEC("kprobe/skb_by_stackid")
+int kprobe_skb_by_stackid(struct pt_regs *ctx) {
+	u64 stackid = get_stackid(ctx);
+
+	struct sk_buff **skb = bpf_map_lookup_elem(&stackid_skb, &stackid);
+	if (skb && *skb)
+		return kprobe_skb(*skb, ctx, PWRU_HAS_GET_FUNC_IP, &stackid);
+
+	return BPF_OK;
+}
 
 #undef PWRU_KPROBE
 #undef PWRU_HAS_GET_FUNC_IP
@@ -434,7 +443,7 @@ SEC("fentry/tc")
 int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 	struct event_t event = {};
 
-	if (!handle_everything(skb, ctx, &event))
+	if (!handle_everything(skb, ctx, &event, NULL))
 		return BPF_OK;
 
 	event.skb_addr = (u64) skb;
