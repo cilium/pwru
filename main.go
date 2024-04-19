@@ -99,7 +99,7 @@ func main() {
 	}
 	// If --filter-trace-tc, it's to retrieve and print bpf prog's name.
 	addr2name, name2addr, err := pwru.ParseKallsyms(funcs, flags.OutputStack ||
-		len(flags.KMods) != 0 || flags.FilterTraceTc)
+		len(flags.KMods) != 0 || flags.FilterTraceTc || len(flags.FilterNonSkbFuncs) > 0)
 	if err != nil {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}
@@ -227,27 +227,38 @@ func main() {
 		} else {
 			kprobes = append(kprobes, kp)
 		}
+	}
 
-		if haveFexit {
-			progs := []*ebpf.Program{
-				coll.Programs["fexit_skb_clone"],
-				coll.Programs["fexit_skb_copy"],
-			}
-			for _, prog := range progs {
-				fexit, err := link.AttachTracing(link.TracingOptions{
-					Program: prog,
-				})
-				bar.Increment()
-				if err != nil {
-					if !errors.Is(err, os.ErrNotExist) {
-						log.Fatalf("Opening tracing(%s): %s\n", prog, err)
-					} else {
-						ignored += 1
-					}
+	if haveFexit && flags.FilterTrackSkb {
+		progs := []*ebpf.Program{
+			coll.Programs["fexit_skb_clone"],
+			coll.Programs["fexit_skb_copy"],
+		}
+		for _, prog := range progs {
+			fexit, err := link.AttachTracing(link.TracingOptions{
+				Program: prog,
+			})
+			bar.Increment()
+			if err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					log.Fatalf("Opening tracing(%s): %s\n", prog, err)
 				} else {
-					kprobes = append(kprobes, fexit)
+					ignored += 1
 				}
+			} else {
+				kprobes = append(kprobes, fexit)
 			}
+		}
+	}
+
+	if len(flags.FilterNonSkbFuncs) > 0 {
+		for _, fn := range flags.FilterNonSkbFuncs {
+			kp, err := link.Kprobe(fn, coll.Programs["kprobe_skb_by_stackid"], nil)
+			bar.Increment()
+			if err != nil {
+				log.Fatalf("Opening kprobe %s: %s\n", fn, err)
+			}
+			kprobes = append(kprobes, kp)
 		}
 	}
 

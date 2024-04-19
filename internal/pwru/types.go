@@ -28,6 +28,7 @@ type Flags struct {
 	FilterNetns             string
 	FilterMark              uint32
 	FilterFunc              string
+	FilterNonSkbFuncs       []string
 	FilterTrackSkb          bool
 	FilterTrackSkbByStackid bool
 	FilterTraceTc           bool
@@ -59,6 +60,7 @@ func (f *Flags) SetFlags() {
 	flag.StringSliceVar(&f.KMods, "kmods", nil, "list of kernel modules names to attach to")
 	flag.BoolVar(&f.AllKMods, "all-kmods", false, "attach to all available kernel modules")
 	flag.StringVar(&f.FilterFunc, "filter-func", "", "filter kernel functions to be probed by name (exact match, supports RE2 regular expression)")
+	flag.StringSliceVar(&f.FilterNonSkbFuncs, "filter-non-skb-funcs", nil, "filter non-skb kernel functions to be probed (--filter-track-skb-by-stackid will be enabled)")
 	flag.StringVar(&f.FilterNetns, "filter-netns", "", "filter netns (\"/proc/<pid>/ns/net\", \"inode:<inode>\")")
 	flag.Uint32Var(&f.FilterMark, "filter-mark", 0, "filter skb mark")
 	flag.BoolVar(&f.FilterTrackSkb, "filter-track-skb", false, "trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)")
@@ -98,6 +100,9 @@ func (f *Flags) PrintHelp() {
 func (f *Flags) Parse() {
 	flag.Parse()
 	f.FilterPcap = strings.Join(flag.Args(), " ")
+	if len(f.FilterNonSkbFuncs) > 0 {
+		f.FilterTrackSkbByStackid = true
+	}
 }
 
 type Tuple struct {
