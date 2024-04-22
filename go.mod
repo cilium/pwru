@@ -6,7 +6,7 @@ toolchain go1.21.6
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.5
-	github.com/cilium/ebpf v0.14.0
+	github.com/cilium/ebpf v0.15.0
 	github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
 	github.com/jsimonetti/rtnetlink v1.4.1
 	github.com/spf13/pflag v1.0.5
