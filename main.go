@@ -253,6 +253,9 @@ func main() {
 
 	if len(flags.FilterNonSkbFuncs) > 0 {
 		for _, fn := range flags.FilterNonSkbFuncs {
+			if _, ok := funcs[fn]; ok {
+				continue
+			}
 			kp, err := link.Kprobe(fn, coll.Programs["kprobe_skb_by_stackid"], nil)
 			bar.Increment()
 			if err != nil {
