@@ -7,6 +7,7 @@ package pwru
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	flag "github.com/spf13/pflag"
@@ -102,6 +103,8 @@ func (f *Flags) Parse() {
 	f.FilterPcap = strings.Join(flag.Args(), " ")
 	if len(f.FilterNonSkbFuncs) > 0 {
 		f.FilterTrackSkbByStackid = true
+		slices.Sort(f.FilterNonSkbFuncs)
+		f.FilterNonSkbFuncs = slices.Compact(f.FilterNonSkbFuncs)
 	}
 }
 
