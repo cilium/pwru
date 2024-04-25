@@ -18,6 +18,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+type kprober struct {
+	links []link.Link
+
+	kprobeMulti bool
+	kprobeBatch uint
+}
+
 type Kprobe struct {
 	hookFunc  string // internal use
 	HookFuncs []string
@@ -115,13 +122,15 @@ func AttachKprobes(ctx context.Context, bar *pb.ProgressBar, kps []Kprobe, batch
 }
 
 // DetachKprobes detaches kprobes concurrently.
-func DetachKprobes(links []link.Link, batch uint) {
+func (k *kprober) DetachKprobes() {
 	log.Println("Detaching kprobes...")
 
+	links := k.links
 	bar := pb.StartNew(len(links))
 	defer bar.Finish()
 
-	if batch == 0 || batch >= uint(len(links)) {
+	batch := k.kprobeBatch
+	if k.kprobeMulti || batch >= uint(len(links)) {
 		for _, l := range links {
 			_ = l.Close()
 			bar.Increment()
@@ -187,4 +196,50 @@ func AttachKprobeMulti(ctx context.Context, bar *pb.ProgressBar, kprobes []Kprob
 	}
 
 	return
+}
+
+func KprobeFuncs(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Addr2Name, useKprobeMulti bool, batch uint) *kprober {
+	msg := "kprobe"
+	if useKprobeMulti {
+		msg = "kprobe-multi"
+	}
+	log.Printf("Attaching kprobes (via %s)...\n", msg)
+
+	ignored := 0
+	bar := pb.StartNew(len(funcs))
+
+	pwruKprobes := make([]Kprobe, 0, len(funcs))
+	funcsByPos := GetFuncsByPos(funcs)
+	for pos, fns := range funcsByPos {
+		fn, ok := coll.Programs[fmt.Sprintf("kprobe_skb_%d", pos)]
+		if ok {
+			pwruKprobes = append(pwruKprobes, Kprobe{HookFuncs: fns, Prog: fn})
+		} else {
+			ignored += len(fns)
+			bar.Add(len(fns))
+		}
+	}
+
+	var k kprober
+	k.kprobeMulti = useKprobeMulti
+	k.kprobeBatch = batch
+
+	if !useKprobeMulti {
+		l, i := AttachKprobes(ctx, bar, pwruKprobes, batch)
+		k.links = l
+		ignored += i
+	} else {
+		l, i := AttachKprobeMulti(ctx, bar, pwruKprobes, a2n)
+		k.links = l
+		ignored += i
+	}
+	bar.Finish()
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+	}
+	log.Printf("Attached (ignored %d)\n", ignored)
+
+	return &k
 }
