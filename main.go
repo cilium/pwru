@@ -16,7 +16,6 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
-	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/rlimit"
 	"golang.org/x/sys/unix"
 
@@ -202,21 +201,13 @@ func main() {
 		defer t.Detach()
 	}
 
-	if len(flags.FilterNonSkbFuncs) > 0 {
-		for _, fn := range flags.FilterNonSkbFuncs {
-			if _, ok := funcs[fn]; ok {
-				continue
-			}
-			kp, err := link.Kprobe(fn, coll.Programs["kprobe_skb_by_stackid"], nil)
-			if err != nil {
-				log.Fatalf("Opening kprobe %s: %s\n", fn, err)
-			}
-			defer kp.Close()
-		}
+	if nonSkbFuncs := flags.FilterNonSkbFuncs; len(nonSkbFuncs) != 0 {
+		k := pwru.KprobeNonSkbFuncs(nonSkbFuncs, funcs, coll)
+		defer k.DetachKprobes()
 	}
 
 	if len(funcs) != 0 {
-		k := pwru.KprobeFuncs(ctx, funcs, coll, addr2name, useKprobeMulti, flags.FilterKprobeBatch)
+		k := pwru.KprobeSkbFuncs(ctx, funcs, coll, addr2name, useKprobeMulti, flags.FilterKprobeBatch)
 		defer k.DetachKprobes()
 	}
 
