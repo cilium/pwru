@@ -14,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	pb "github.com/cheggaaa/pb/v3"
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/link"
@@ -198,35 +197,16 @@ func main() {
 		defer close()
 	}
 
-	var kprobes []link.Link
-	defer func() {
-		batch := uint(0)
-		if !useKprobeMulti {
-			batch = flags.FilterKprobeBatch
-		}
-		pwru.DetachKprobes(kprobes, batch)
-	}()
-
-	msg := "kprobe"
-	if useKprobeMulti {
-		msg = "kprobe-multi"
-	}
-	log.Printf("Attaching kprobes (via %s)...\n", msg)
-	ignored := 0
-	bar := pb.StartNew(len(funcs))
-
 	if flags.FilterTrackSkb || flags.FilterTrackSkbByStackid {
 		kp, err := link.Kprobe("kfree_skbmem", coll.Programs["kprobe_skb_lifetime_termination"], nil)
-		bar.Increment()
 		if err != nil {
 			if !errors.Is(err, os.ErrNotExist) {
 				log.Fatalf("Opening kprobe kfree_skbmem: %s\n", err)
 			} else {
-				ignored += 1
 				log.Printf("Warn: kfree_skbmem not found, pwru is likely to mismatch skb due to lack of skb lifetime management\n")
 			}
 		} else {
-			kprobes = append(kprobes, kp)
+			defer kp.Close()
 		}
 	}
 
@@ -239,15 +219,12 @@ func main() {
 			fexit, err := link.AttachTracing(link.TracingOptions{
 				Program: prog,
 			})
-			bar.Increment()
 			if err != nil {
 				if !errors.Is(err, os.ErrNotExist) {
 					log.Fatalf("Opening tracing(%s): %s\n", prog, err)
-				} else {
-					ignored += 1
 				}
 			} else {
-				kprobes = append(kprobes, fexit)
+				defer fexit.Close()
 			}
 		}
 	}
@@ -258,41 +235,17 @@ func main() {
 				continue
 			}
 			kp, err := link.Kprobe(fn, coll.Programs["kprobe_skb_by_stackid"], nil)
-			bar.Increment()
 			if err != nil {
 				log.Fatalf("Opening kprobe %s: %s\n", fn, err)
 			}
-			kprobes = append(kprobes, kp)
+			defer kp.Close()
 		}
 	}
 
-	pwruKprobes := make([]pwru.Kprobe, 0, len(funcs))
-	funcsByPos := pwru.GetFuncsByPos(funcs)
-	for pos, fns := range funcsByPos {
-		fn, ok := coll.Programs[fmt.Sprintf("kprobe_skb_%d", pos)]
-		if ok {
-			pwruKprobes = append(pwruKprobes, pwru.Kprobe{HookFuncs: fns, Prog: fn})
-		} else {
-			ignored += len(fns)
-			bar.Add(len(fns))
-		}
+	if len(funcs) != 0 {
+		k := pwru.KprobeFuncs(ctx, funcs, coll, addr2name, useKprobeMulti, flags.FilterKprobeBatch)
+		defer k.DetachKprobes()
 	}
-	if !useKprobeMulti {
-		l, i := pwru.AttachKprobes(ctx, bar, pwruKprobes, flags.FilterKprobeBatch)
-		kprobes = append(kprobes, l...)
-		ignored += i
-	} else {
-		l, i := pwru.AttachKprobeMulti(ctx, bar, pwruKprobes, addr2name)
-		kprobes = append(kprobes, l...)
-		ignored += i
-	}
-	bar.Finish()
-	select {
-	case <-ctx.Done():
-		return
-	default:
-	}
-	log.Printf("Attached (ignored %d)\n", ignored)
 
 	log.Println("Listening for events..")
 
