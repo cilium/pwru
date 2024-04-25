@@ -401,7 +401,7 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 static __noinline bool
 handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event, u64 *_stackid) {
 	u8 tracked_by;
-	u64 skb_addr = (u64) skb;
+	u64 skb_addr = (u64) BPF_CORE_READ(skb, head);
 	u64 stackid;
 
 	if (cfg->track_skb_by_stackid)
@@ -456,7 +456,7 @@ kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip, u64 *
 	if (!handle_everything(skb, ctx, &event, _stackid))
 		return BPF_OK;
 
-	event.skb_addr = (u64) skb;
+	event.skb_addr = (u64) BPF_CORE_READ(skb, head);
 	event.addr = has_get_func_ip ? bpf_get_func_ip(ctx) : PT_REGS_IP(ctx);
 	event.param_second = PT_REGS_PARM2(ctx);
 	if (CFG.output_caller)
@@ -505,35 +505,44 @@ int kprobe_skb_by_stackid(struct pt_regs *ctx) {
 
 SEC("kprobe/skb_lifetime_termination")
 int kprobe_skb_lifetime_termination(struct pt_regs *ctx) {
-	u64 skb = (u64) PT_REGS_PARM1(ctx);
+	struct sk_buff *skb = (typeof(skb)) PT_REGS_PARM1(ctx);
+	u64 skb_addr = (u64) BPF_CORE_READ(skb, head);
 
-	bpf_map_delete_elem(&skb_addresses, &skb);
+	bpf_map_delete_elem(&skb_addresses, &skb_addr);
 
 	if (cfg->track_skb_by_stackid) {
 		u64 stackid = get_stackid(ctx);
 		bpf_map_delete_elem(&stackid_skb, &stackid);
-		bpf_map_delete_elem(&skb_stackid, &skb);
+		bpf_map_delete_elem(&skb_stackid, &skb_addr);
 	}
 
 	return BPF_OK;
 }
 
 static __always_inline int
-track_skb_clone(u64 old, u64 new) {
-	if (bpf_map_lookup_elem(&skb_addresses, &old))
-		bpf_map_update_elem(&skb_addresses, &new, &TRUE, BPF_ANY);
+track_skb_clone(struct sk_buff *old, struct sk_buff *new) {
+	u64 skb_addr_old = (u64) BPF_CORE_READ(old, head);
+	u64 skb_addr_new = (u64) BPF_CORE_READ(new, head);
+	if (bpf_map_lookup_elem(&skb_addresses, &skb_addr_old))
+		bpf_map_update_elem(&skb_addresses, &skb_addr_new, &TRUE, BPF_ANY);
 
 	return BPF_OK;
 }
 
 SEC("fexit/skb_clone")
-int BPF_PROG(fexit_skb_clone, u64 old, gfp_t mask, u64 new) {
-	return track_skb_clone(old, new);
+int BPF_PROG(fexit_skb_clone, struct sk_buff *old, gfp_t mask, struct sk_buff *new) {
+	if (new)
+		return track_skb_clone(old, new);
+
+	return BPF_OK;
 }
 
 SEC("fexit/skb_copy")
-int BPF_PROG(fexit_skb_copy, u64 old, gfp_t mask, u64 new) {
-	return track_skb_clone(old, new);
+int BPF_PROG(fexit_skb_copy, struct sk_buff *old, gfp_t mask, struct sk_buff *new) {
+	if (new)
+		return track_skb_clone(old, new);
+
+	return BPF_OK;
 }
 
 SEC("fentry/tc")
@@ -543,7 +552,7 @@ int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 	if (!handle_everything(skb, ctx, &event, NULL))
 		return BPF_OK;
 
-	event.skb_addr = (u64) skb;
+	event.skb_addr = (u64) BPF_CORE_READ(skb, head);
 	event.addr = BPF_PROG_ADDR;
 	event.type = EVENT_TYPE_TC;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
@@ -629,11 +638,21 @@ set_xdp_output(void *ctx, struct xdp_buff *xdp, struct event_t *event) {
 
 SEC("fentry/xdp")
 int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
+	u64 skb_addr = (u64) BPF_CORE_READ(xdp, data_hard_start);
 	struct event_t event = {};
 
 	if (cfg->is_set) {
-		if (!filter_xdp(xdp))
+		if (cfg->track_skb) {
+			if (!bpf_map_lookup_elem(&skb_addresses, &skb_addr)) {
+				if (!filter_xdp(xdp))
+					return BPF_OK;
+
+				bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
+			}
+
+		} else if (!filter_xdp(xdp)) {
 			return BPF_OK;
+		}
 
 		set_xdp_output(ctx, xdp, &event);
 	}
@@ -641,7 +660,7 @@ int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
 	event.pid = bpf_get_current_pid_tgid() >> 32;
 	event.ts = bpf_ktime_get_ns();
 	event.cpu_id = bpf_get_smp_processor_id();
-	event.skb_addr = (u64) xdp;
+	event.skb_addr = (u64) skb_addr;
 	event.addr = BPF_PROG_ADDR;
 	event.type = EVENT_TYPE_XDP;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
