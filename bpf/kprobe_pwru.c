@@ -9,6 +9,7 @@
 #include "bpf/bpf_ipv6.h"
 
 #define PRINT_SKB_STR_SIZE    2048
+#define PRINT_SHINFO_STR_SIZE PRINT_SKB_STR_SIZE
 
 #define ETH_P_IP              0x800
 #define ETH_P_IPV6            0x86dd
@@ -46,6 +47,7 @@ struct tuple {
 } __attribute__((packed));
 
 u64 print_skb_id = 0;
+u64 print_shinfo_id = 0;
 
 struct event_t {
 	u32 pid;
@@ -54,6 +56,7 @@ struct event_t {
 	u64 skb_addr;
 	u64 ts;
 	typeof(print_skb_id) print_skb_id;
+	typeof(print_shinfo_id) print_shinfo_id;
 	struct skb_meta meta;
 	struct tuple tuple;
 	s64 print_stack_id;
@@ -97,6 +100,7 @@ struct config {
 	u8 output_meta;
 	u8 output_tuple;
 	u8 output_skb;
+	u8 output_shinfo;
 	u8 output_stack;
 	u8 is_set;
 	u8 track_skb;
@@ -119,12 +123,22 @@ struct print_skb_value {
 	u32 len;
 	char str[PRINT_SKB_STR_SIZE];
 };
+struct print_shinfo_value {
+	u32 len;
+	char str[PRINT_SHINFO_STR_SIZE];
+};
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
 	__uint(max_entries, 256);
 	__type(key, u32);
 	__type(value, struct print_skb_value);
 } print_skb_map SEC(".maps");
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 256);
+	__type(key, u32);
+	__type(value, struct print_shinfo_value);
+} print_shinfo_map SEC(".maps");
 #endif
 
 static __always_inline u32
@@ -273,6 +287,49 @@ set_skb_btf(struct sk_buff *skb, typeof(print_skb_id) *event_id) {
 #endif
 }
 
+static __always_inline void
+set_shinfo_btf(struct sk_buff *skb, typeof(print_shinfo_id) *event_id) {
+#ifdef OUTPUT_SKB
+	struct skb_shared_info *shinfo;
+	static struct btf_ptr p = {};
+	struct print_shinfo_value *v;
+	typeof(print_shinfo_id) id;
+	unsigned char *head;
+	unsigned int end;
+	long n;
+
+        /* skb_shared_info is located at the end of skb data.
+         * When CONFIG_NET_SKBUFF_DATA_USES_OFFSET is enabled, skb->end
+         * is an offset from skb->head to the end of skb data. If not,
+         * skb->end is a pointer to the end of skb data. For amd64 and
+         * arm64 (in 64bit arch in general), CONFIG_NET_SKBUFF_DATA_USES_OFFSET
+	 * is enabled by default.
+         */
+        head = BPF_CORE_READ(skb, head);
+	end = BPF_CORE_READ(skb, end);
+	shinfo = (struct skb_shared_info *)(head + end);
+
+	p.type_id = bpf_core_type_id_kernel(struct skb_shared_info);
+	p.ptr = shinfo;
+
+	id = __sync_fetch_and_add(&print_shinfo_id, 1) % 256;
+
+	v = bpf_map_lookup_elem(&print_shinfo_map, (u32 *) &id);
+	if (!v) {
+		return;
+	}
+
+	n = bpf_snprintf_btf(v->str, PRINT_SHINFO_STR_SIZE, &p, sizeof(p), 0);
+	if (n < 0) {
+		return;
+	}
+
+	v->len = n;
+
+	*event_id = id;
+#endif
+}
+
 static __always_inline u64
 get_stackid(struct pt_regs *ctx) {
 	u64 caller_fp;
@@ -301,6 +358,10 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 
 	if (cfg->output_skb) {
 		set_skb_btf(skb, &event->print_skb_id);
+	}
+
+	if (cfg->output_shinfo) {
+		set_shinfo_btf(skb, &event->print_shinfo_id);
 	}
 
 	if (cfg->output_stack) {

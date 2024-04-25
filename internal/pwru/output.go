@@ -31,20 +31,22 @@ import (
 const absoluteTS string = "15:04:05.000"
 
 type output struct {
-	flags         *Flags
-	lastSeenSkb   map[uint64]uint64 // skb addr => last seen TS
-	printSkbMap   *ebpf.Map
-	printStackMap *ebpf.Map
-	addr2name     Addr2Name
-	writer        *os.File
-	kprobeMulti   bool
-	kfreeReasons  map[uint64]string
-	ifaceCache    map[uint64]map[uint32]string
+	flags          *Flags
+	lastSeenSkb    map[uint64]uint64 // skb addr => last seen TS
+	printSkbMap    *ebpf.Map
+	printShinfoMap *ebpf.Map
+	printStackMap  *ebpf.Map
+	addr2name      Addr2Name
+	writer         *os.File
+	kprobeMulti    bool
+	kfreeReasons   map[uint64]string
+	ifaceCache     map[uint64]map[uint32]string
 }
 
 // outputStructured is a struct to hold the data for the json output
 type jsonPrinter struct {
 	Skb         string      `json:"skb,omitempty"`
+	Shinfo      string      `json:"skb_shared_info,omitempty"`
 	Cpu         uint32      `json:"cpu,omitempty"`
 	Process     string      `json:"process,omitempty"`
 	Func        string      `json:"func,omitempty"`
@@ -68,9 +70,7 @@ type jsonTuple struct {
 	Proto uint8  `json:"proto,omitempty"`
 }
 
-func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
-	addr2Name Addr2Name, kprobeMulti bool, btfSpec *btf.Spec,
-) (*output, error) {
+func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap *ebpf.Map, addr2Name Addr2Name, kprobeMulti bool, btfSpec *btf.Spec) (*output, error) {
 	writer := os.Stdout
 
 	if flags.OutputFile != "" {
@@ -95,15 +95,16 @@ func NewOutput(flags *Flags, printSkbMap *ebpf.Map, printStackMap *ebpf.Map,
 	}
 
 	return &output{
-		flags:         flags,
-		lastSeenSkb:   map[uint64]uint64{},
-		printSkbMap:   printSkbMap,
-		printStackMap: printStackMap,
-		addr2name:     addr2Name,
-		writer:        writer,
-		kprobeMulti:   kprobeMulti,
-		kfreeReasons:  reasons,
-		ifaceCache:    ifs,
+		flags:          flags,
+		lastSeenSkb:    map[uint64]uint64{},
+		printSkbMap:    printSkbMap,
+		printShinfoMap: printShinfoMap,
+		printStackMap:  printStackMap,
+		addr2name:      addr2Name,
+		writer:         writer,
+		kprobeMulti:    kprobeMulti,
+		kfreeReasons:   reasons,
+		ifaceCache:     ifs,
 	}, nil
 }
 
@@ -175,6 +176,10 @@ func (o *output) PrintJson(event *Event) {
 
 	if o.flags.OutputSkb {
 		d.SkbMetadata = getSkbData(event, o)
+	}
+
+	if o.flags.OutputShinfo {
+		d.SkbMetadata = getShinfoData(event, o)
 	}
 
 	// Create new encoder to write the json to stdout or file depending on the flags
@@ -264,6 +269,24 @@ func getSkbData(event *Event, o *output) (skbData string) {
 	return "\n" + string(b[4:4+length])
 }
 
+func getShinfoData(event *Event, o *output) (shinfoData string) {
+	id := uint32(event.PrintShinfoId)
+
+	b, err := o.printShinfoMap.LookupBytes(&id)
+	if err != nil {
+		return ""
+	}
+
+	length := binary.NativeEndian.Uint32(b[:4])
+
+	// Bounds check
+	if int(length+4) > len(b) {
+		return ""
+	}
+
+	return "\n" + string(b[4:4+length])
+}
+
 func getMetaData(event *Event, o *output) (metaData string) {
 	metaData = fmt.Sprintf("netns=%d mark=%#x iface=%s proto=%#04x mtu=%d len=%d",
 		event.Meta.Netns, event.Meta.Mark,
@@ -336,6 +359,10 @@ func (o *output) Print(event *Event) {
 
 	if o.flags.OutputSkb {
 		fmt.Fprintf(o.writer, "%s", getSkbData(event, o))
+	}
+
+	if o.flags.OutputShinfo {
+		fmt.Fprintf(o.writer, "%s", getShinfoData(event, o))
 	}
 
 	fmt.Fprintln(o.writer)
