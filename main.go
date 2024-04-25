@@ -92,13 +92,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
 	}
-	if len(funcs) <= 0 {
+	if len(funcs) == 0 && !flags.FilterTraceTc && !flags.FilterTraceXdp {
 		log.Fatalf("Cannot find a matching kernel function")
 	}
-	// If --filter-trace-tc, it's to retrieve and print bpf prog's name.
+	// If --filter-trace-tc/--filter-trace-xdp, it's to retrieve and print bpf
+	// prog's name.
 	addr2name, name2addr, err := pwru.ParseKallsyms(funcs, flags.OutputStack ||
-		len(flags.KMods) != 0 || flags.FilterTraceTc || len(flags.FilterNonSkbFuncs) > 0 ||
-		flags.OutputCaller)
+		len(flags.KMods) != 0 || flags.FilterTraceTc || flags.FilterTraceXdp ||
+		len(flags.FilterNonSkbFuncs) > 0 || flags.OutputCaller)
 	if err != nil {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}
@@ -130,6 +131,12 @@ func main() {
 			name == "fexit_skb_copy" {
 			continue
 		}
+		if name == "fentry_xdp" {
+			if err := libpcap.InjectL2Filter(program, flags.FilterPcap); err != nil {
+				log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
+			}
+			continue
+		}
 		if err = libpcap.InjectFilters(program, flags.FilterPcap); err != nil {
 			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
 		}
@@ -146,25 +153,33 @@ func main() {
 	}
 
 	haveFexit := pwru.HaveBPFLinkTracing()
-	if flags.FilterTraceTc && !haveFexit {
-		log.Fatalf("Current kernel does not support fentry/fexit to run with --filter-trace-tc")
+	if (flags.FilterTraceTc || flags.FilterTraceXdp) && !haveFexit {
+		log.Fatalf("Current kernel does not support fentry/fexit to run with --filter-trace-tc/--filter-trace-xdp")
 	}
 
 	// As we know, for every fentry tracing program, there is a corresponding
 	// bpf prog spec with attaching target and attaching function. So, we can
-	// just copy the spec and keep the fentry_tc program spec only in the copied
-	// spec.
-	var bpfSpecFentry *ebpf.CollectionSpec
+	// just copy the spec and keep the fentry_tc/fentry_xdp program spec only in
+	// the copied spec.
+	var bpfSpecFentryTc *ebpf.CollectionSpec
 	if flags.FilterTraceTc {
-		bpfSpecFentry = bpfSpec.Copy()
-		bpfSpecFentry.Programs = map[string]*ebpf.ProgramSpec{
-			"fentry_tc": bpfSpec.Programs["fentry_tc"],
+		bpfSpecFentryTc = bpfSpec.Copy()
+		bpfSpecFentryTc.Programs = map[string]*ebpf.ProgramSpec{
+			"fentry_tc": bpfSpecFentryTc.Programs["fentry_tc"],
+		}
+	}
+	var bpfSpecFentryXdp *ebpf.CollectionSpec
+	if flags.FilterTraceXdp {
+		bpfSpecFentryXdp = bpfSpec.Copy()
+		bpfSpecFentryXdp.Programs = map[string]*ebpf.ProgramSpec{
+			"fentry_xdp": bpfSpecFentryXdp.Programs["fentry_xdp"],
 		}
 	}
 
-	// fentry_tc is not used in the kprobe/kprobe-multi cases. So, it should be
-	// deleted from the spec.
+	// fentry_tc&fentry_xdp are not used in the kprobe/kprobe-multi cases. So,
+	// they should be deleted from the spec.
 	delete(bpfSpec.Programs, "fentry_tc")
+	delete(bpfSpec.Programs, "fentry_xdp")
 
 	// If not tracking skb, deleting the skb-tracking programs to reduce loading
 	// time.
@@ -191,9 +206,22 @@ func main() {
 	}
 	defer coll.Close()
 
+	traceTc := false
 	if flags.FilterTraceTc {
-		close := pwru.TraceTC(coll, bpfSpecFentry, &opts, flags.OutputSkb, flags.OutputShinfo, name2addr)
-		defer close()
+		t := pwru.TraceTC(coll, bpfSpecFentryTc, &opts, flags.OutputSkb, flags.OutputShinfo, name2addr)
+		defer t.Detach()
+		traceTc = t.HaveTracing()
+	}
+
+	traceXdp := false
+	if flags.FilterTraceXdp {
+		t := pwru.TraceXDP(coll, bpfSpecFentryXdp, &opts, flags.OutputSkb, flags.OutputShinfo, name2addr)
+		defer t.Detach()
+		traceXdp = t.HaveTracing()
+	}
+
+	if !traceTc && !traceXdp && len(funcs) == 0 {
+		log.Fatalf("No kprobe/tc-bpf/xdp to trace!")
 	}
 
 	if flags.FilterTrackSkb || flags.FilterTrackSkbByStackid {
