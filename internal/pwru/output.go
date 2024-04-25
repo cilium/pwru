@@ -31,6 +31,12 @@ import (
 
 const absoluteTS string = "15:04:05.000"
 
+const (
+	eventTypeKprobe     = 0
+	eventTypeTracingTc  = 1
+	eventTypeTracingXdp = 2
+)
+
 type output struct {
 	flags          *Flags
 	lastSeenSkb    map[uint64]uint64 // skb addr => last seen TS
@@ -211,7 +217,6 @@ func (o *output) PrintJson(event *Event) {
 	encoder.SetEscapeHTML(false)
 
 	err := encoder.Encode(d)
-
 	if err != nil {
 		log.Fatalf("Error encoding JSON: %s", err)
 	}
@@ -348,6 +353,15 @@ func getOutFuncName(o *output, event *Event, addr uint64) string {
 			outFuncName = fmt.Sprintf("%s(%s)", funcName, reason)
 		} else {
 			outFuncName = fmt.Sprintf("%s (%d)", funcName, event.ParamSecond)
+		}
+	}
+
+	if event.Type != eventTypeKprobe {
+		switch event.Type {
+		case eventTypeTracingTc:
+			outFuncName += "(tc)"
+		case eventTypeTracingXdp:
+			outFuncName += "(xdp)"
 		}
 	}
 
