@@ -198,35 +198,8 @@ func main() {
 	}
 
 	if flags.FilterTrackSkb || flags.FilterTrackSkbByStackid {
-		kp, err := link.Kprobe("kfree_skbmem", coll.Programs["kprobe_skb_lifetime_termination"], nil)
-		if err != nil {
-			if !errors.Is(err, os.ErrNotExist) {
-				log.Fatalf("Opening kprobe kfree_skbmem: %s\n", err)
-			} else {
-				log.Printf("Warn: kfree_skbmem not found, pwru is likely to mismatch skb due to lack of skb lifetime management\n")
-			}
-		} else {
-			defer kp.Close()
-		}
-	}
-
-	if haveFexit && flags.FilterTrackSkb {
-		progs := []*ebpf.Program{
-			coll.Programs["fexit_skb_clone"],
-			coll.Programs["fexit_skb_copy"],
-		}
-		for _, prog := range progs {
-			fexit, err := link.AttachTracing(link.TracingOptions{
-				Program: prog,
-			})
-			if err != nil {
-				if !errors.Is(err, os.ErrNotExist) {
-					log.Fatalf("Opening tracing(%s): %s\n", prog, err)
-				}
-			} else {
-				defer fexit.Close()
-			}
-		}
+		t := pwru.TrackSkb(coll, haveFexit, flags.FilterTrackSkb)
+		defer t.Detach()
 	}
 
 	if len(flags.FilterNonSkbFuncs) > 0 {
