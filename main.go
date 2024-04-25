@@ -111,9 +111,9 @@ func main() {
 
 	var bpfSpec *ebpf.CollectionSpec
 	switch {
-	case flags.OutputSkb && useKprobeMulti:
+	case (flags.OutputSkb || flags.OutputShinfo) && useKprobeMulti:
 		bpfSpec, err = LoadKProbeMultiPWRU()
-	case flags.OutputSkb:
+	case flags.OutputSkb || flags.OutputShinfo:
 		bpfSpec, err = LoadKProbePWRU()
 	case useKprobeMulti:
 		bpfSpec, err = LoadKProbeMultiPWRUWithoutOutputSKB()
@@ -193,7 +193,7 @@ func main() {
 	defer coll.Close()
 
 	if flags.FilterTraceTc {
-		close := pwru.TraceTC(coll, bpfSpecFentry, &opts, flags.OutputSkb, name2addr)
+		close := pwru.TraceTC(coll, bpfSpecFentry, &opts, flags.OutputSkb, flags.OutputShinfo, name2addr)
 		defer close()
 	}
 
@@ -304,8 +304,9 @@ func main() {
 	}
 
 	printSkbMap := coll.Maps["print_skb_map"]
+	printShinfoMap := coll.Maps["print_shinfo_map"]
 	printStackMap := coll.Maps["print_stack_map"]
-	output, err := pwru.NewOutput(&flags, printSkbMap, printStackMap, addr2name, useKprobeMulti, btfSpec)
+	output, err := pwru.NewOutput(&flags, printSkbMap, printShinfoMap, printStackMap, addr2name, useKprobeMulti, btfSpec)
 	if err != nil {
 		log.Fatalf("Failed to create outputer: %s", err)
 	}

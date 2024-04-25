@@ -94,7 +94,7 @@ func (t *tcTracer) trace(spec *ebpf.CollectionSpec,
 }
 
 func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
-	opts *ebpf.CollectionOptions, outputSkb bool, n2a BpfProgName2Addr,
+	opts *ebpf.CollectionOptions, outputSkb bool, outputShinfo bool, n2a BpfProgName2Addr,
 ) func() {
 	progs, err := listBpfProgs(ebpf.SchedCLS)
 	if err != nil {
@@ -109,6 +109,9 @@ func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	}
 	if outputSkb {
 		replacedMaps["print_skb_map"] = coll.Maps["print_skb_map"]
+	}
+	if outputShinfo {
+		replacedMaps["print_shinfo_map"] = coll.Maps["print_shinfo_map"]
 	}
 	opts.MapReplacements = replacedMaps
 

@@ -24,10 +24,11 @@ type FilterCfg struct {
 	FilterIfindex uint32
 
 	// TODO: if there are more options later, then you can consider using a bit map
-	OutputMeta  uint8
-	OutputTuple uint8
-	OutputSkb   uint8
-	OutputStack uint8
+	OutputMeta   uint8
+	OutputTuple  uint8
+	OutputSkb    uint8
+	OutputShinfo uint8
+	OutputStack  uint8
 
 	IsSet             byte
 	TrackSkb          byte
@@ -41,6 +42,9 @@ func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	}
 	if flags.OutputSkb {
 		cfg.OutputSkb = 1
+	}
+	if flags.OutputShinfo {
+		cfg.OutputShinfo = 1
 	}
 	if flags.OutputMeta {
 		cfg.OutputMeta = 1

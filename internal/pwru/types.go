@@ -41,6 +41,7 @@ type Flags struct {
 	OutputMeta       bool
 	OutputTuple      bool
 	OutputSkb        bool
+	OutputShinfo     bool
 	OutputStack      bool
 	OutputLimitLines uint64
 	OutputFile       string
@@ -73,6 +74,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputMeta, "output-meta", false, "print skb metadata")
 	flag.BoolVar(&f.OutputTuple, "output-tuple", false, "print L4 tuple")
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
+	flag.BoolVar(&f.OutputShinfo, "output-skb-shared-info", false, "print skb shared info")
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
 
@@ -133,15 +135,16 @@ type StackData struct {
 }
 
 type Event struct {
-	PID          uint32
-	Type         uint32
-	Addr         uint64
-	SAddr        uint64
-	Timestamp    uint64
-	PrintSkbId   uint64
-	Meta         Meta
-	Tuple        Tuple
-	PrintStackId int64
-	ParamSecond  uint64
-	CPU          uint32
+	PID           uint32
+	Type          uint32
+	Addr          uint64
+	SAddr         uint64
+	Timestamp     uint64
+	PrintSkbId    uint64
+	PrintShinfoId uint64
+	Meta          Meta
+	Tuple         Tuple
+	PrintStackId  int64
+	ParamSecond   uint64
+	CPU           uint32
 }
