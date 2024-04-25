@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build linux || netbsd
-// +build linux netbsd
 
 package ps
 
@@ -28,7 +27,9 @@ func newUnixProcess(pid int) (Process, error) {
 	} else if err != nil {
 		return nil, fmt.Errorf("failed to lstat %s: %w", procDir, err)
 	}
-	b, err := os.ReadFile(filepath.Join(procDir, "stat"))
+
+	procStat := filepath.Join(procDir, "stat")
+	b, err := os.ReadFile(procStat)
 	if err != nil {
 		return nil, err
 	}
@@ -37,22 +38,24 @@ func newUnixProcess(pid int) (Process, error) {
 	// format
 	commStart := bytes.IndexByte(b, '(')
 	commEnd := bytes.LastIndexByte(b[commStart:], ')') + commStart
-	pidS := b[:bytes.IndexByte(b, ' ')]
-	comm := b[commStart+1 : commEnd]
-	fields := append([][]byte{pidS, comm}, bytes.Fields(b[commEnd+2:])...) // +2 for '( '
+	comm := string(b[commStart+1 : commEnd])
+	fields := bytes.Fields(b[commEnd+2:]) // +2 for '( '
+	if len(fields) < 2 {
+		return nil, fmt.Errorf("invalid process status format in %s", procStat)
+	}
+	ppid, err := strconv.Atoi(string(fields[1]))
+	if err != nil {
+		return nil, fmt.Errorf("invalid ppid format %s: %w", fields[1], err)
+	}
 
 	p := &unixProcess{
 		pid:          pid,
+		ppid:         ppid,
 		uid:          int(st.Uid),
 		gid:          int(st.Gid),
+		command:      comm,
 		creationTime: time.Unix(int64(st.Ctim.Sec), int64(st.Ctim.Nsec)),
 	}
-
-	p.ppid, err = strconv.Atoi(string(fields[3]))
-	if err != nil {
-		return nil, err
-	}
-	p.command = string(comm)
 	p.executablePath, _ = filepath.EvalSymlinks(filepath.Join(procDir, "exe"))
 
 	b, err = os.ReadFile(filepath.Join(procDir, "cmdline"))
