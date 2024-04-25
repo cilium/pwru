@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build dragonfly || freebsd || openbsd
-// +build dragonfly freebsd openbsd
 
 package ps
 
