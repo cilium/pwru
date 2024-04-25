@@ -198,7 +198,7 @@ func AttachKprobeMulti(ctx context.Context, bar *pb.ProgressBar, kprobes []Kprob
 	return
 }
 
-func KprobeFuncs(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Addr2Name, useKprobeMulti bool, batch uint) *kprober {
+func KprobeSkbFuncs(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Addr2Name, useKprobeMulti bool, batch uint) *kprober {
 	msg := "kprobe"
 	if useKprobeMulti {
 		msg = "kprobe-multi"
@@ -240,6 +240,26 @@ func KprobeFuncs(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Ad
 	default:
 	}
 	log.Printf("Attached (ignored %d)\n", ignored)
+
+	return &k
+}
+
+func KprobeNonSkbFuncs(nonSkbFuncs []string, funcs Funcs, coll *ebpf.Collection) *kprober {
+	var k kprober
+	k.kprobeBatch = uint(len(nonSkbFuncs))
+
+	for _, fn := range nonSkbFuncs {
+		if _, ok := funcs[fn]; ok {
+			continue
+		}
+
+		kp, err := link.Kprobe(fn, coll.Programs["kprobe_skb_by_stackid"], nil)
+		if err != nil {
+			log.Fatalf("Opening kprobe %s: %s\n", fn, err)
+		}
+
+		k.links = append(k.links, kp)
+	}
 
 	return &k
 }
