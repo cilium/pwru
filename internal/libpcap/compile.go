@@ -74,7 +74,7 @@ func CompileCbpf(expr string, l3 bool) (insts []bpf.Instruction, err error) {
 
 /*
 Steps:
-1. Compile pcap expresion to cbpf using libpcap
+1. Compile pcap expression to cbpf using libpcap
 2. Convert cbpf to ebpf using cloudflare/cbpfc
 3. Convert direct memory load to bpf_probe_read_kernel
 

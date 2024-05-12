@@ -83,7 +83,7 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap *ebpf.Ma
 
 	reasons, err := getKFreeSKBReasons(btfSpec)
 	if err != nil {
-		log.Printf("Unable to load packet drop reaons: %v", err)
+		log.Printf("Unable to load packet drop reasons: %v", err)
 	}
 
 	var ifs map[uint64]map[uint32]string
