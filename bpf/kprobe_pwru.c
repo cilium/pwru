@@ -97,14 +97,16 @@ struct config {
 	u32 netns;
 	u32 mark;
 	u32 ifindex;
-	u8 output_meta;
-	u8 output_tuple;
-	u8 output_skb;
-	u8 output_shinfo;
-	u8 output_stack;
-	u8 is_set;
-	u8 track_skb;
-	u8 track_skb_by_stackid;
+	u8 output_meta: 1;
+	u8 output_tuple: 1;
+	u8 output_skb: 1;
+	u8 output_shinfo: 1;
+	u8 output_stack: 1;
+	u8 output_unused: 3;
+	u8 is_set: 1;
+	u8 track_skb: 1;
+	u8 track_skb_by_stackid: 1;
+	u8 unused: 5;
 } __attribute__((packed));
 
 static volatile const struct config CFG;

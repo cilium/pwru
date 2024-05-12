@@ -15,6 +15,20 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const (
+	OutputMetaMask uint8 = 1 << iota
+	OutputTupleMask
+	OutputSkbMask
+	OutputShinfoMask
+	OutputStackMask
+)
+
+const (
+	IsSetMask uint8 = 1 << iota
+	TrackSkbMask
+	TrackSkbByStackidMask
+)
+
 // Version is the pwru version and is set at compile time via LDFLAGS-
 var Version string = "version unknown"
 
@@ -23,43 +37,35 @@ type FilterCfg struct {
 	FilterMark    uint32
 	FilterIfindex uint32
 
-	// TODO: if there are more options later, then you can consider using a bit map
-	OutputMeta   uint8
-	OutputTuple  uint8
-	OutputSkb    uint8
-	OutputShinfo uint8
-	OutputStack  uint8
-
-	IsSet             byte
-	TrackSkb          byte
-	TrackSkbByStackid byte
+	OutputFlags uint8
+	FilterFlags uint8
 }
 
 func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	cfg = FilterCfg{
 		FilterMark: flags.FilterMark,
-		IsSet:      1,
 	}
+	cfg.FilterFlags |= IsSetMask
 	if flags.OutputSkb {
-		cfg.OutputSkb = 1
+		cfg.OutputFlags |= OutputSkbMask
 	}
 	if flags.OutputShinfo {
-		cfg.OutputShinfo = 1
+		cfg.OutputFlags |= OutputShinfoMask
 	}
 	if flags.OutputMeta {
-		cfg.OutputMeta = 1
+		cfg.OutputFlags |= OutputMetaMask
 	}
 	if flags.OutputTuple {
-		cfg.OutputTuple = 1
+		cfg.OutputFlags |= OutputTupleMask
 	}
 	if flags.OutputStack {
-		cfg.OutputStack = 1
+		cfg.OutputFlags |= OutputStackMask
 	}
 	if flags.FilterTrackSkb {
-		cfg.TrackSkb = 1
+		cfg.FilterFlags |= TrackSkbMask
 	}
 	if flags.FilterTrackSkbByStackid {
-		cfg.TrackSkbByStackid = 1
+		cfg.FilterFlags |= TrackSkbByStackidMask
 	}
 
 	netnsID, ns, err := parseNetns(flags.FilterNetns)
