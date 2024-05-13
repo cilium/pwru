@@ -140,6 +140,7 @@ type Event struct {
 	PID           uint32
 	Type          uint32
 	Addr          uint64
+	CallerAddr    uint64
 	SAddr         uint64
 	Timestamp     uint64
 	PrintSkbId    uint64

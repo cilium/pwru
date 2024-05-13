@@ -51,6 +51,7 @@ type jsonPrinter struct {
 	Cpu         uint32      `json:"cpu,omitempty"`
 	Process     string      `json:"process,omitempty"`
 	Func        string      `json:"func,omitempty"`
+	CallerFunc  string      `json:"caller_func,omitempty"`
 	Time        interface{} `json:"time,omitempty"`
 	Netns       uint32      `json:"netns,omitempty"`
 	Mark        uint32      `json:"mark,omitempty"`
@@ -140,6 +141,9 @@ func (o *output) PrintHeader() {
 		fmt.Fprintf(o.writer, " %s", "TUPLE")
 	}
 	fmt.Fprintf(o.writer, " %s", "FUNC")
+	if o.flags.OutputCaller {
+		fmt.Fprintf(o.writer, " %s", "CALLER")
+	}
 	fmt.Fprintf(o.writer, "\n")
 }
 
@@ -153,6 +157,9 @@ func (o *output) PrintJson(event *Event) {
 	d.Cpu = event.CPU
 	d.Process = getExecName(int(event.PID))
 	d.Func = getOutFuncName(o, event, event.Addr)
+	if o.flags.OutputCaller {
+		d.CallerFunc = o.addr2name.findNearestSym(event.CallerAddr)
+	}
 
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
@@ -390,6 +397,9 @@ func (o *output) Print(event *Event) {
 	}
 
 	fmt.Fprintf(o.writer, " %s", outFuncName)
+	if o.flags.OutputCaller {
+		fmt.Fprintf(o.writer, " %s", o.addr2name.findNearestSym(event.CallerAddr))
+	}
 
 	if o.flags.OutputStack && event.PrintStackId > 0 {
 		fmt.Fprintf(o.writer, "%s", getStackData(event, o))

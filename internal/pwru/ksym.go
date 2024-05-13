@@ -32,14 +32,14 @@ func (a *Addr2Name) findNearestSym(ip uint64) string {
 		h := int(uint(i+j) >> 1)
 		if a.Addr2NameSlice[h].addr <= ip {
 			if h+1 < total && a.Addr2NameSlice[h+1].addr > ip {
-				return a.Addr2NameSlice[h].name
+				return strings.Replace(a.Addr2NameSlice[h].name, "\t", "", -1)
 			}
 			i = h + 1
 		} else {
 			j = h
 		}
 	}
-	return a.Addr2NameSlice[i-1].name
+	return strings.Replace(a.Addr2NameSlice[i-1].name, "\t", "", -1)
 }
 
 func ParseKallsyms(funcs Funcs, all bool) (Addr2Name, BpfProgName2Addr, error) {
