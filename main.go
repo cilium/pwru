@@ -99,7 +99,8 @@ func main() {
 	}
 	// If --filter-trace-tc, it's to retrieve and print bpf prog's name.
 	addr2name, name2addr, err := pwru.ParseKallsyms(funcs, flags.OutputStack ||
-		len(flags.KMods) != 0 || flags.FilterTraceTc || len(flags.FilterNonSkbFuncs) > 0)
+		len(flags.KMods) != 0 || flags.FilterTraceTc || len(flags.FilterNonSkbFuncs) > 0 ||
+		flags.OutputCaller)
 	if err != nil {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}
