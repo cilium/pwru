@@ -21,6 +21,7 @@ const (
 	OutputSkbMask
 	OutputShinfoMask
 	OutputStackMask
+	OutputCallerMask
 )
 
 const (
@@ -60,6 +61,9 @@ func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	}
 	if flags.OutputStack {
 		cfg.OutputFlags |= OutputStackMask
+	}
+	if flags.OutputCaller {
+		cfg.OutputFlags |= OutputCallerMask
 	}
 	if flags.FilterTrackSkb {
 		cfg.FilterFlags |= TrackSkbMask

@@ -102,7 +102,8 @@ struct config {
 	u8 output_skb: 1;
 	u8 output_shinfo: 1;
 	u8 output_stack: 1;
-	u8 output_unused: 3;
+	u8 output_caller: 1;
+	u8 output_unused: 2;
 	u8 is_set: 1;
 	u8 track_skb: 1;
 	u8 track_skb_by_stackid: 1;

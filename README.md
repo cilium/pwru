@@ -66,6 +66,7 @@ Usage: pwru [options] [pcap-filter]
   -h, --help                           display this message and exit
       --kernel-btf string              specify kernel BTF file
       --kmods strings                  list of kernel modules names to attach to
+      --output-caller                  print caller function name
       --output-file string             write traces to file
       --output-json                    output traces in JSON format
       --output-limit-lines uint        exit the program after the number of events has been received/printed
