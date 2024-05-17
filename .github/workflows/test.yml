@@ -72,7 +72,7 @@ jobs:
           traffic-setup: |
             iptables -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 --dport 8080 -j DROP
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.1:8080 || true
-          expected-output-pattern: '(kfree_skb_reason|kfree_skb\b).*1.0.0.1:8080'
+          expected-output-pattern: '1.0.0.1:8080.*(kfree_skb_reason|kfree_skb\b)'
 
       - name: Test basic IPv6
         uses: ./.github/actions/pwru-test
@@ -82,7 +82,7 @@ jobs:
           traffic-setup: |
             ip6tables -I OUTPUT 1 -m tcp --proto tcp --dst 2606:4700:4700::1001 --dport 8080 -j DROP
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://[2606:4700:4700::1001]:8080 || true
-          expected-output-pattern: '(kfree_skb_reason|kfree_skb\b).*\[2606:4700:4700::1001\]:8080'
+          expected-output-pattern: '\[2606:4700:4700::1001\]:8080.*(kfree_skb_reason|kfree_skb\b)'
 
       - name: Test advanced IPv4
         uses: ./.github/actions/pwru-test
@@ -92,7 +92,7 @@ jobs:
           traffic-setup: |
             iptables -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.2/32 --dport 8080 -j DROP
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.2:8080 || true
-          expected-output-pattern: '(kfree_skb_reason|kfree_skb\b).*1.0.0.2:8080'
+          expected-output-pattern: '1.0.0.2:8080.*(kfree_skb_reason|kfree_skb\b)'
 
       - name: Test advanced IPv6
         uses: ./.github/actions/pwru-test
@@ -102,7 +102,7 @@ jobs:
           traffic-setup: |
             ip6tables -I OUTPUT 1 -m tcp --proto tcp --dst 2606:4700:4700::1002 --dport 8080 -j DROP
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://[2606:4700:4700::1002]:8080 || true
-          expected-output-pattern: '(kfree_skb_reason|kfree_skb\b).*\[2606:4700:4700::1002\]:8080'
+          expected-output-pattern: '\[2606:4700:4700::1002\]:8080.*(kfree_skb_reason|kfree_skb\b)'
 
       - name: Test pcap filter using stack
         uses: ./.github/actions/pwru-test
