@@ -45,9 +45,18 @@ runs:
 
           grep -P '${{ inputs.expected-output-pattern }}' /tmp/pwru-${{ inputs.test-name }}.log
 
+    - name: Fetch artifacts from LVH VM
+      if: ${{ !success() }}
+      uses: cilium/little-vm-helper@9d758b756305e83718a51b792a5aeabd022a39ec # v0.0.16
+      with:
+        provision: 'false'
+        cmd: |
+          mkdir -p /host/logs/${{ inputs.test-name }}
+          cp /tmp/pwru-* /host/logs/${{ inputs.test-name }}
+
     - name: Upload artifacts
       if: ${{ !success() }}
       uses: actions/upload-artifact@1746f4ab65b179e0ea60a494b83293b640dd5bba # v4.3.2
       with:
         name: logs-${{ inputs.test-name }}
-        path: /tmp/pwru-*
+        path: ./logs/${{ inputs.test-name }}/pwru-*
