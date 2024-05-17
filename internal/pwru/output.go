@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -68,6 +69,15 @@ type jsonTuple struct {
 	Sport uint16 `json:"sport,omitempty"`
 	Dport uint16 `json:"dport,omitempty"`
 	Proto uint8  `json:"proto,omitempty"`
+}
+
+func centerAlignString(s string, width int) string {
+	if len(s) >= width {
+		return s
+	}
+	leftPadding := (width - len(s)) / 2
+	rightPadding := width - len(s) - leftPadding
+	return fmt.Sprintf("%s%s%s", strings.Repeat(" ", leftPadding), s, strings.Repeat(" ", rightPadding))
 }
 
 func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap *ebpf.Map, addr2Name Addr2Name, kprobeMulti bool, btfSpec *btf.Spec) (*output, error) {
@@ -124,7 +134,7 @@ func (o *output) PrintHeader() {
 		fmt.Fprintf(o.writer, " %-16s", "TIMESTAMP")
 	}
 	if o.flags.OutputMeta {
-		fmt.Fprintf(o.writer, " %-10s %-8s %s %s %s %s", "NETNS", "MARK", "IFACE", "PROTO", "MTU", "LEN")
+		fmt.Fprintf(o.writer, " %-10s %-8s %16s %s %s %s", "NETNS", "MARK", centerAlignString("IFACE", 16), "PROTO", "MTU", "LEN")
 	}
 	if o.flags.OutputTuple {
 		fmt.Fprintf(o.writer, " %s", "TUPLE")
@@ -301,9 +311,9 @@ func getShinfoData(event *Event, o *output) (shinfoData string) {
 }
 
 func getMetaData(event *Event, o *output) (metaData string) {
-	metaData = fmt.Sprintf("%10d %08x %s %#04x %d %d",
+	metaData = fmt.Sprintf("%10d %08x %16s %#04x %d %d",
 		event.Meta.Netns, event.Meta.Mark,
-		o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex),
+		centerAlignString(o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex), 16),
 		byteorder.NetworkToHost16(event.Meta.Proto), event.Meta.MTU, event.Meta.Len)
 	return metaData
 }
@@ -386,7 +396,14 @@ func (o *output) Print(event *Event) {
 func (o *output) getIfaceName(netnsInode, ifindex uint32) string {
 	if ifaces, ok := o.ifaceCache[uint64(netnsInode)]; ok {
 		if name, ok := ifaces[ifindex]; ok {
-			return fmt.Sprintf("%d(%s)", ifindex, name)
+			ifname := fmt.Sprintf("%s:%d", name, ifindex)
+			if len(ifname) > 16 {
+				ifname = ifname[len(ifname)-16:]
+				bifname := []byte(ifname)
+				bifname[0] = '~'
+				ifname = string(bifname)
+			}
+			return ifname
 		}
 	}
 	return fmt.Sprintf("%d", ifindex)
