@@ -124,7 +124,7 @@ func (o *output) PrintHeader() {
 		fmt.Fprintf(o.writer, " %-16s", "TIMESTAMP")
 	}
 	if o.flags.OutputMeta {
-		fmt.Fprintf(o.writer, " %s %s %s %s %s %s", "NETNS", "MARK", "IFACE", "PROTO", "MTU", "LEN")
+		fmt.Fprintf(o.writer, " %-10s %s %s %s %s %s", "NETNS", "MARK", "IFACE", "PROTO", "MTU", "LEN")
 	}
 	if o.flags.OutputTuple {
 		fmt.Fprintf(o.writer, " %s", "TUPLE")
@@ -301,7 +301,7 @@ func getShinfoData(event *Event, o *output) (shinfoData string) {
 }
 
 func getMetaData(event *Event, o *output) (metaData string) {
-	metaData = fmt.Sprintf("%d %#x %s %#04x %d %d",
+	metaData = fmt.Sprintf("%10d %#x %s %#04x %d %d",
 		event.Meta.Netns, event.Meta.Mark,
 		o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex),
 		byteorder.NetworkToHost16(event.Meta.Proto), event.Meta.MTU, event.Meta.Len)
