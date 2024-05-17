@@ -134,7 +134,7 @@ func (o *output) PrintHeader() {
 		fmt.Fprintf(o.writer, " %-16s", "TIMESTAMP")
 	}
 	if o.flags.OutputMeta {
-		fmt.Fprintf(o.writer, " %-10s %-8s %16s %s %s %s", "NETNS", "MARK", centerAlignString("IFACE", 16), "PROTO", "MTU", "LEN")
+		fmt.Fprintf(o.writer, " %-10s %-8s %16s %-6s %s %s", "NETNS", "MARK", centerAlignString("IFACE", 16), "PROTO", "MTU", "LEN")
 	}
 	if o.flags.OutputTuple {
 		fmt.Fprintf(o.writer, " %s", "TUPLE")
