@@ -119,7 +119,7 @@ func (o *output) PrintHeader() {
 	if o.flags.OutputTS == "absolute" {
 		fmt.Fprintf(o.writer, "%12s ", "TIME")
 	}
-	fmt.Fprintf(o.writer, "%18s %6s %16s %24s", "SKB", "CPU", "PROCESS", "FUNC")
+	fmt.Fprintf(o.writer, "%18s %6s %16s", "SKB", "CPU", "PROCESS")
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %16s", "TIMESTAMP")
 	}
@@ -129,6 +129,7 @@ func (o *output) PrintHeader() {
 	if o.flags.OutputTuple {
 		fmt.Fprintf(o.writer, " %s", "TUPLE")
 	}
+	fmt.Fprintf(o.writer, " %s", "FUNC")
 	fmt.Fprintf(o.writer, "\n")
 }
 
@@ -344,8 +345,8 @@ func (o *output) Print(event *Event) {
 
 	outFuncName := getOutFuncName(o, event, addr)
 
-	fmt.Fprintf(o.writer, "%18s %6s %16s %24s", fmt.Sprintf("%#x", event.SAddr),
-		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName), outFuncName)
+	fmt.Fprintf(o.writer, "%18s %6s %16s", fmt.Sprintf("%#x", event.SAddr),
+		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName))
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %16d", ts)
 	}
@@ -358,6 +359,8 @@ func (o *output) Print(event *Event) {
 	if o.flags.OutputTuple {
 		fmt.Fprintf(o.writer, " %s", getTupleData(event))
 	}
+
+	fmt.Fprintf(o.writer, " %s", outFuncName)
 
 	if o.flags.OutputStack && event.PrintStackId > 0 {
 		fmt.Fprintf(o.writer, "%s", getStackData(event, o))
