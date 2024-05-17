@@ -216,9 +216,15 @@ func getRelativeTs(event *Event, o *output) uint64 {
 
 func getExecName(pid int) string {
 	p, err := ps.FindProcess(pid)
-	execName := fmt.Sprintf("<empty>:(%d)", pid)
+	execName := fmt.Sprintf("<empty>:%d", pid)
 	if err == nil && p != nil {
-		return fmt.Sprintf("%s:%d", p.ExecutablePath(), pid)
+		execName = fmt.Sprintf("%s:%d", p.ExecutablePath(), pid)
+		if len(execName) > 16 {
+			execName = execName[len(execName)-16:]
+			bexecName := []byte(execName)
+			bexecName[0] = '~'
+			execName = string(bexecName)
+		}
 	}
 	return execName
 }
@@ -346,7 +352,7 @@ func (o *output) Print(event *Event) {
 	outFuncName := getOutFuncName(o, event, addr)
 
 	fmt.Fprintf(o.writer, "%-18s %-3s %-16s", fmt.Sprintf("%#x", event.SAddr),
-		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName))
+		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("%s", execName))
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %-16d", ts)
 	}
