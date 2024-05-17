@@ -45,6 +45,9 @@ runs:
 
           grep -P '${{ inputs.expected-output-pattern }}' /tmp/pwru-${{ inputs.test-name }}.log
 
+          failure
+
+
     - name: Fetch artifacts from LVH VM
       if: ${{ !success() }}
       uses: cilium/little-vm-helper@9d758b756305e83718a51b792a5aeabd022a39ec # v0.0.16
