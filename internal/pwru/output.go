@@ -119,7 +119,7 @@ func (o *output) PrintHeader() {
 	if o.flags.OutputTS == "absolute" {
 		fmt.Fprintf(o.writer, "%-12s ", "TIME")
 	}
-	fmt.Fprintf(o.writer, "%-18s %-6s %-16s", "SKB", "CPU", "PROCESS")
+	fmt.Fprintf(o.writer, "%-18s %-3s %-16s", "SKB", "CPU", "PROCESS")
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %-16s", "TIMESTAMP")
 	}
@@ -345,7 +345,7 @@ func (o *output) Print(event *Event) {
 
 	outFuncName := getOutFuncName(o, event, addr)
 
-	fmt.Fprintf(o.writer, "%-18s %-6s %-16s", fmt.Sprintf("%#x", event.SAddr),
+	fmt.Fprintf(o.writer, "%-18s %-3s %-16s", fmt.Sprintf("%#x", event.SAddr),
 		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName))
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %-16d", ts)
