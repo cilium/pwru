@@ -117,11 +117,11 @@ func (o *output) Close() {
 
 func (o *output) PrintHeader() {
 	if o.flags.OutputTS == "absolute" {
-		fmt.Fprintf(o.writer, "%12s ", "TIME")
+		fmt.Fprintf(o.writer, "%-12s ", "TIME")
 	}
-	fmt.Fprintf(o.writer, "%18s %6s %16s", "SKB", "CPU", "PROCESS")
+	fmt.Fprintf(o.writer, "%-18s %-6s %-16s", "SKB", "CPU", "PROCESS")
 	if o.flags.OutputTS != "none" {
-		fmt.Fprintf(o.writer, " %16s", "TIMESTAMP")
+		fmt.Fprintf(o.writer, " %-16s", "TIMESTAMP")
 	}
 	if o.flags.OutputMeta {
 		fmt.Fprintf(o.writer, " %s %s %s %s %s %s", "NETNS", "MARK", "IFACE", "PROTO", "MTU", "LEN")
@@ -330,7 +330,7 @@ func getOutFuncName(o *output, event *Event, addr uint64) string {
 
 func (o *output) Print(event *Event) {
 	if o.flags.OutputTS == "absolute" {
-		fmt.Fprintf(o.writer, "%12s ", getAbsoluteTs())
+		fmt.Fprintf(o.writer, "%-12s ", getAbsoluteTs())
 	}
 
 	execName := getExecName(int(event.PID))
@@ -345,10 +345,10 @@ func (o *output) Print(event *Event) {
 
 	outFuncName := getOutFuncName(o, event, addr)
 
-	fmt.Fprintf(o.writer, "%18s %6s %16s", fmt.Sprintf("%#x", event.SAddr),
+	fmt.Fprintf(o.writer, "%-18s %-6s %-16s", fmt.Sprintf("%#x", event.SAddr),
 		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("[%s]", execName))
 	if o.flags.OutputTS != "none" {
-		fmt.Fprintf(o.writer, " %16d", ts)
+		fmt.Fprintf(o.writer, " %-16d", ts)
 	}
 	o.lastSeenSkb[event.SAddr] = event.Timestamp
 
