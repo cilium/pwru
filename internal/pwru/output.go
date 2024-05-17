@@ -346,6 +346,16 @@ func getOutFuncName(o *output, event *Event, addr uint64) string {
 	return outFuncName
 }
 
+var maxTupleLengthSeen int
+
+func fprintTupleData(writer *os.File, tupleData string) {
+	if len(tupleData) > maxTupleLengthSeen {
+		maxTupleLengthSeen = len(tupleData)
+	}
+	formatter := fmt.Sprintf(" %%-%ds", maxTupleLengthSeen)
+	fmt.Fprintf(writer, formatter, tupleData)
+}
+
 func (o *output) Print(event *Event) {
 	if o.flags.OutputTS == "absolute" {
 		fmt.Fprintf(o.writer, "%-12s ", getAbsoluteTs())
@@ -375,7 +385,7 @@ func (o *output) Print(event *Event) {
 	}
 
 	if o.flags.OutputTuple {
-		fmt.Fprintf(o.writer, " %s", getTupleData(event))
+		fprintTupleData(o.writer, getTupleData(event))
 	}
 
 	fmt.Fprintf(o.writer, " %s", outFuncName)
