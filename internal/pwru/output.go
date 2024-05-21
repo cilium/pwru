@@ -311,8 +311,8 @@ func getShinfoData(event *Event, o *output) (shinfoData string) {
 }
 
 func getMetaData(event *Event, o *output) (metaData string) {
-	metaData = fmt.Sprintf("%10d %08x %16s %#04x %-5s %-5s",
-		event.Meta.Netns, event.Meta.Mark,
+	metaData = fmt.Sprintf("%-10s %08x %16s %#04x %-5s %-5s",
+		fmt.Sprintf("%d", event.Meta.Netns), event.Meta.Mark,
 		centerAlignString(o.getIfaceName(event.Meta.Netns, event.Meta.Ifindex), 16),
 		byteorder.NetworkToHost16(event.Meta.Proto),
 		fmt.Sprintf("%d", event.Meta.MTU),
