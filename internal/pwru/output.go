@@ -355,13 +355,14 @@ func getOutFuncName(o *output, event *Event, addr uint64) string {
 }
 
 var maxTupleLengthSeen int
+var maxFuncLengthSeen int
 
-func fprintTupleData(writer *os.File, tupleData string) {
-	if len(tupleData) > maxTupleLengthSeen {
-		maxTupleLengthSeen = len(tupleData)
+func fprintWithPadding(writer *os.File, data string, maxLenSeen *int) {
+	if len(data) > *maxLenSeen {
+		*maxLenSeen = len(data)
 	}
-	formatter := fmt.Sprintf(" %%-%ds", maxTupleLengthSeen)
-	fmt.Fprintf(writer, formatter, tupleData)
+	formatter := fmt.Sprintf(" %%-%ds", *maxLenSeen)
+	fmt.Fprintf(writer, formatter, data)
 }
 
 func (o *output) Print(event *Event) {
@@ -393,12 +394,15 @@ func (o *output) Print(event *Event) {
 	}
 
 	if o.flags.OutputTuple {
-		fprintTupleData(o.writer, getTupleData(event))
+		fprintWithPadding(o.writer, getTupleData(event), &maxTupleLengthSeen)
 	}
 
-	fmt.Fprintf(o.writer, " %s", outFuncName)
 	if o.flags.OutputCaller {
+		fprintWithPadding(o.writer, outFuncName, &maxFuncLengthSeen)
 		fmt.Fprintf(o.writer, " %s", o.addr2name.findNearestSym(event.CallerAddr))
+	} else {
+
+		fmt.Fprintf(o.writer, " %s", outFuncName)
 	}
 
 	if o.flags.OutputStack && event.PrintStackId > 0 {
