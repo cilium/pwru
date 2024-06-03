@@ -18,6 +18,12 @@ const static bool TRUE = true;
 
 volatile const static __u64 BPF_PROG_ADDR = 0;
 
+enum {
+	TRACKED_BY_FILTER = (1 << 0),
+	TRACKED_BY_SKB = (1 << 1),
+	TRACKED_BY_STACKID = (1 << 2),
+};
+
 union addr {
 	u32 v4addr;
 	struct {
@@ -375,7 +381,7 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 
 static __noinline bool
 handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event, u64 *_stackid) {
-	bool tracked_by_addr = false;
+	u8 tracked_by;
 	u64 skb_addr = (u64) skb;
 	u64 stackid;
 
@@ -384,27 +390,31 @@ handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event, u64 *_s
 
 	if (cfg->is_set) {
 		if (cfg->track_skb && bpf_map_lookup_elem(&skb_addresses, &skb_addr)) {
-			tracked_by_addr = true;
+			tracked_by = _stackid ? TRACKED_BY_STACKID : TRACKED_BY_SKB;
 			goto cont;
 		}
 
 		if (cfg->track_skb_by_stackid && bpf_map_lookup_elem(&stackid_skb, &stackid)) {
+			tracked_by = TRACKED_BY_STACKID;
 			goto cont;
 		}
 
-		if (!filter(skb)) {
-			return false;
+		if (filter(skb)) {
+			tracked_by = TRACKED_BY_FILTER;
+			goto cont;
 		}
+
+		return false;
 
 cont:
 		set_output(ctx, skb, event);
 	}
 
-	if (cfg->track_skb && !tracked_by_addr) {
+	if (cfg->track_skb && tracked_by == TRACKED_BY_FILTER) {
 		bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
 	}
 
-	if (cfg->track_skb_by_stackid) {
+	if (cfg->track_skb_by_stackid && tracked_by != TRACKED_BY_STACKID) {
 		u64 *old_stackid = bpf_map_lookup_elem(&skb_stackid, &skb);
 		if (old_stackid && *old_stackid != stackid) {
 			bpf_map_delete_elem(&stackid_skb, old_stackid);
