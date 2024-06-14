@@ -16,6 +16,17 @@
 #define ETH_P_IPV6            0x86dd
 #define ETH_P_8021Q           0x8100
 
+#define RTAX_MTU              2
+#define SKB_DST_NOREF         1UL
+#define SKB_DST_PTRMASK       ~(SKB_DST_NOREF)
+#define __SKB_DST_PTR(X)      \
+	((struct dst_entry *)((X) & SKB_DST_PTRMASK))
+
+#define DST_METRICS_FLAGS     0x3UL
+#define __DST_METRICS_PTR(X)  \
+	((u32 *)((X) & ~DST_METRICS_FLAGS))
+
+
 const static bool TRUE = true;
 
 volatile const static __u64 BPF_PROG_ADDR = 0;
@@ -238,6 +249,13 @@ set_meta(struct sk_buff *skb, struct skb_meta *meta) {
 	meta->protocol = BPF_CORE_READ(skb, protocol);
 	meta->ifindex = BPF_CORE_READ(skb, dev, ifindex);
 	meta->mtu = BPF_CORE_READ(skb, dev, mtu);
+	struct dst_entry *dst = __SKB_DST_PTR(BPF_CORE_READ(skb, _skb_refdst));
+	if (dst) {
+		u32 *metrics = __DST_METRICS_PTR(BPF_CORE_READ(dst, _metrics));
+		bpf_probe_read_kernel(&meta->mtu, sizeof(meta->mtu), metrics + RTAX_MTU - 1);
+		if (!meta->mtu)
+			meta->mtu = BPF_CORE_READ(dst, dev, mtu);
+	}
 }
 
 static __always_inline void
