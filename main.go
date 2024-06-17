@@ -230,12 +230,12 @@ func main() {
 	}
 
 	if nonSkbFuncs := flags.FilterNonSkbFuncs; len(nonSkbFuncs) != 0 {
-		k := pwru.KprobeNonSkbFuncs(nonSkbFuncs, funcs, coll)
+		k := pwru.NewNonSkbFuncsKprober(nonSkbFuncs, funcs, coll)
 		defer k.DetachKprobes()
 	}
 
 	if len(funcs) != 0 {
-		k := pwru.KprobeSkbFuncs(ctx, funcs, coll, addr2name, useKprobeMulti, flags.FilterKprobeBatch)
+		k := pwru.NewKprober(ctx, funcs, coll, addr2name, useKprobeMulti, flags.FilterKprobeBatch)
 		defer k.DetachKprobes()
 	}
 
