@@ -198,7 +198,7 @@ func AttachKprobeMulti(ctx context.Context, bar *pb.ProgressBar, kprobes []Kprob
 	return
 }
 
-func KprobeSkbFuncs(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Addr2Name, useKprobeMulti bool, batch uint) *kprober {
+func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Addr2Name, useKprobeMulti bool, batch uint) *kprober {
 	msg := "kprobe"
 	if useKprobeMulti {
 		msg = "kprobe-multi"
@@ -244,7 +244,7 @@ func KprobeSkbFuncs(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n
 	return &k
 }
 
-func KprobeNonSkbFuncs(nonSkbFuncs []string, funcs Funcs, coll *ebpf.Collection) *kprober {
+func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, coll *ebpf.Collection) *kprober {
 	var k kprober
 	k.kprobeBatch = uint(len(nonSkbFuncs))
 
