@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/btf"
 	"golang.org/x/sys/unix"
 )
 
@@ -47,26 +46,15 @@ func getEntryFuncName(prog *ebpf.Program) (string, string, error) {
 		return "", "", fmt.Errorf("failed to get program info: %w", err)
 	}
 
-	id, ok := info.BTFID()
-	if !ok {
-		return "", "", fmt.Errorf("bpf program %s does not have BTF", info.Name)
-	}
-
-	handle, err := btf.NewHandleFromID(id)
+	insns, err := info.Instructions()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get BTF handle: %w", err)
-	}
-	defer handle.Close()
-
-	spec, err := handle.Spec(nil)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to get BTF spec: %w", err)
+		return "", "", fmt.Errorf("failed to get program instructions: %w", err)
 	}
 
-	iter := spec.Iterate()
-	for iter.Next() {
-		if fn, ok := iter.Type.(*btf.Func); ok {
-			return fn.Name, info.Name, nil
+	for _, insn := range insns {
+		sym := insn.Symbol()
+		if sym != "" {
+			return sym, info.Name, nil
 		}
 	}
 
