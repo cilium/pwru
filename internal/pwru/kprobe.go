@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"sync"
 	"syscall"
 
@@ -245,6 +246,9 @@ func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Add
 }
 
 func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, coll *ebpf.Collection) *kprober {
+	slices.Sort(nonSkbFuncs)
+	nonSkbFuncs = slices.Compact(nonSkbFuncs)
+
 	var k kprober
 	k.kprobeBatch = uint(len(nonSkbFuncs))
 
@@ -255,10 +259,13 @@ func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, coll *ebpf.Collect
 
 		kp, err := link.Kprobe(fn, coll.Programs["kprobe_skb_by_stackid"], nil)
 		if err != nil {
-			log.Fatalf("Opening kprobe %s: %s\n", fn, err)
+			if errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			log.Printf("Opening non-skb-kprobe %s: %s\n", fn, err)
+		} else {
+			k.links = append(k.links, kp)
 		}
-
-		k.links = append(k.links, kp)
 	}
 
 	return &k

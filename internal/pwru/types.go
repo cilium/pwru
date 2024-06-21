@@ -7,7 +7,6 @@ package pwru
 import (
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 
 	flag "github.com/spf13/pflag"
@@ -34,6 +33,7 @@ type Flags struct {
 	FilterTrackSkbByStackid bool
 	FilterTraceTc           bool
 	FilterTraceXdp          bool
+	FilterTrackBpfHelpers   bool
 	FilterIfname            string
 	FilterPcap              string
 	FilterKprobeBatch       uint
@@ -71,6 +71,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.FilterTrackSkbByStackid, "filter-track-skb-by-stackid", false, "trace a packet even after it is kfreed (e.g., traffic going through bridge)")
 	flag.BoolVar(&f.FilterTraceTc, "filter-trace-tc", false, "trace TC bpf progs")
 	flag.BoolVar(&f.FilterTraceXdp, "filter-trace-xdp", false, "trace XDP bpf progs")
+	flag.BoolVar(&f.FilterTrackBpfHelpers, "filter-track-bpf-helpers", false, "trace BPF helper functions")
 	flag.StringVar(&f.FilterIfname, "filter-ifname", "", "filter skb ifname in --filter-netns (if not specified, use current netns)")
 	flag.UintVar(&f.FilterKprobeBatch, "filter-kprobe-batch", 10, "batch size for kprobe attaching/detaching")
 	flag.StringVar(&f.OutputTS, "timestamp", "none", "print timestamp per skb (\"current\", \"relative\", \"absolute\", \"none\")")
@@ -107,10 +108,8 @@ func (f *Flags) PrintHelp() {
 func (f *Flags) Parse() {
 	flag.Parse()
 	f.FilterPcap = strings.Join(flag.Args(), " ")
-	if len(f.FilterNonSkbFuncs) > 0 {
+	if len(f.FilterNonSkbFuncs) > 0 || f.FilterTrackBpfHelpers {
 		f.FilterTrackSkbByStackid = true
-		slices.Sort(f.FilterNonSkbFuncs)
-		f.FilterNonSkbFuncs = slices.Compact(f.FilterNonSkbFuncs)
 	}
 }
 

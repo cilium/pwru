@@ -99,7 +99,7 @@ func main() {
 	// prog's name.
 	addr2name, name2addr, err := pwru.ParseKallsyms(funcs, flags.OutputStack ||
 		len(flags.KMods) != 0 || flags.FilterTraceTc || flags.FilterTraceXdp ||
-		len(flags.FilterNonSkbFuncs) > 0 || flags.OutputCaller)
+		len(flags.FilterNonSkbFuncs) > 0 || flags.OutputCaller || flags.FilterTrackBpfHelpers)
 	if err != nil {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}
@@ -233,6 +233,14 @@ func main() {
 	if flags.FilterTrackSkb || flags.FilterTrackSkbByStackid {
 		t := pwru.TrackSkb(coll, haveFexit, flags.FilterTrackSkb)
 		defer t.Detach()
+	}
+
+	if flags.FilterTrackBpfHelpers {
+		bpfHelpers, err := pwru.GetBpfHelpers(addr2name)
+		if err != nil {
+			log.Fatalf("Failed to get bpf helpers: %s\n", err)
+		}
+		flags.FilterNonSkbFuncs = append(flags.FilterNonSkbFuncs, bpfHelpers...)
 	}
 
 	if nonSkbFuncs := flags.FilterNonSkbFuncs; len(nonSkbFuncs) != 0 {
