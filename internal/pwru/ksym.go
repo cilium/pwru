@@ -90,18 +90,5 @@ func ParseKallsyms(funcs Funcs, all bool) (Addr2Name, BpfProgName2Addr, error) {
 }
 
 func extractBpfProgName(name string) (string, bool) {
-	if !strings.HasPrefix(name, "bpf_prog_") || !strings.HasSuffix(name, "[bpf]") {
-		return name, false
-	}
-
-	// The symbol of bpf prog is "bpf_prog_<tag>_<name>\t[bpf]". We want
-	// to get the tag and the name.
-
-	items := strings.Split(name, "_")
-	if len(items) > 3 {
-		name = strings.Join(items[3:], "_")
-		name = strings.TrimSpace(name[:len(name)-5])
-	}
-
-	return name, true
+	return strings.ReplaceAll(name, "\t", ""), strings.HasSuffix(name, "[bpf]")
 }
