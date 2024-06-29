@@ -38,6 +38,24 @@ func TrackSkb(coll *ebpf.Collection, haveFexit, trackSkbClone bool) *skbTracker 
 		t.links = append(t.links, kp)
 	}
 
+	kp, err = link.Kretprobe("veth_convert_skb_to_xdp_buff", coll.Programs["kretprobe_veth_convert_skb_to_xdp_buff"], nil)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			log.Fatalf("Opening kretprobe veth_convert_skb_to_xdp_buff: %s\n", err)
+		}
+	} else {
+		t.links = append(t.links, kp)
+	}
+
+	kp, err = link.Kprobe("veth_convert_skb_to_xdp_buff", coll.Programs["kprobe_veth_convert_skb_to_xdp_buff"], nil)
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			log.Fatalf("Opening kprobe veth_convert_skb_to_xdp_buff: %s\n", err)
+		}
+	} else {
+		t.links = append(t.links, kp)
+	}
+
 	if haveFexit && trackSkbClone {
 		progs := []*ebpf.Program{
 			coll.Programs["fexit_skb_clone"],
