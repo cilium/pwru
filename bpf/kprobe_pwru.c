@@ -107,6 +107,13 @@ struct {
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64); // pid_tgid
+	__type(value, __u64); // struct sk_buff **
+	__uint(max_entries, MAX_TRACK_SIZE);
+} veth_skbs SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, struct sk_buff *);
 	__type(value, __u64);
 	__uint(max_entries, MAX_TRACK_SIZE);
@@ -683,6 +690,31 @@ int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
 	event.type = EVENT_TYPE_XDP;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
+	return BPF_OK;
+}
+
+SEC("kprobe/veth_convert_skb_to_xdp_buff")
+int kprobe_veth_convert_skb_to_xdp_buff(struct pt_regs *ctx) {
+	struct sk_buff **skb = (struct sk_buff **)PT_REGS_PARM3(ctx);
+	u64 skb_addr;
+	bpf_probe_read_kernel(&skb_addr, sizeof(skb_addr), (void *)skb);
+	if (bpf_map_lookup_elem(&skb_addresses, &skb_addr)) {
+		u64 pid_tgid = bpf_get_current_pid_tgid();
+		bpf_map_update_elem(&veth_skbs, &pid_tgid, &skb, BPF_ANY);
+	}
+	return BPF_OK;
+}
+
+SEC("kretprobe/veth_convert_skb_to_xdp_buff")
+int kretprobe_veth_convert_skb_to_xdp_buff(struct pt_regs *ctx) {
+	u64 pid_tgid = bpf_get_current_pid_tgid();
+	struct sk_buff ***skb = (struct sk_buff ***)bpf_map_lookup_elem(&veth_skbs, &pid_tgid);
+	if (skb && *skb) {
+		u64 skb_addr;
+		bpf_probe_read_kernel(&skb_addr, sizeof(skb_addr), (void *)*skb);
+		bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
+		bpf_map_delete_elem(&veth_skbs, &pid_tgid);
+	}
 	return BPF_OK;
 }
 

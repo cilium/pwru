@@ -126,9 +126,12 @@ func main() {
 
 	for name, program := range bpfSpec.Programs {
 		// Skip the skb-tracking ones that should not inject pcap-filter.
-		if name == "kprobe_skb_lifetime_termination" ||
-			name == "fexit_skb_clone" ||
-			name == "fexit_skb_copy" {
+		switch name {
+		case "kprobe_skb_lifetime_termination",
+			"fexit_skb_clone",
+			"fexit_skb_copy",
+			"kprobe_veth_convert_skb_to_xdp_buff",
+			"kretprobe_veth_convert_skb_to_xdp_buff":
 			continue
 		}
 		if name == "fentry_xdp" {
