@@ -11,6 +11,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var errNotFound = errors.New("not found")
+
 type BpfProgName2Addr map[string]uint64
 
 func listBpfProgs(typ ebpf.ProgramType) ([]*ebpf.Program, error) {
@@ -46,6 +48,14 @@ func getEntryFuncName(prog *ebpf.Program) (string, string, error) {
 		return "", "", fmt.Errorf("failed to get program info: %w", err)
 	}
 
+	_, ok := info.BTFID()
+	if !ok {
+		// FENTRY/FEXIT program can only be attached to another program
+		// annotated with BTF. So if the BTF ID is not found, it means
+		// the program is not annotated with BTF.
+		return "", "", errNotFound
+	}
+
 	insns, err := info.Instructions()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get program instructions: %w", err)
@@ -58,5 +68,5 @@ func getEntryFuncName(prog *ebpf.Program) (string, string, error) {
 		}
 	}
 
-	return "", "", fmt.Errorf("no function found in %s bpf prog", info.Name)
+	return "", "", errNotFound
 }
