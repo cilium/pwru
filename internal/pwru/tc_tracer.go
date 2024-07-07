@@ -40,6 +40,10 @@ func (t *tcTracer) trace(spec *ebpf.CollectionSpec,
 ) error {
 	entryFn, name, err := getEntryFuncName(prog)
 	if err != nil {
+		if errors.Is(err, errNotFound) {
+			log.Printf("Skip tracing bpf prog %s because cannot find its entry function name", prog)
+			return nil
+		}
 		return fmt.Errorf("failed to get entry function name: %w", err)
 	}
 
