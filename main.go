@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -35,6 +36,11 @@ func main() {
 	if flags.ShowVersion {
 		fmt.Printf("pwru %s\n", pwru.Version)
 		os.Exit(0)
+	}
+	if flags.FilterTrackBpfHelpers {
+		if runtime.GOARCH != "amd64" {
+			log.Fatalf("BPF helpers tracking is only supported on amd64")
+		}
 	}
 
 	if err := unix.Setrlimit(unix.RLIMIT_NOFILE, &unix.Rlimit{
