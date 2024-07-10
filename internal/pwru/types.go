@@ -143,7 +143,7 @@ type Event struct {
 	Type          uint32
 	Addr          uint64
 	CallerAddr    uint64
-	SAddr         uint64
+	SkbHead       uint64
 	Timestamp     uint64
 	PrintSkbId    uint64
 	PrintShinfoId uint64
