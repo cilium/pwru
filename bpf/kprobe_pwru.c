@@ -695,12 +695,13 @@ int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
 
 SEC("kprobe/veth_convert_skb_to_xdp_buff")
 int kprobe_veth_convert_skb_to_xdp_buff(struct pt_regs *ctx) {
-	struct sk_buff **skb = (struct sk_buff **)PT_REGS_PARM3(ctx);
-	u64 skb_addr;
-	bpf_probe_read_kernel(&skb_addr, sizeof(skb_addr), (void *)skb);
-	if (bpf_map_lookup_elem(&skb_heads, &skb_addr)) {
+	struct sk_buff **pskb = (struct sk_buff **)PT_REGS_PARM3(ctx);
+	struct sk_buff *skb;
+	bpf_probe_read_kernel(&skb, sizeof(skb), (void *)pskb);
+	u64 skb_head = (u64) BPF_CORE_READ(skb, head);
+	if (bpf_map_lookup_elem(&skb_heads, &skb_head)) {
 		u64 pid_tgid = bpf_get_current_pid_tgid();
-		bpf_map_update_elem(&veth_skbs, &pid_tgid, &skb, BPF_ANY);
+		bpf_map_update_elem(&veth_skbs, &pid_tgid, &pskb, BPF_ANY);
 	}
 	return BPF_OK;
 }
@@ -708,11 +709,12 @@ int kprobe_veth_convert_skb_to_xdp_buff(struct pt_regs *ctx) {
 SEC("kretprobe/veth_convert_skb_to_xdp_buff")
 int kretprobe_veth_convert_skb_to_xdp_buff(struct pt_regs *ctx) {
 	u64 pid_tgid = bpf_get_current_pid_tgid();
-	struct sk_buff ***skb = (struct sk_buff ***)bpf_map_lookup_elem(&veth_skbs, &pid_tgid);
-	if (skb && *skb) {
-		u64 skb_addr;
-		bpf_probe_read_kernel(&skb_addr, sizeof(skb_addr), (void *)*skb);
-		bpf_map_update_elem(&skb_heads, &skb_addr, &TRUE, BPF_ANY);
+	struct sk_buff ***pskb = (struct sk_buff ***)bpf_map_lookup_elem(&veth_skbs, &pid_tgid);
+	if (pskb && *pskb) {
+		struct sk_buff *skb;
+		bpf_probe_read_kernel(&skb, sizeof(skb), (void *)*pskb);
+		u64 skb_head = (u64) BPF_CORE_READ(skb, head);
+		bpf_map_update_elem(&skb_heads, &skb_head, &TRUE, BPF_ANY);
 		bpf_map_delete_elem(&veth_skbs, &pid_tgid);
 	}
 	return BPF_OK;
