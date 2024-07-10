@@ -49,7 +49,8 @@ You can download the statically linked executable for x86\_64 and arm64 from the
 
 ```
 $ ./pwru --help
-Usage: pwru [options] [pcap-filter]
+
+Usage: ./pwru [options] [pcap-filter]
     Available pcap-filter: see "man 7 pcap-filter"
     Available options:
       --all-kmods                      attach to all available kernel modules
@@ -61,6 +62,7 @@ Usage: pwru [options] [pcap-filter]
       --filter-netns string            filter netns ("/proc/<pid>/ns/net", "inode:<inode>")
       --filter-non-skb-funcs strings   filter non-skb kernel functions to be probed (--filter-track-skb-by-stackid will be enabled)
       --filter-trace-tc                trace TC bpf progs
+      --filter-trace-xdp               trace XDP bpf progs
       --filter-track-skb               trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)
       --filter-track-skb-by-stackid    trace a packet even after it is kfreed (e.g., traffic going through bridge)
   -h, --help                           display this message and exit
@@ -72,6 +74,7 @@ Usage: pwru [options] [pcap-filter]
       --output-limit-lines uint        exit the program after the number of events has been received/printed
       --output-meta                    print skb metadata
       --output-skb                     print skb
+      --output-skb-shared-info         print skb shared info
       --output-stack                   print stack
       --output-tuple                   print L4 tuple
       --timestamp string               print timestamp per skb ("current", "relative", "absolute", "none") (default "none")
