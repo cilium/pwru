@@ -438,13 +438,13 @@ handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event, u64 *_s
 			goto cont;
 		}
 
-		if (cfg->track_skb_by_stackid && bpf_map_lookup_elem(&stackid_skb, &stackid)) {
-			tracked_by = TRACKED_BY_STACKID;
+		if (filter(skb)) {
+			tracked_by = TRACKED_BY_FILTER;
 			goto cont;
 		}
 
-		if (filter(skb)) {
-			tracked_by = TRACKED_BY_FILTER;
+		if (cfg->track_skb_by_stackid && bpf_map_lookup_elem(&stackid_skb, &stackid)) {
+			tracked_by = TRACKED_BY_STACKID;
 			goto cont;
 		}
 
@@ -538,7 +538,7 @@ int kprobe_skb_lifetime_termination(struct pt_regs *ctx) {
 	if (cfg->track_skb_by_stackid) {
 		u64 stackid = get_stackid(ctx);
 		bpf_map_delete_elem(&stackid_skb, &stackid);
-		bpf_map_delete_elem(&skb_stackid, &skb_head);
+		bpf_map_delete_elem(&skb_stackid, &skb);
 	}
 
 	return BPF_OK;
