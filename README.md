@@ -174,7 +174,7 @@ their commit messages.
 
 ## Community
 
-Join the `#pwru` [Slack channel](https://cilium.herokuapp.com/) to chat with
+Join the `#pwru` [Slack channel](https://slack.cilium.io) to chat with
 developers, maintainers, and other users. This is a good first stop to ask
 questions and share your experiences.
 
