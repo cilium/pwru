@@ -131,7 +131,8 @@ func main() {
 			"fexit_skb_clone",
 			"fexit_skb_copy",
 			"kprobe_veth_convert_skb_to_xdp_buff",
-			"kretprobe_veth_convert_skb_to_xdp_buff":
+			"kretprobe_veth_convert_skb_to_xdp_buff",
+			"fexit_xdp":
 			continue
 		}
 		if name == "fentry_xdp" {
@@ -176,6 +177,7 @@ func main() {
 		bpfSpecFentryXdp = bpfSpec.Copy()
 		bpfSpecFentryXdp.Programs = map[string]*ebpf.ProgramSpec{
 			"fentry_xdp": bpfSpecFentryXdp.Programs["fentry_xdp"],
+			"fexit_xdp":  bpfSpecFentryXdp.Programs["fexit_xdp"],
 		}
 	}
 
@@ -183,6 +185,7 @@ func main() {
 	// they should be deleted from the spec.
 	delete(bpfSpec.Programs, "fentry_tc")
 	delete(bpfSpec.Programs, "fentry_xdp")
+	delete(bpfSpec.Programs, "fexit_xdp")
 
 	// If not tracking skb, deleting the skb-tracking programs to reduce loading
 	// time.

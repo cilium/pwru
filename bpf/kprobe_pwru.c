@@ -36,6 +36,7 @@ enum {
 	TRACKED_BY_FILTER = (1 << 0),
 	TRACKED_BY_SKB = (1 << 1),
 	TRACKED_BY_STACKID = (1 << 2),
+	TRACKED_BY_XDP = (1 << 3),
 };
 
 union addr {
@@ -124,6 +125,13 @@ struct {
 	__uint(max_entries, MAX_TRACK_SIZE);
 } stackid_skb SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u64);
+	__type(value, bool);
+	__uint(max_entries, MAX_TRACK_SIZE);
+} xdp_dhs_skb_heads SEC(".maps");
+
 struct config {
 	u32 netns;
 	u32 mark;
@@ -138,7 +146,8 @@ struct config {
 	u8 is_set: 1;
 	u8 track_skb: 1;
 	u8 track_skb_by_stackid: 1;
-	u8 unused: 5;
+	u8 track_xdp: 1;
+	u8 unused: 4;
 } __attribute__((packed));
 
 static volatile const struct config CFG;
@@ -427,12 +436,21 @@ static __noinline bool
 handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event, u64 *_stackid) {
 	u8 tracked_by;
 	u64 skb_addr = (u64) skb;
+	u64 skb_head = (u64) BPF_CORE_READ(skb, head);
 	u64 stackid;
 
 	if (cfg->track_skb_by_stackid)
 		stackid = _stackid ? *_stackid : get_stackid(ctx);
 
 	if (cfg->is_set) {
+		if (cfg->track_xdp && cfg->track_skb) {
+			if (bpf_map_lookup_elem(&xdp_dhs_skb_heads, &skb_head)) {
+				tracked_by = TRACKED_BY_XDP;
+				bpf_map_delete_elem(&xdp_dhs_skb_heads, &skb_head);
+				goto cont;
+			}
+		}
+
 		if (cfg->track_skb && bpf_map_lookup_elem(&skb_addresses, &skb_addr)) {
 			tracked_by = _stackid ? TRACKED_BY_STACKID : TRACKED_BY_SKB;
 			goto cont;
@@ -663,19 +681,10 @@ set_xdp_output(void *ctx, struct xdp_buff *xdp, struct event_t *event) {
 
 SEC("fentry/xdp")
 int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
-	u64 skb_head = (u64) BPF_CORE_READ(xdp, data_hard_start);
 	struct event_t event = {};
 
 	if (cfg->is_set) {
-		if (cfg->track_skb) {
-			if (!bpf_map_lookup_elem(&skb_addresses, &skb_head)) {
-				if (!filter_xdp(xdp))
-					return BPF_OK;
-
-				bpf_map_update_elem(&skb_addresses, &skb_head, &TRUE, BPF_ANY);
-			}
-
-		} else if (!filter_xdp(xdp)) {
+		if (!filter_xdp(xdp)) {
 			return BPF_OK;
 		}
 
@@ -685,11 +694,18 @@ int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
 	event.pid = bpf_get_current_pid_tgid() >> 32;
 	event.ts = bpf_ktime_get_ns();
 	event.cpu_id = bpf_get_smp_processor_id();
-	event.skb_addr = (u64) skb_head;
+	event.skb_addr = (u64) &xdp;
 	event.addr = BPF_PROG_ADDR;
 	event.type = EVENT_TYPE_XDP;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
+	return BPF_OK;
+}
+
+SEC("fexit/xdp")
+int BPF_PROG(fexit_xdp, struct xdp_buff *xdp) {
+	u64 xdp_dhs = (u64) BPF_CORE_READ(xdp, data_hard_start);
+	bpf_map_update_elem(&xdp_dhs_skb_heads, &xdp_dhs, &TRUE, BPF_ANY);
 	return BPF_OK;
 }
 
