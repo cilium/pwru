@@ -128,7 +128,7 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, __u64);
-	__type(value, bool);
+	__type(value, struct skb *);
 	__uint(max_entries, MAX_TRACK_SIZE);
 } xdp_dhs_skb_heads SEC(".maps");
 
@@ -474,6 +474,8 @@ cont:
 
 	if (cfg->track_skb && tracked_by == TRACKED_BY_FILTER) {
 		bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
+		if (cfg->track_xdp)
+			bpf_map_update_elem(&xdp_dhs_skb_heads, &skb_head, &skb_addr, BPF_ANY);
 	}
 
 	if (cfg->track_skb_by_stackid && tracked_by != TRACKED_BY_STACKID) {
@@ -682,12 +684,19 @@ set_xdp_output(void *ctx, struct xdp_buff *xdp, struct event_t *event) {
 SEC("fentry/xdp")
 int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
 	struct event_t event = {};
+	u64 xdp_dhs = (u64) BPF_CORE_READ(xdp, data_hard_start);
 
 	if (cfg->is_set) {
-		if (!filter_xdp(xdp)) {
-			return BPF_OK;
+		if (cfg->track_skb && bpf_map_lookup_elem(&xdp_dhs_skb_heads, &xdp_dhs)) {
+			bpf_map_delete_elem(&xdp_dhs_skb_heads, &xdp_dhs);
+			goto cont;
 		}
 
+		if (filter_xdp(xdp)) {
+			goto cont;
+		}
+
+cont:
 		set_xdp_output(ctx, xdp, &event);
 	}
 
@@ -705,7 +714,7 @@ int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
 SEC("fexit/xdp")
 int BPF_PROG(fexit_xdp, struct xdp_buff *xdp) {
 	u64 xdp_dhs = (u64) BPF_CORE_READ(xdp, data_hard_start);
-	bpf_map_update_elem(&xdp_dhs_skb_heads, &xdp_dhs, &TRUE, BPF_ANY);
+	bpf_map_update_elem(&xdp_dhs_skb_heads, &xdp_dhs, &xdp, BPF_ANY);
 	return BPF_OK;
 }
 
