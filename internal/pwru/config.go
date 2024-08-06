@@ -28,6 +28,7 @@ const (
 	IsSetMask uint8 = 1 << iota
 	TrackSkbMask
 	TrackSkbByStackidMask
+	TrackXDPMask
 )
 
 // Version is the pwru version and is set at compile time via LDFLAGS-
@@ -70,6 +71,9 @@ func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	}
 	if flags.FilterTrackSkbByStackid {
 		cfg.FilterFlags |= TrackSkbByStackidMask
+	}
+	if flags.FilterTraceXdp {
+		cfg.FilterFlags |= TrackXDPMask
 	}
 
 	netnsID, ns, err := parseNetns(flags.FilterNetns)

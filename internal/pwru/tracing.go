@@ -190,6 +190,9 @@ func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, ebpf.XDP, "fentry_xdp"); err != nil {
 		log.Fatalf("failed to trace XDP progs: %v", err)
 	}
+	if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, ebpf.XDP, "fexit_xdp"); err != nil {
+		log.Fatalf("failed to trace XDP progs: %v", err)
+	}
 
 	return &t
 }
