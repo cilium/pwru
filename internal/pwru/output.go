@@ -158,7 +158,7 @@ func (o *output) PrintJson(event *Event) {
 	d := &jsonPrinter{}
 
 	// add the data to the struct
-	d.Skb = fmt.Sprintf("%#x", event.SkbHead)
+	d.Skb = fmt.Sprintf("%#x", event.SkbAddr)
 	d.Cpu = event.CPU
 	d.Process = getExecName(int(event.PID))
 	d.Func = getOutFuncName(o, event, event.Addr)
@@ -166,7 +166,7 @@ func (o *output) PrintJson(event *Event) {
 		d.CallerFunc = o.addr2name.findNearestSym(event.CallerAddr)
 	}
 
-	o.lastSeenSkb[event.SkbHead] = event.Timestamp
+	o.lastSeenSkb[event.SkbAddr] = event.Timestamp
 
 	// add the timestamp to the struct if it is not set to none
 	if o.flags.OutputTS != "none" {
@@ -227,7 +227,7 @@ func getAbsoluteTs() string {
 
 func getRelativeTs(event *Event, o *output) uint64 {
 	ts := event.Timestamp
-	if last, found := o.lastSeenSkb[event.SkbHead]; found {
+	if last, found := o.lastSeenSkb[event.SkbAddr]; found {
 		ts = ts - last
 	} else {
 		ts = 0
@@ -393,12 +393,12 @@ func (o *output) Print(event *Event) {
 
 	outFuncName := getOutFuncName(o, event, addr)
 
-	fmt.Fprintf(o.writer, "%-18s %-3s %-16s", fmt.Sprintf("%#x", event.SkbHead),
+	fmt.Fprintf(o.writer, "%-18s %-3s %-16s", fmt.Sprintf("%#x", event.SkbAddr),
 		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("%s", execName))
 	if o.flags.OutputTS != "none" {
 		fmt.Fprintf(o.writer, " %-16d", ts)
 	}
-	o.lastSeenSkb[event.SkbHead] = event.Timestamp
+	o.lastSeenSkb[event.SkbAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
 		fmt.Fprintf(o.writer, " %s", getMetaData(event, o))
