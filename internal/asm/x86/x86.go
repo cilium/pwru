@@ -5,16 +5,18 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"golang.org/x/arch/x86/x86asm"
 )
 
 var (
-	kcore    *os.File
-	kcoreElf *elf.File
+	kcore     *os.File
+	kcoreElf  *elf.File
+	kcoreOnce sync.Once
 )
 
-func init() {
+func parseKCore() {
 	var err error
 	if kcore, err = os.Open("/proc/kcore"); err != nil {
 		log.Fatalf("failed to open /proc/kcore: %s", err)
@@ -26,6 +28,8 @@ func init() {
 }
 
 func GetCallees(addr uint64, leng int) (callees []uint64, err error) {
+	kcoreOnce.Do(parseKCore)
+
 	if leng == 0 {
 		leng = 100000
 	}
