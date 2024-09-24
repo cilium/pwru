@@ -254,7 +254,7 @@ func getAddrByArch(event *Event, o *output) (addr uint64) {
 	switch runtime.GOARCH {
 	case "amd64":
 		addr = event.Addr
-		if !o.kprobeMulti {
+		if !o.kprobeMulti && event.Type == eventTypeKprobe {
 			addr -= 1
 		}
 	case "arm64":
@@ -365,8 +365,10 @@ func getOutFuncName(o *output, event *Event, addr uint64) string {
 	return outFuncName
 }
 
-var maxTupleLengthSeen int
-var maxFuncLengthSeen int
+var (
+	maxTupleLengthSeen int
+	maxFuncLengthSeen  int
+)
 
 func fprintWithPadding(writer *os.File, data string, maxLenSeen *int) {
 	if len(data) > *maxLenSeen {
@@ -412,7 +414,6 @@ func (o *output) Print(event *Event) {
 		fprintWithPadding(o.writer, outFuncName, &maxFuncLengthSeen)
 		fmt.Fprintf(o.writer, " %s", o.addr2name.findNearestSym(event.CallerAddr))
 	} else {
-
 		fmt.Fprintf(o.writer, " %s", outFuncName)
 	}
 
