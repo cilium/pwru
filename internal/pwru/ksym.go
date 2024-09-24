@@ -58,7 +58,7 @@ func ParseKallsyms(funcs Funcs, all bool) (Addr2Name, BpfProgName2Addr, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.Split(scanner.Text(), " ")
-		name, isBpfProg := extractBpfProgName(line[2])
+		name := strings.ReplaceAll(line[2], "\t", "")
 		if all || (funcs[name] > 0) {
 			addr, err := strconv.ParseUint(line[0], 16, 64)
 			if err != nil {
@@ -73,7 +73,7 @@ func ParseKallsyms(funcs Funcs, all bool) (Addr2Name, BpfProgName2Addr, error) {
 			if all {
 				a2n.Addr2NameSlice = append(a2n.Addr2NameSlice, sym)
 			}
-			if isBpfProg {
+			if isBpfProg := strings.HasSuffix(name, "[bpf]"); isBpfProg {
 				n2a[name] = addr
 			}
 		}
@@ -87,8 +87,4 @@ func ParseKallsyms(funcs Funcs, all bool) (Addr2Name, BpfProgName2Addr, error) {
 	}
 
 	return a2n, n2a, nil
-}
-
-func extractBpfProgName(name string) (string, bool) {
-	return strings.ReplaceAll(name, "\t", ""), strings.HasSuffix(name, "[bpf]")
 }

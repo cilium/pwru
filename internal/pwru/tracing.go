@@ -64,7 +64,7 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 	opts *ebpf.CollectionOptions, prog *ebpf.Program, n2a BpfProgName2Addr,
 	tracingName string,
 ) error {
-	entryFn, name, err := getEntryFuncName(prog)
+	entryFn, progName, tag, err := getBpfProgInfo(prog)
 	if err != nil {
 		if errors.Is(err, errNotFound) {
 			log.Printf("Skip tracing bpf prog %s because cannot find its entry function name", prog)
@@ -80,11 +80,13 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 	// distinguish which exact bpf prog is called.
 	//   -- @jschwinger233
 
-	addr, ok := n2a[entryFn]
+	progKsym := fmt.Sprintf("bpf_prog_%s_%s[bpf]", tag, entryFn)
+	addr, ok := n2a[progKsym]
 	if !ok {
-		addr, ok = n2a[name]
+		progKsym = fmt.Sprintf("bpf_prog_%s_%s[bpf]", tag, progName)
+		addr, ok = n2a[progKsym]
 		if !ok {
-			return fmt.Errorf("failed to find address for function %s of bpf prog %v", name, prog)
+			return fmt.Errorf("failed to find address for function %s of bpf prog %v", progName, prog)
 		}
 	}
 

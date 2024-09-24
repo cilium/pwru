@@ -42,10 +42,11 @@ func listBpfProgs(typ ebpf.ProgramType) ([]*ebpf.Program, error) {
 	return progs, nil
 }
 
-func getEntryFuncName(prog *ebpf.Program) (string, string, error) {
+func getBpfProgInfo(prog *ebpf.Program) (entryFuncName, progName, tag string, err error) {
 	info, err := prog.Info()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get program info: %w", err)
+		err = fmt.Errorf("failed to get program info: %w", err)
+		return
 	}
 
 	_, ok := info.BTFID()
@@ -53,20 +54,23 @@ func getEntryFuncName(prog *ebpf.Program) (string, string, error) {
 		// FENTRY/FEXIT program can only be attached to another program
 		// annotated with BTF. So if the BTF ID is not found, it means
 		// the program is not annotated with BTF.
-		return "", "", errNotFound
+		err = errNotFound
+		return
 	}
 
 	insns, err := info.Instructions()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get program instructions: %w", err)
+		err = fmt.Errorf("failed to get program instructions: %w", err)
+		return
 	}
 
 	for _, insn := range insns {
 		sym := insn.Symbol()
 		if sym != "" {
-			return sym, info.Name, nil
+			return sym, info.Name, info.Tag, nil
 		}
 	}
 
-	return "", "", errNotFound
+	err = errNotFound
+	return
 }
