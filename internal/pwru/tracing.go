@@ -189,11 +189,20 @@ func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	log.Printf("Attaching xdp progs...\n")
 
 	var t tracing
-	if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, ebpf.XDP, "fentry_xdp"); err != nil {
-		log.Fatalf("failed to trace XDP progs: %v", err)
+	{
+		spec := spec.Copy()
+		delete(spec.Programs, "fexit_xdp")
+		if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, ebpf.XDP, "fentry_xdp"); err != nil {
+			log.Fatalf("failed to trace XDP progs: %v", err)
+		}
 	}
-	if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, ebpf.XDP, "fexit_xdp"); err != nil {
-		log.Fatalf("failed to trace XDP progs: %v", err)
+
+	{
+		spec := spec.Copy()
+		delete(spec.Programs, "fentry_xdp")
+		if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, ebpf.XDP, "fexit_xdp"); err != nil {
+			log.Fatalf("failed to trace XDP progs: %v", err)
+		}
 	}
 
 	return &t
