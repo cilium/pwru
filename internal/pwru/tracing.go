@@ -127,13 +127,8 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 
 func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	opts *ebpf.CollectionOptions, outputSkb bool, outputShinfo bool,
-	n2a BpfProgName2Addr, progType ebpf.ProgramType, tracingName string,
+	n2a BpfProgName2Addr, progs []*ebpf.Program, tracingName string,
 ) error {
-	progs, err := listBpfProgs(progType)
-	if err != nil {
-		return fmt.Errorf("failed to list bpf progs: %w", err)
-	}
-
 	// Reusing maps from previous collection is to handle the events together
 	// with the kprobes.
 	replacedMaps := map[string]*ebpf.Map{
@@ -147,9 +142,6 @@ func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 		replacedMaps["print_shinfo_map"] = coll.Maps["print_shinfo_map"]
 	}
 	opts.MapReplacements = replacedMaps
-
-	t.links = make([]link.Link, 0, len(progs))
-	t.progs = progs
 
 	var errg errgroup.Group
 
@@ -174,8 +166,16 @@ func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 ) *tracing {
 	log.Printf("Attaching tc-bpf progs...\n")
 
+	progs, err := listBpfProgs(ebpf.SchedCLS)
+	if err != nil {
+		log.Fatalf("failed to list tc-bpf progs: %v", err)
+	}
+
 	var t tracing
-	if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, ebpf.SchedCLS, "fentry_tc"); err != nil {
+	t.progs = progs
+	t.links = make([]link.Link, 0, len(progs))
+
+	if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, progs, "fentry_tc"); err != nil {
 		log.Fatalf("failed to trace TC progs: %v", err)
 	}
 
@@ -188,11 +188,19 @@ func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 ) *tracing {
 	log.Printf("Attaching xdp progs...\n")
 
+	progs, err := listBpfProgs(ebpf.XDP)
+	if err != nil {
+		log.Fatalf("failed to list XDP progs: %v", err)
+	}
+
 	var t tracing
+	t.progs = progs
+	t.links = make([]link.Link, 0, len(progs)*2)
+
 	{
 		spec := spec.Copy()
 		delete(spec.Programs, "fexit_xdp")
-		if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, ebpf.XDP, "fentry_xdp"); err != nil {
+		if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, progs, "fentry_xdp"); err != nil {
 			log.Fatalf("failed to trace XDP progs: %v", err)
 		}
 	}
@@ -200,7 +208,7 @@ func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	{
 		spec := spec.Copy()
 		delete(spec.Programs, "fentry_xdp")
-		if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, ebpf.XDP, "fexit_xdp"); err != nil {
+		if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, progs, "fexit_xdp"); err != nil {
 			log.Fatalf("failed to trace XDP progs: %v", err)
 		}
 	}
