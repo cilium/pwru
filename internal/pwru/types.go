@@ -150,5 +150,6 @@ type Event struct {
 	Tuple         Tuple
 	PrintStackId  int64
 	ParamSecond   uint64
+	ParamThird    uint64
 	CPU           uint32
 }

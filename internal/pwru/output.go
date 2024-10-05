@@ -351,6 +351,12 @@ func getOutFuncName(o *output, event *Event, addr uint64) string {
 		} else {
 			outFuncName = fmt.Sprintf("%s (%d)", funcName, event.ParamSecond)
 		}
+	} else if funcName == "sk_skb_reason_drop" {
+		if reason, ok := o.kfreeReasons[event.ParamThird]; ok {
+			outFuncName = fmt.Sprintf("%s(%s)", funcName, reason)
+		} else {
+			outFuncName = fmt.Sprintf("%s (%d)", funcName, event.ParamThird)
+		}
 	}
 
 	if event.Type != eventTypeKprobe {
@@ -478,8 +484,11 @@ func addrToStr(proto uint16, addr [16]byte) string {
 // defined in /include/net/dropreason.h.
 func getKFreeSKBReasons(spec *btf.Spec) (map[uint64]string, error) {
 	if _, err := spec.AnyTypeByName("kfree_skb_reason"); err != nil {
-		// Kernel is too old to have kfree_skb_reason
-		return nil, nil
+		if _, err := spec.AnyTypeByName("sk_skb_reason_drop"); err != nil {
+			// Kernel is too old to have either kfree_skb_reason or sk_skb_reason_drop
+			// see https://github.com/torvalds/linux/commit/ba8de796baf4bdc03530774fb284fe3c97875566
+			return nil, nil
+		}
 	}
 
 	var dropReasonsEnum *btf.Enum
