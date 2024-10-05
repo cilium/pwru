@@ -86,6 +86,7 @@ struct event_t {
 	struct tuple tuple;
 	s64 print_stack_id;
 	u64 param_second;
+	u64 param_third;
 	u32 cpu_id;
 } __attribute__((packed));
 
@@ -504,6 +505,7 @@ kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip, u64 *
 	event.skb_addr = (u64) skb;
 	event.addr = has_get_func_ip ? bpf_get_func_ip(ctx) : PT_REGS_IP(ctx);
 	event.param_second = PT_REGS_PARM2(ctx);
+	event.param_third = PT_REGS_PARM3(ctx);
 	if (CFG.output_caller)
 		bpf_probe_read_kernel(&event.caller_addr, sizeof(event.caller_addr), (void *)PT_REGS_SP(ctx));
 
