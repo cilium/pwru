@@ -434,13 +434,13 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 }
 
 static __noinline bool
-handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event, u64 *_stackid) {
+handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event, u64 *_stackid, const bool is_kprobe) {
 	u8 tracked_by;
 	u64 skb_addr = (u64) skb;
 	u64 skb_head = (u64) BPF_CORE_READ(skb, head);
 	u64 stackid;
 
-	if (cfg->track_skb_by_stackid)
+	if (cfg->track_skb_by_stackid && is_kprobe)
 		stackid = _stackid ? *_stackid : get_stackid(ctx);
 
 	if (cfg->is_set) {
@@ -457,7 +457,7 @@ handle_everything(struct sk_buff *skb, void *ctx, struct event_t *event, u64 *_s
 			goto cont;
 		}
 
-		if (cfg->track_skb_by_stackid && bpf_map_lookup_elem(&stackid_skb, &stackid)) {
+		if (cfg->track_skb_by_stackid && is_kprobe && bpf_map_lookup_elem(&stackid_skb, &stackid)) {
 			tracked_by = TRACKED_BY_STACKID;
 			goto cont;
 		}
@@ -479,7 +479,7 @@ cont:
 			bpf_map_update_elem(&xdp_dhs_skb_heads, &skb_head, &skb_addr, BPF_ANY);
 	}
 
-	if (cfg->track_skb_by_stackid && tracked_by != TRACKED_BY_STACKID) {
+	if (cfg->track_skb_by_stackid && is_kprobe && tracked_by != TRACKED_BY_STACKID) {
 		u64 *old_stackid = bpf_map_lookup_elem(&skb_stackid, &skb);
 		if (old_stackid && *old_stackid != stackid) {
 			bpf_map_delete_elem(&stackid_skb, old_stackid);
@@ -499,7 +499,7 @@ static __always_inline int
 kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip, u64 *_stackid) {
 	struct event_t event = {};
 
-	if (!handle_everything(skb, ctx, &event, _stackid))
+	if (!handle_everything(skb, ctx, &event, _stackid, true))
 		return BPF_OK;
 
 	event.skb_addr = (u64) skb;
@@ -596,7 +596,7 @@ SEC("fentry/tc")
 int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 	struct event_t event = {};
 
-	if (!handle_everything(skb, ctx, &event, NULL))
+	if (!handle_everything(skb, ctx, &event, NULL, false))
 		return BPF_OK;
 
 	event.skb_addr = (u64) skb;
