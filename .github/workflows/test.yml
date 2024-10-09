@@ -31,7 +31,7 @@ jobs:
         tar xfv release/pwru-linux-amd64.tar.gz
 
     - name: Store executable
-      uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a
+      uses: actions/upload-artifact@84480863f228bb9747b473957fcc9e309aa96097
       with:
         name: pwru
         path: pwru
