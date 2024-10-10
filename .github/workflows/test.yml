@@ -9,7 +9,7 @@ on:
 jobs:
 
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
 
@@ -37,7 +37,7 @@ jobs:
         path: pwru
 
   test:
-    runs-on: ubuntu-latest-4cores-16gb
+    runs-on: ubuntu-latest
     name: Test
     needs: build
     strategy:
