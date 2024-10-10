@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -254,6 +255,11 @@ func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, coll *ebpf.Collect
 
 	for _, fn := range nonSkbFuncs {
 		if _, ok := funcs[fn]; ok {
+			continue
+		}
+
+		if strings.HasSuffix(fn, "[bpf]") {
+			// Skip bpf progs
 			continue
 		}
 
