@@ -698,6 +698,8 @@ int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
 			goto cont;
 		}
 
+		return BPF_OK;
+
 cont:
 		set_xdp_output(ctx, xdp, &event);
 	}
