@@ -73,7 +73,7 @@ github.com/tklauser/ps
 # github.com/vishvananda/netns v0.0.4
 ## explicit; go 1.17
 github.com/vishvananda/netns
-# golang.org/x/arch v0.8.0
+# golang.org/x/arch v0.11.0
 ## explicit; go 1.18
 golang.org/x/arch/x86/x86asm
 # golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
