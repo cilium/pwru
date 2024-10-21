@@ -13,7 +13,7 @@ require (
 	golang.org/x/arch v0.11.0
 	golang.org/x/net v0.28.0
 	golang.org/x/sync v0.8.0
-	golang.org/x/sys v0.24.0
+	golang.org/x/sys v0.26.0
 )
 
 require (
