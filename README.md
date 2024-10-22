@@ -145,7 +145,7 @@ See [docs/vagrant.md](docs/vagrant.md)
 ### Dependencies
 
 * Go >= 1.16
-* LLVM/clang >= 1.12
+* LLVM/clang >= 12
 * Bison
 * Lex/Flex >= 2.5.31
 
