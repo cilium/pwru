@@ -11,6 +11,7 @@ VERSION=$(shell git describe --tags --always)
 LIBPCAP_ARCH ?= x86_64-unknown-linux-gnu
 # For compiling libpcap and CGO
 CC ?= gcc
+ARCHS ?= amd64 arm64
 
 TEST_TIMEOUT ?= 5s
 .DEFAULT_GOAL := pwru
@@ -41,7 +42,7 @@ release:
 
 ## Build a new release
 local-release: clean
-	ARCHS='amd64 arm64' ./local-release.sh
+	ARCHS='$(ARCHS)' ./local-release.sh
 
 ## Install the GO Binary to the location specified by 'BINDIR'
 install: $(TARGET)
