@@ -16,6 +16,7 @@ import (
 
 	"github.com/cheggaaa/pb/v3"
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/link"
 	"golang.org/x/sync/errgroup"
 )
@@ -247,7 +248,7 @@ func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Add
 	return &k
 }
 
-func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, coll *ebpf.Collection) *kprober {
+func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, bpfMapFuncs map[string]*btf.FuncProto, coll *ebpf.Collection) *kprober {
 	slices.Sort(nonSkbFuncs)
 	nonSkbFuncs = slices.Compact(nonSkbFuncs)
 
@@ -264,7 +265,18 @@ func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, coll *ebpf.Collect
 			continue
 		}
 
-		kp, err := link.Kprobe(fn, coll.Programs["kprobe_skb_by_stackid"], nil)
+		var cookie uint64
+		if proto, ok := bpfMapFuncs[fn]; ok {
+			cookie = 1
+			for _, p := range proto.Params {
+				if p.Name == "value" {
+					cookie = 2
+				}
+			}
+		}
+
+		opts := &link.KprobeOptions{Cookie: cookie}
+		kp, err := link.Kprobe(fn, coll.Programs["kprobe_skb_by_stackid"], opts)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				continue

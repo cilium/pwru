@@ -82,6 +82,7 @@ struct event_t {
 	u64 ts;
 	u64 print_skb_id;
 	u64 print_shinfo_id;
+	//u64 print_bpf_map_id;
 	struct skb_meta meta;
 	struct tuple tuple;
 	s64 print_stack_id;
@@ -143,7 +144,8 @@ struct config {
 	u8 output_shinfo: 1;
 	u8 output_stack: 1;
 	u8 output_caller: 1;
-	u8 output_unused: 2;
+	u8 output_bpf_map: 1;
+	u8 output_unused: 1;
 	u8 is_set: 1;
 	u8 track_skb: 1;
 	u8 track_skb_by_stackid: 1;
@@ -390,6 +392,21 @@ set_shinfo_btf(struct sk_buff *skb, u64 *event_id) {
 	bpf_map_update_elem(&print_shinfo_map, event_id, &v, BPF_ANY);
 }
 
+static __always_inline void
+set_bpf_map(struct pt_regs *ctx, u64 cookie, u64 *event_id) {
+	if (cookie == 1)
+		bpf_printk("bpf_map_lookup/delete");
+	else if (cookie == 2)
+		bpf_printk("bpf_map_update");
+
+	struct bpf_map *map = (struct bpf_map *)PT_REGS_PARM1(ctx);
+
+	char name[16];
+	BPF_CORE_READ_STR_INTO(&name, map, name);
+	bpf_printk(" name=%s key_size=%ld value_size=%ld\n", &name, BPF_CORE_READ(map, key_size), BPF_CORE_READ(map, value_size));
+	// TODO@gray: print/collect key and value hex
+}
+
 static __always_inline u64
 get_tracing_fp(void)
 {
@@ -520,6 +537,13 @@ kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, const bool has_get_func_ip,
 	event.param_third = PT_REGS_PARM3(ctx);
 	if (CFG.output_caller)
 		bpf_probe_read_kernel(&event.caller_addr, sizeof(event.caller_addr), (void *)PT_REGS_SP(ctx));
+
+	if (CFG.output_bpf_map) {
+		// TODO@gray: kernel>=5.15
+		__u64 cookie = bpf_get_attach_cookie(ctx);
+		if (cookie)
+			set_bpf_map(ctx, cookie, NULL);
+	}
 
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
