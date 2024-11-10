@@ -201,9 +201,10 @@ func AttachKprobeMulti(ctx context.Context, bar *pb.ProgressBar, kprobes []Kprob
 }
 
 func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Addr2Name, useKprobeMulti bool, batch uint) *kprober {
-	msg := "kprobe"
+	msg, probeMethod := "kprobe", "kprobe"
 	if useKprobeMulti {
 		msg = "kprobe-multi"
+		probeMethod = "kprobe_multi"
 	}
 	log.Printf("Attaching kprobes (via %s)...\n", msg)
 
@@ -213,7 +214,7 @@ func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Add
 	pwruKprobes := make([]Kprobe, 0, len(funcs))
 	funcsByPos := GetFuncsByPos(funcs)
 	for pos, fns := range funcsByPos {
-		fn, ok := coll.Programs[fmt.Sprintf("kprobe_skb_%d", pos)]
+		fn, ok := coll.Programs[fmt.Sprintf("%s_skb_%d", probeMethod, pos)]
 		if ok {
 			pwruKprobes = append(pwruKprobes, Kprobe{HookFuncs: fns, Prog: fn})
 		} else {

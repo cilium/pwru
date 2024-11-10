@@ -119,15 +119,19 @@ func main() {
 	opts.Programs.LogLevel = ebpf.LogLevelInstruction
 	opts.Programs.LogSize = ebpf.DefaultVerifierLogSize * 100
 
-	var bpfSpec *ebpf.CollectionSpec
-	switch {
-	case (flags.OutputSkb || flags.OutputShinfo) && useKprobeMulti:
-		bpfSpec, err = LoadKProbeMultiPWRU()
-	default:
-		bpfSpec, err = LoadKProbePWRU()
-	}
+	bpfSpec, err := LoadKProbePWRU()
 	if err != nil {
 		log.Fatalf("Failed to load bpf spec: %v", err)
+	}
+
+	if useKprobeMulti {
+		for i := 1; i <= 5; i++ {
+			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_skb_%d", i))
+		}
+	} else {
+		for i := 1; i <= 5; i++ {
+			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_multi_skb_%d", i))
+		}
 	}
 
 	for name, program := range bpfSpec.Programs {
