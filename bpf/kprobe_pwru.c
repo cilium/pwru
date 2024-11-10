@@ -492,7 +492,7 @@ cont:
 }
 
 static __always_inline int
-kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip, u64 *_stackid) {
+kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, const bool has_get_func_ip, u64 *_stackid) {
 	struct event_t event = {};
 
 	if (!handle_everything(skb, ctx, &event, _stackid, true))
@@ -510,19 +510,17 @@ kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, bool has_get_func_ip, u64 *
 	return BPF_OK;
 }
 
-#ifdef HAS_KPROBE_MULTI
-#define PWRU_KPROBE_TYPE "kprobe.multi"
-#define PWRU_HAS_GET_FUNC_IP true
-#else
-#define PWRU_KPROBE_TYPE "kprobe"
-#define PWRU_HAS_GET_FUNC_IP false
-#endif /* HAS_KPROBE_MULTI */
-
-#define PWRU_ADD_KPROBE(X)                                                     \
-  SEC(PWRU_KPROBE_TYPE "/skb-" #X)                                             \
-  int kprobe_skb_##X(struct pt_regs *ctx) {                                    \
-    struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM##X(ctx);             \
-    return kprobe_skb(skb, ctx, PWRU_HAS_GET_FUNC_IP, NULL);                         \
+#define PWRU_ADD_KPROBE(X)                                                  \
+  SEC("kprobe/skb-" #X)                                                     \
+  int kprobe_skb_##X(struct pt_regs *ctx) {                                 \
+    struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM##X(ctx);          \
+    return kprobe_skb(skb, ctx, false, NULL);                               \
+  }                                                                         \
+                                                                            \
+  SEC("kprobe.multi/skb-" #X)                                               \
+  int kprobe_multi_skb_##X(struct pt_regs *ctx) {                           \
+    struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM##X(ctx);          \
+    return kprobe_skb(skb, ctx, true, NULL);                                \
   }
 
 PWRU_ADD_KPROBE(1)
@@ -531,20 +529,18 @@ PWRU_ADD_KPROBE(3)
 PWRU_ADD_KPROBE(4)
 PWRU_ADD_KPROBE(5)
 
+#undef PWRU_ADD_KPROBE
+
 SEC("kprobe/skb_by_stackid")
 int kprobe_skb_by_stackid(struct pt_regs *ctx) {
 	u64 stackid = get_stackid(ctx);
 
 	struct sk_buff **skb = bpf_map_lookup_elem(&stackid_skb, &stackid);
 	if (skb && *skb)
-		return kprobe_skb(*skb, ctx, PWRU_HAS_GET_FUNC_IP, &stackid);
+		return kprobe_skb(*skb, ctx, false, &stackid);
 
 	return BPF_OK;
 }
-
-#undef PWRU_KPROBE
-#undef PWRU_HAS_GET_FUNC_IP
-#undef PWRU_KPROBE_TYPE
 
 SEC("kprobe/skb_lifetime_termination")
 int kprobe_skb_lifetime_termination(struct pt_regs *ctx) {
