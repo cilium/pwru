@@ -239,7 +239,7 @@ func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Add
 	bar.Finish()
 	select {
 	case <-ctx.Done():
-		return nil
+		return &k
 	default:
 	}
 	log.Printf("Attached (ignored %d)\n", ignored)
