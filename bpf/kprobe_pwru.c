@@ -164,7 +164,6 @@ struct {
 	__uint(value_size, MAX_STACK_DEPTH * sizeof(u64));
 } print_stack_map SEC(".maps");
 
-#ifdef OUTPUT_SKB
 struct print_skb_value {
 	u32 len;
 	char str[PRINT_SKB_STR_SIZE];
@@ -197,7 +196,6 @@ struct {
 	__type(key, u64);
 	__type(value, struct print_shinfo_value);
 } print_shinfo_map SEC(".maps");
-#endif
 
 static __always_inline u32
 get_netns(struct sk_buff *skb) {
@@ -344,7 +342,6 @@ sync_fetch_and_add(void *id_map) {
 
 static __always_inline void
 set_skb_btf(struct sk_buff *skb, u64 *event_id) {
-#ifdef OUTPUT_SKB
 	static struct btf_ptr p = {};
 	static struct print_skb_value v = {};
 	u64 id;
@@ -359,12 +356,10 @@ set_skb_btf(struct sk_buff *skb, u64 *event_id) {
 	}
 
 	bpf_map_update_elem(&print_skb_map, event_id, &v, BPF_ANY);
-#endif
 }
 
 static __always_inline void
 set_shinfo_btf(struct sk_buff *skb, u64 *event_id) {
-#ifdef OUTPUT_SKB
 	struct skb_shared_info *shinfo;
 	static struct btf_ptr p = {};
 	static struct print_shinfo_value v = {};
@@ -393,7 +388,6 @@ set_shinfo_btf(struct sk_buff *skb, u64 *event_id) {
 	}
 
 	bpf_map_update_elem(&print_shinfo_map, event_id, &v, BPF_ANY);
-#endif
 }
 
 static __always_inline u64

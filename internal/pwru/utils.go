@@ -194,3 +194,22 @@ func HaveAvailableFilterFunctions() bool {
 	_, err := getAvailableFilterFunctions()
 	return err == nil
 }
+
+func HaveSnprintfBtf(kernelBtf *btf.Spec) bool {
+	types, err := kernelBtf.AnyTypesByName("bpf_func_id")
+	if err != nil {
+		return false
+	}
+
+	for _, t := range types {
+		if enum, ok := t.(*btf.Enum); ok {
+			for _, v := range enum.Values {
+				if v.Name == "BPF_FUNC_snprintf_btf" {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}

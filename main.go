@@ -67,6 +67,10 @@ func main() {
 		log.Fatalf("Failed to load BTF spec: %s", err)
 	}
 
+	if (flags.OutputSkb || flags.OutputShinfo) && !pwru.HaveSnprintfBtf(btfSpec) {
+		log.Fatal("Unsupported to output skb or shinfo because bpf_snprintf_btf() is unavailable")
+	}
+
 	if flags.AllKMods {
 		files, err := os.ReadDir("/sys/kernel/btf")
 		if err != nil {
@@ -119,12 +123,8 @@ func main() {
 	switch {
 	case (flags.OutputSkb || flags.OutputShinfo) && useKprobeMulti:
 		bpfSpec, err = LoadKProbeMultiPWRU()
-	case flags.OutputSkb || flags.OutputShinfo:
-		bpfSpec, err = LoadKProbePWRU()
-	case useKprobeMulti:
-		bpfSpec, err = LoadKProbeMultiPWRUWithoutOutputSKB()
 	default:
-		bpfSpec, err = LoadKProbePWRUWithoutOutputSKB()
+		bpfSpec, err = LoadKProbePWRU()
 	}
 	if err != nil {
 		log.Fatalf("Failed to load bpf spec: %v", err)
