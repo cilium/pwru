@@ -149,6 +149,8 @@ struct config {
 	u8 track_skb_by_stackid: 1;
 	u8 track_xdp: 1;
 	u8 unused: 4;
+	u32 skb_btf_id;
+	u32 shinfo_btf_id;
 } __attribute__((packed));
 
 static volatile const struct config CFG;
@@ -347,7 +349,7 @@ set_skb_btf(struct sk_buff *skb, u64 *event_id) {
 	static struct print_skb_value v = {};
 	u64 id;
 
-	p.type_id = bpf_core_type_id_kernel(struct sk_buff);
+	p.type_id = cfg->skb_btf_id;
 	p.ptr = skb;
 	*event_id = sync_fetch_and_add(&print_skb_id_map);
 
@@ -380,7 +382,7 @@ set_shinfo_btf(struct sk_buff *skb, u64 *event_id) {
 	end = BPF_CORE_READ(skb, end);
 	shinfo = (struct skb_shared_info *)(head + end);
 
-	p.type_id = bpf_core_type_id_kernel(struct skb_shared_info);
+	p.type_id = cfg->shinfo_btf_id;
 	p.ptr = shinfo;
 
 	*event_id = sync_fetch_and_add(&print_shinfo_id_map);

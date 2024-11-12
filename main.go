@@ -152,7 +152,18 @@ func main() {
 		}
 	}
 
+	skbBtfID, err := pwru.GetStructBtfID(btfSpec, "sk_buff")
+	if err != nil {
+		log.Fatalf("Failed to get BTF ID for sk_buff: %v", err)
+	}
+	shinfoBtfID, err := pwru.GetStructBtfID(btfSpec, "skb_shared_info")
+	if err != nil {
+		log.Fatalf("Failed to get BTF ID for skb_shared_info: %v", err)
+	}
+
 	pwruConfig, err := pwru.GetConfig(&flags)
+	pwruConfig.SkbBtfID = uint32(skbBtfID)
+	pwruConfig.ShinfoBtfID = uint32(shinfoBtfID)
 	if err != nil {
 		log.Fatalf("Failed to get pwru config: %v", err)
 	}

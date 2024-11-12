@@ -41,6 +41,9 @@ type FilterCfg struct {
 
 	OutputFlags uint8
 	FilterFlags uint8
+
+	SkbBtfID    uint32
+	ShinfoBtfID uint32
 }
 
 func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
