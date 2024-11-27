@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"sync"
 
 	"github.com/cilium/ebpf"
@@ -131,16 +132,8 @@ func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 ) error {
 	// Reusing maps from previous collection is to handle the events together
 	// with the kprobes.
-	replacedMaps := map[string]*ebpf.Map{
-		"events":          coll.Maps["events"],
-		"print_stack_map": coll.Maps["print_stack_map"],
-	}
-	if outputSkb {
-		replacedMaps["print_skb_map"] = coll.Maps["print_skb_map"]
-	}
-	if outputShinfo {
-		replacedMaps["print_shinfo_map"] = coll.Maps["print_shinfo_map"]
-	}
+	replacedMaps := maps.Clone(coll.Maps)
+	delete(replacedMaps, ".rodata")
 	opts.MapReplacements = replacedMaps
 
 	var errg errgroup.Group
