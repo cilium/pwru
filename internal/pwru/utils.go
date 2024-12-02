@@ -42,8 +42,9 @@ func getAvailableFilterFunctions() (map[string]struct{}, error) {
 	return availableFuncs, nil
 }
 
-func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) (Funcs, error) {
+func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti, bpfMap bool) (Funcs, map[string]*btf.FuncProto, error) {
 	funcs := Funcs{}
+	bpfMapFuncs := make(map[string]*btf.FuncProto)
 
 	type iterator struct {
 		kmod string
@@ -52,7 +53,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 
 	reg, err := regexp.Compile(pattern)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile regular expression %v", err)
+		return nil, nil, fmt.Errorf("failed to compile regular expression %v", err)
 	}
 
 	var availableFuncs map[string]struct{}
@@ -68,13 +69,13 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 		path := filepath.Join("/sys/kernel/btf", module)
 		f, err := os.Open(path)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open %s: %v", path, err)
+			return nil, nil, fmt.Errorf("failed to open %s: %v", path, err)
 		}
 		defer f.Close()
 
 		modSpec, err := btf.LoadSplitSpecFromReader(f, spec)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load %s btf: %v", module, err)
+			return nil, nil, fmt.Errorf("failed to load %s btf: %v", module, err)
 		}
 		iters = append(iters, iterator{module, modSpec.Iterate()})
 	}
@@ -108,6 +109,9 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 			for _, p := range fnProto.Params {
 				if ptr, ok := p.Type.(*btf.Pointer); ok {
 					if strct, ok := ptr.Target.(*btf.Struct); ok {
+						if bpfMap && strct.Name == "bpf_map" {
+							bpfMapFuncs[fnName] = fnProto
+						}
 						if strct.Name == "sk_buff" && i <= 5 {
 							name := fnName
 							if kprobeMulti && it.kmod != "" {
@@ -123,7 +127,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 		}
 	}
 
-	return funcs, nil
+	return funcs, bpfMapFuncs, nil
 }
 
 func GetFuncsByPos(funcs Funcs) map[int][]string {
