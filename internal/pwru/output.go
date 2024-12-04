@@ -64,6 +64,7 @@ type jsonPrinter struct {
 	Proto       uint16      `json:"proto,omitempty"`
 	Mtu         uint32      `json:"mtu,omitempty"`
 	Len         uint32      `json:"len,omitempty"`
+	Cb          [5]uint32   `json:"cb,omitempty"`
 	Tuple       *jsonTuple  `json:"tuple,omitempty"`
 	Stack       interface{} `json:"stack,omitempty"`
 	SkbMetadata interface{} `json:"skb_metadata,omitempty"`
@@ -141,6 +142,9 @@ func (o *output) PrintHeader() {
 	}
 	if o.flags.OutputMeta {
 		fmt.Fprintf(o.writer, " %-10s %-8s %16s %-6s %-5s %-5s", "NETNS", "MARK/x", centerAlignString("IFACE", 16), "PROTO", "MTU", "LEN")
+		if o.flags.FilterTraceTc {
+			fmt.Fprintf(o.writer, " %-56s", "__sk_buff->cb[]")
+		}
 	}
 	if o.flags.OutputTuple {
 		fmt.Fprintf(o.writer, " %s", "TUPLE")
@@ -187,6 +191,9 @@ func (o *output) PrintJson(event *Event) {
 		d.Proto = byteorder.NetworkToHost16(event.Meta.Proto)
 		d.Mtu = event.Meta.MTU
 		d.Len = event.Meta.Len
+		if o.flags.FilterTraceTc {
+			d.Cb = event.Meta.Cb
+		}
 	}
 
 	if o.flags.OutputTuple {
@@ -330,6 +337,14 @@ func getMetaData(event *Event, o *output) (metaData string) {
 	return metaData
 }
 
+func getCb(event *Event) (cb string) {
+	res := []string{}
+	for _, val := range event.Meta.Cb {
+		res = append(res, fmt.Sprintf("0x%08X", val))
+	}
+	return fmt.Sprintf("[%s]", strings.Join(res, ","))
+}
+
 func getOutFuncName(o *output, event *Event, addr uint64) string {
 	var funcName string
 
@@ -410,6 +425,9 @@ func (o *output) Print(event *Event) {
 
 	if o.flags.OutputMeta {
 		fmt.Fprintf(o.writer, " %s", getMetaData(event, o))
+		if o.flags.FilterTraceTc {
+			fmt.Fprintf(o.writer, " %s", getCb(event))
+		}
 	}
 
 	if o.flags.OutputTuple {

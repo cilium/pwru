@@ -54,7 +54,7 @@ struct skb_meta {
 	u32 len;
 	u32 mtu;
 	u16 protocol;
-	u16 pad;
+	u32 cb[5];
 } __attribute__((packed));
 
 struct tuple {
@@ -143,7 +143,8 @@ struct config {
 	u8 output_shinfo: 1;
 	u8 output_stack: 1;
 	u8 output_caller: 1;
-	u8 output_unused: 2;
+	u8 output_cb: 1;
+	u8 output_unused: 1;
 	u8 is_set: 1;
 	u8 track_skb: 1;
 	u8 track_skb_by_stackid: 1;
@@ -442,6 +443,11 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 
 	if (cfg->output_stack) {
 		event->print_stack_id = bpf_get_stackid(ctx, &print_stack_map, BPF_F_FAST_STACK_CMP);
+	}
+
+	if (cfg->output_cb) {
+		struct qdisc_skb_cb *cb = (struct qdisc_skb_cb *)&skb->cb;
+		bpf_probe_read_kernel(&event->meta.cb, sizeof(event->meta.cb), (void *)&cb->data);
 	}
 }
 

@@ -130,7 +130,7 @@ type Meta struct {
 	Len     uint32
 	MTU     uint32
 	Proto   uint16
-	Pad     uint16
+	Cb      [5]uint32
 }
 
 type StackData struct {
