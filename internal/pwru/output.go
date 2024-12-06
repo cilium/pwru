@@ -142,7 +142,7 @@ func (o *output) PrintHeader() {
 	}
 	if o.flags.OutputMeta {
 		fmt.Fprintf(o.writer, " %-10s %-8s %16s %-6s %-5s %-5s", "NETNS", "MARK/x", centerAlignString("IFACE", 16), "PROTO", "MTU", "LEN")
-		if o.flags.FilterTraceTc {
+		if o.flags.FilterTraceTc || o.flags.OutputSkbCB {
 			fmt.Fprintf(o.writer, " %-56s", "__sk_buff->cb[]")
 		}
 	}
@@ -191,7 +191,7 @@ func (o *output) PrintJson(event *Event) {
 		d.Proto = byteorder.NetworkToHost16(event.Meta.Proto)
 		d.Mtu = event.Meta.MTU
 		d.Len = event.Meta.Len
-		if o.flags.FilterTraceTc {
+		if o.flags.FilterTraceTc || o.flags.OutputSkbCB {
 			d.Cb = event.Meta.Cb
 		}
 	}
@@ -425,7 +425,7 @@ func (o *output) Print(event *Event) {
 
 	if o.flags.OutputMeta {
 		fmt.Fprintf(o.writer, " %s", getMetaData(event, o))
-		if o.flags.FilterTraceTc {
+		if o.flags.FilterTraceTc || o.flags.OutputSkbCB {
 			fmt.Fprintf(o.writer, " %s", getCb(event))
 		}
 	}
