@@ -51,6 +51,7 @@ type Flags struct {
 	OutputSkbCB      bool
 	OutputFile       string
 	OutputJson       bool
+	OutputTCPFlags   bool
 
 	KMods    []string
 	AllKMods bool
@@ -86,6 +87,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputCaller, "output-caller", false, "print caller function name")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
 	flag.BoolVar(&f.OutputSkbCB, "output-skb-cb", false, "print skb->cb")
+	flag.BoolVar(&f.OutputTCPFlags, "output-tcp-flags", false, "print TCP flags")
 
 	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
 
@@ -117,6 +119,30 @@ func (f *Flags) Parse() {
 	}
 }
 
+type tcpFlag uint8
+
+func (f tcpFlag) String() string {
+	tcpFlags := []string{
+		"FIN",
+		"SYN",
+		"RST",
+		"PSH",
+		"ACK",
+		"URG",
+		"ECE",
+		"CWR",
+	}
+
+	var flags []string
+	for i, flag := range tcpFlags {
+		if f&(1<<uint(i)) != 0 {
+			flags = append(flags, flag)
+		}
+	}
+
+	return strings.Join(flags, "|")
+}
+
 type Tuple struct {
 	Saddr   [16]byte
 	Daddr   [16]byte
@@ -124,7 +150,7 @@ type Tuple struct {
 	Dport   uint16
 	L3Proto uint16
 	L4Proto uint8
-	Pad     uint8
+	TCPFlag tcpFlag
 }
 
 type Meta struct {
@@ -176,7 +202,7 @@ func (f *markFlagValue) String() string {
 
 func (f *markFlagValue) Set(value string) error {
 	parts := strings.Split(value, "/")
-	
+
 	mark, err := parseUint32HexOrDecimal(parts[0])
 	if err != nil {
 		return fmt.Errorf("invalid mark value: %v", err)
@@ -191,7 +217,7 @@ func (f *markFlagValue) Set(value string) error {
 		}
 		*f.mask = mask
 	}
-	
+
 	return nil
 }
 
@@ -205,7 +231,7 @@ func parseUint32HexOrDecimal(s string) (uint32, error) {
 		s = s[2:]
 		base = 16
 	}
-	
+
 	val, err := strconv.ParseUint(s, base, 32)
 	if err != nil {
 		return 0, err
