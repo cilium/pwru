@@ -46,6 +46,7 @@ type Flags struct {
 	OutputStack      bool
 	OutputCaller     bool
 	OutputLimitLines uint64
+	OutputSkbCB      bool
 	OutputFile       string
 	OutputJson       bool
 
@@ -82,6 +83,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
 	flag.BoolVar(&f.OutputCaller, "output-caller", false, "print caller function name")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
+	flag.BoolVar(&f.OutputSkbCB, "output-skb-cb", false, "print skb->cb")
 
 	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
 
