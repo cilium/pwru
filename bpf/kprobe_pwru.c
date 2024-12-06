@@ -64,7 +64,7 @@ struct tuple {
 	u16 dport;
 	u16 l3_proto;
 	u8 l4_proto;
-	u8 pad;
+	u8 tcp_flags;
 } __attribute__((packed));
 
 enum event_type {
@@ -313,6 +313,7 @@ __set_tuple(struct tuple *tpl, void *data, u16 l3_off, bool is_ipv4) {
 		struct tcphdr *tcp = (struct tcphdr *) (data + l4_off);
 		tpl->sport= BPF_CORE_READ(tcp, source);
 		tpl->dport= BPF_CORE_READ(tcp, dest);
+		bpf_probe_read_kernel(&tpl->tcp_flags, sizeof(tpl->tcp_flags), (void *)tcp + offsetof(struct tcphdr, window) - 1);
 	} else if (tpl->l4_proto == IPPROTO_UDP) {
 		struct udphdr *udp = (struct udphdr *) (data + l4_off);
 		tpl->sport= BPF_CORE_READ(udp, source);

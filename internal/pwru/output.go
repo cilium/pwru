@@ -77,6 +77,7 @@ type jsonTuple struct {
 	Sport uint16 `json:"sport,omitempty"`
 	Dport uint16 `json:"dport,omitempty"`
 	Proto uint8  `json:"proto,omitempty"`
+	Flags string `json:"flags,omitempty"`
 }
 
 func centerAlignString(s string, width int) string {
@@ -101,7 +102,7 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap *ebpf.Ma
 
 	reasons, err := getKFreeSKBReasons(btfSpec)
 	if err != nil {
-		log.Printf("Unable to load packet drop reaons: %v", err)
+		log.Printf("Unable to load packet drop reasons: %v", err)
 	}
 
 	var ifs map[uint64]map[uint32]string
@@ -204,6 +205,7 @@ func (o *output) PrintJson(event *Event) {
 		t.Sport = byteorder.NetworkToHost16(event.Tuple.Sport)
 		t.Dport = byteorder.NetworkToHost16(event.Tuple.Dport)
 		t.Proto = event.Tuple.L4Proto
+		t.Flags = event.Tuple.TCPFlag.String()
 		d.Tuple = t
 	}
 
@@ -271,11 +273,17 @@ func getAddrByArch(event *Event, o *output) (addr uint64) {
 	return addr
 }
 
-func getTupleData(event *Event) (tupleData string) {
+func getTupleData(event *Event, outputTCPFlags bool) (tupleData string) {
+	var l4Info string
+	if event.Tuple.L4Proto == syscall.IPPROTO_TCP && event.Tuple.TCPFlag != 0 && outputTCPFlags {
+		l4Info = fmt.Sprintf("%s:%s", protoToStr(event.Tuple.L4Proto), event.Tuple.TCPFlag)
+	} else {
+		l4Info = protoToStr(event.Tuple.L4Proto)
+	}
 	tupleData = fmt.Sprintf("%s:%d->%s:%d(%s)",
 		addrToStr(event.Tuple.L3Proto, event.Tuple.Saddr), byteorder.NetworkToHost16(event.Tuple.Sport),
 		addrToStr(event.Tuple.L3Proto, event.Tuple.Daddr), byteorder.NetworkToHost16(event.Tuple.Dport),
-		protoToStr(event.Tuple.L4Proto))
+		l4Info)
 	return tupleData
 }
 
@@ -432,7 +440,7 @@ func (o *output) Print(event *Event) {
 	}
 
 	if o.flags.OutputTuple {
-		fprintWithPadding(o.writer, getTupleData(event), &maxTupleLengthSeen)
+		fprintWithPadding(o.writer, getTupleData(event, o.flags.OutputTCPFlags), &maxTupleLengthSeen)
 	}
 
 	if o.flags.OutputCaller {
@@ -499,7 +507,7 @@ func addrToStr(proto uint16, addr [16]byte) string {
 	}
 }
 
-// getKFreeSKBReasons dervices SKB drop reasons from the "skb_drop_reason" enum
+// getKFreeSKBReasons derives SKB drop reasons from the "skb_drop_reason" enum
 // defined in /include/net/dropreason.h.
 func getKFreeSKBReasons(spec *btf.Spec) (map[uint64]string, error) {
 	if _, err := spec.AnyTypeByName("kfree_skb_reason"); err != nil {
