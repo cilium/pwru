@@ -115,6 +115,30 @@ func (f *Flags) Parse() {
 	}
 }
 
+type tcpFlag uint8
+
+func (f tcpFlag) String() string {
+	tcpFlags := []string{
+		"FIN",
+		"SYN",
+		"RST",
+		"PSH",
+		"ACK",
+		"URG",
+		"ECE",
+		"CWR",
+	}
+
+	var flags []string
+	for i, flag := range tcpFlags {
+		if f&(1<<uint(i)) != 0 {
+			flags = append(flags, flag)
+		}
+	}
+
+	return strings.Join(flags, "|")
+}
+
 type Tuple struct {
 	Saddr   [16]byte
 	Daddr   [16]byte
@@ -122,7 +146,7 @@ type Tuple struct {
 	Dport   uint16
 	L3Proto uint16
 	L4Proto uint8
-	Pad     uint8
+	TCPFlag tcpFlag
 }
 
 type Meta struct {
