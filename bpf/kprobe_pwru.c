@@ -31,8 +31,6 @@
 const static bool TRUE = true;
 const static u32 ZERO = 0;
 
-volatile const __u64 BPF_PROG_ADDR = 0;
-
 enum {
 	TRACKED_BY_FILTER = (1 << 0),
 	TRACKED_BY_SKB = (1 << 1),
@@ -683,6 +681,90 @@ int BPF_PROG(fexit_skb_copy, struct sk_buff *old, gfp_t mask, struct sk_buff *ne
 	return BPF_OK;
 }
 
+#ifdef bpf_target_arm64
+/* As R10 of bpf is not A64_FP, we need to detect the FP of trampoline
+ * by scanning the stacks of current bpf prog and the trampoline.
+ *
+ * Since commit 5d4fa9ec5643 ("bpf, arm64: Avoid blindly saving/restoring all callee-saved registers"),
+ * the number of callee-saved registers saved in the bpf prog prologue is
+ * dynamic, not fixed anymore.
+ */
+static __always_inline u64
+detect_tramp_fp(void) {
+	static const int range_of_detection = 256;
+	u64 fp, r10;
+
+	r10 = get_tracing_fp(); /* R10 of current bpf prog */
+	for (int i = 6; i >= 0; i--) {
+		bpf_probe_read_kernel(&fp, sizeof(fp), (void *) (r10 + i * 16));
+		if (r10 < fp && fp < r10 + range_of_detection)
+			return fp;
+	}
+
+	return r10;
+}
+#endif
+
+static __always_inline u64
+get_func_ip(void) {
+	u64 fp_tramp, ip;
+
+#if defined(bpf_target_x86)
+	static const int ip_offset = 5/* sizeof callq insn */;
+	u64 fp;
+#elif defined(bpf_target_arm64)
+	/* Ref: commit b2ad54e1533e ("bpf, arm64: Implement bpf_arch_text_poke() for arm64") */
+	static const int ip_offset = 12/* sizeof 3 insns */;
+#else
+#error Unsupported architecture
+#endif
+
+	/* Stack layout on x86:
+	 * +-----+ FP of tracee's caller
+	 * | ... |
+	 * | rip | IP of tracee's caller
+	 * | rip | IP of tracee
+	 * | rbp | FP of tracee's caller
+	 * +-----+ FP of trampoline
+	 * | ... |
+	 * | rip | IP of trampoline
+	 * | rbp | FP of trampoline
+	 * +-----+ FP of current prog
+	 * | ... |
+	 * +-----+ SP of current prog
+	 *
+	 * Stack layout on arm64:
+	 * |  r9  |
+	 * |  fp  | FP of tracee's caller
+	 * |  lr  | IP of tracee
+	 * |  fp  | FP of tracee
+	 * +------+ FP of trampoline  <-------+
+	 * |  ..  | padding                   |
+	 * |  ..  | callee saved regs         |
+	 * | retv | retval of tracee          |
+	 * | regs | regs of tracee            |
+	 * | nreg | number of regs            |
+	 * |  ip  | IP of tracee if needed    | possible range of
+	 * | rctx | bpf_tramp_run_ctx         | detection
+	 * |  lr  | IP of trampoline          |
+	 * |  fp  | FP of trampoline  <--------- detect it
+	 * +------+ FP of current prog        |
+	 * | regs | callee saved regs         |
+	 * +------+ R10 of bpf prog   <-------+
+	 * |  ..  |
+	 * +------+ SP of current prog
+	 */
+
+#if defined(bpf_target_x86)
+	fp = get_tracing_fp(); /* FP of current prog */
+	bpf_probe_read_kernel(&fp_tramp, sizeof(fp_tramp), (void *)fp); /* FP of trampoline */
+#elif defined(bpf_target_arm64)
+	fp_tramp = detect_tramp_fp(); /* FP of trampoline */
+#endif
+	bpf_probe_read_kernel(&ip, sizeof(ip), (void *)(fp_tramp + 8)); /* IP of tracee */
+	return ip - ip_offset;
+}
+
 SEC("fentry/tc")
 int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 	struct event_t event = {};
@@ -691,7 +773,7 @@ int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 		return BPF_OK;
 
 	event.skb_addr = (u64) skb;
-	event.addr = BPF_PROG_ADDR;
+	event.addr = get_func_ip();
 	event.type = EVENT_TYPE_TC;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
@@ -799,7 +881,7 @@ cont:
 	event.ts = bpf_ktime_get_ns();
 	event.cpu_id = bpf_get_smp_processor_id();
 	event.skb_addr = (u64) &xdp;
-	event.addr = BPF_PROG_ADDR;
+	event.addr = get_func_ip();
 	event.type = EVENT_TYPE_XDP;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
