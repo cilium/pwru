@@ -31,6 +31,8 @@
 const static bool TRUE = true;
 const static u32 ZERO = 0;
 
+const volatile u32 ENDBR_INSN_SIZE = 0;
+
 enum {
 	TRACKED_BY_FILTER = (1 << 0),
 	TRACKED_BY_SKB = (1 << 1),
@@ -585,6 +587,25 @@ cont:
 	return true;
 }
 
+static __always_inline u64 get_func_ip(void);
+
+static __always_inline u64
+get_addr(void *ctx, const bool is_kprobe, const bool has_get_func_ip) {
+	u64 ip;
+
+	if (has_get_func_ip) {
+		ip = bpf_get_func_ip(ctx); /* endbr has been handled in helper. */
+	} else {
+		ip = is_kprobe ? PT_REGS_IP((struct pt_regs *) ctx) : get_func_ip();
+#ifdef bpf_target_x86
+		ip -= ENDBR_INSN_SIZE;
+		ip -= is_kprobe; /* -1 always on x86 if kprobe. */
+#endif
+	}
+
+	return ip;
+}
+
 static __always_inline int
 kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, const bool has_get_func_ip,
 	   u64 *_stackid, const bool kprobe_multi) {
@@ -594,7 +615,7 @@ kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, const bool has_get_func_ip,
 		return BPF_OK;
 
 	event.skb_addr = (u64) skb;
-	event.addr = has_get_func_ip ? bpf_get_func_ip(ctx) : PT_REGS_IP(ctx);
+	event.addr = get_addr(ctx, true, has_get_func_ip);
 	event.type = kprobe_multi ? EVENT_TYPE_KPROBE_MULTI: EVENT_TYPE_KPROBE;
 	event.param_second = PT_REGS_PARM2(ctx);
 	event.param_third = PT_REGS_PARM3(ctx);
@@ -773,7 +794,7 @@ int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 		return BPF_OK;
 
 	event.skb_addr = (u64) skb;
-	event.addr = get_func_ip();
+	event.addr = get_addr(ctx, false, false);
 	event.type = EVENT_TYPE_TC;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
@@ -881,7 +902,7 @@ cont:
 	event.ts = bpf_ktime_get_ns();
 	event.cpu_id = bpf_get_smp_processor_id();
 	event.skb_addr = (u64) &xdp;
-	event.addr = get_func_ip();
+	event.addr = get_addr(ctx, false, false);
 	event.type = EVENT_TYPE_XDP;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
