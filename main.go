@@ -107,7 +107,7 @@ func main() {
 	}
 	// If --filter-trace-tc/--filter-trace-xdp, it's to retrieve and print bpf
 	// prog's name.
-	addr2name, name2addr, err := pwru.ParseKallsyms(funcs, flags.OutputStack ||
+	addr2name, err := pwru.ParseKallsyms(funcs, flags.OutputStack ||
 		len(flags.KMods) != 0 || flags.FilterTraceTc || flags.FilterTraceXdp ||
 		len(flags.FilterNonSkbFuncs) > 0 || flags.OutputCaller || flags.FilterTrackBpfHelpers)
 	if err != nil {
@@ -235,14 +235,14 @@ func main() {
 
 	traceTc := false
 	if flags.FilterTraceTc {
-		t := pwru.TraceTC(coll, bpfSpecFentryTc, &opts, flags.OutputSkb, flags.OutputShinfo, name2addr)
+		t := pwru.TraceTC(coll, bpfSpecFentryTc, &opts)
 		defer t.Detach()
 		traceTc = t.HaveTracing()
 	}
 
 	traceXdp := false
 	if flags.FilterTraceXdp {
-		t := pwru.TraceXDP(coll, bpfSpecFentryXdp, &opts, flags.OutputSkb, flags.OutputShinfo, name2addr)
+		t := pwru.TraceXDP(coll, bpfSpecFentryXdp, &opts)
 		defer t.Detach()
 		traceXdp = t.HaveTracing()
 	}
