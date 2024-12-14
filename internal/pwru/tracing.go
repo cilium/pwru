@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"runtime"
 	"sync"
 
 	"github.com/cilium/ebpf"
@@ -105,6 +106,25 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	opts *ebpf.CollectionOptions, progs []*ebpf.Program, tracingName string,
 ) error {
+	if len(progs) == 0 {
+		return nil
+	}
+
+	if runtime.GOARCH == "amd64" {
+		haveEndbr, err := haveEndbrInsn(progs[0])
+		if err != nil {
+			return fmt.Errorf("failed to check if the program has ENDBR instruction: %w", err)
+		}
+
+		endbrInsnSize := uint32(0)
+		if haveEndbr {
+			endbrInsnSize = 4
+		}
+		if err := spec.Variables["ENDBR_INSN_SIZE"].Set(endbrInsnSize); err != nil {
+			return fmt.Errorf("failed to set ENDBR_INSN_SIZE: %w", err)
+		}
+	}
+
 	// Reusing maps from previous collection is to handle the events together
 	// with the kprobes.
 	replacedMaps := maps.Clone(coll.Maps)
