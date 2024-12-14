@@ -62,10 +62,9 @@ func (t *tracing) addLink(l link.Link) {
 }
 
 func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
-	opts *ebpf.CollectionOptions, prog *ebpf.Program, n2a BpfProgName2Addr,
-	tracingName string,
+	opts *ebpf.CollectionOptions, prog *ebpf.Program, tracingName string,
 ) error {
-	entryFn, _, _, err := getBpfProgInfo(prog)
+	entryFn, err := getBpfProgInfo(prog)
 	if err != nil {
 		if errors.Is(err, errNotFound) {
 			log.Printf("Skip tracing bpf prog %s because cannot find its entry function name", prog)
@@ -104,8 +103,7 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 }
 
 func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
-	opts *ebpf.CollectionOptions, outputSkb bool, outputShinfo bool,
-	n2a BpfProgName2Addr, progs []*ebpf.Program, tracingName string,
+	opts *ebpf.CollectionOptions, progs []*ebpf.Program, tracingName string,
 ) error {
 	// Reusing maps from previous collection is to handle the events together
 	// with the kprobes.
@@ -118,7 +116,7 @@ func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	for _, prog := range progs {
 		prog := prog
 		errg.Go(func() error {
-			return t.traceProg(spec, opts, prog, n2a, tracingName)
+			return t.traceProg(spec, opts, prog, tracingName)
 		})
 	}
 
@@ -130,10 +128,7 @@ func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	return nil
 }
 
-func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
-	opts *ebpf.CollectionOptions, outputSkb bool, outputShinfo bool,
-	n2a BpfProgName2Addr,
-) *tracing {
+func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec, opts *ebpf.CollectionOptions) *tracing {
 	log.Printf("Attaching tc-bpf progs...\n")
 
 	progs, err := listBpfProgs(ebpf.SchedCLS)
@@ -145,17 +140,14 @@ func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	t.progs = progs
 	t.links = make([]link.Link, 0, len(progs))
 
-	if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, progs, "fentry_tc"); err != nil {
+	if err := t.trace(coll, spec, opts, progs, "fentry_tc"); err != nil {
 		log.Fatalf("failed to trace TC progs: %v", err)
 	}
 
 	return &t
 }
 
-func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
-	opts *ebpf.CollectionOptions, outputSkb bool, outputShinfo bool,
-	n2a BpfProgName2Addr,
-) *tracing {
+func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec, opts *ebpf.CollectionOptions) *tracing {
 	log.Printf("Attaching xdp progs...\n")
 
 	progs, err := listBpfProgs(ebpf.XDP)
@@ -170,7 +162,7 @@ func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	{
 		spec := spec.Copy()
 		delete(spec.Programs, "fexit_xdp")
-		if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, progs, "fentry_xdp"); err != nil {
+		if err := t.trace(coll, spec, opts, progs, "fentry_xdp"); err != nil {
 			log.Fatalf("failed to trace XDP progs: %v", err)
 		}
 	}
@@ -178,7 +170,7 @@ func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	{
 		spec := spec.Copy()
 		delete(spec.Programs, "fentry_xdp")
-		if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, progs, "fexit_xdp"); err != nil {
+		if err := t.trace(coll, spec, opts, progs, "fexit_xdp"); err != nil {
 			log.Fatalf("failed to trace XDP progs: %v", err)
 		}
 	}
