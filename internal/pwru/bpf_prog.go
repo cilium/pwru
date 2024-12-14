@@ -13,8 +13,6 @@ import (
 
 var errNotFound = errors.New("not found")
 
-type BpfProgName2Addr map[string]uint64
-
 func listBpfProgs(typ ebpf.ProgramType) ([]*ebpf.Program, error) {
 	var (
 		id  ebpf.ProgramID
@@ -42,7 +40,7 @@ func listBpfProgs(typ ebpf.ProgramType) ([]*ebpf.Program, error) {
 	return progs, nil
 }
 
-func getBpfProgInfo(prog *ebpf.Program) (entryFuncName, progName, tag string, err error) {
+func getBpfProgInfo(prog *ebpf.Program) (entryFuncName string, err error) {
 	info, err := prog.Info()
 	if err != nil {
 		err = fmt.Errorf("failed to get program info: %w", err)
@@ -67,7 +65,7 @@ func getBpfProgInfo(prog *ebpf.Program) (entryFuncName, progName, tag string, er
 	for _, insn := range insns {
 		sym := insn.Symbol()
 		if sym != "" {
-			return sym, info.Name, info.Tag, nil
+			return sym, nil
 		}
 	}
 
