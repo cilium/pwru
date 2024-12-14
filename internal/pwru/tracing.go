@@ -65,7 +65,7 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 	opts *ebpf.CollectionOptions, prog *ebpf.Program, n2a BpfProgName2Addr,
 	tracingName string,
 ) error {
-	entryFn, progName, tag, err := getBpfProgInfo(prog)
+	entryFn, _, _, err := getBpfProgInfo(prog)
 	if err != nil {
 		if errors.Is(err, errNotFound) {
 			log.Printf("Skip tracing bpf prog %s because cannot find its entry function name", prog)
@@ -74,28 +74,7 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 		return fmt.Errorf("failed to get entry function name: %w", err)
 	}
 
-	// The addr may hold the wrong rip value, because two addresses could
-	// have one same symbol. As discussed before, that doesn't affect the
-	// symbol resolution because even a "wrong" rip can be matched to the
-	// right symbol. However, this could make a difference when we want to
-	// distinguish which exact bpf prog is called.
-	//   -- @jschwinger233
-
-	progKsym := fmt.Sprintf("bpf_prog_%s_%s[bpf]", tag, entryFn)
-	addr, ok := n2a[progKsym]
-	if !ok {
-		progKsym = fmt.Sprintf("bpf_prog_%s_%s[bpf]", tag, progName)
-		addr, ok = n2a[progKsym]
-		if !ok {
-			return fmt.Errorf("failed to find address for function %s of bpf prog %v", progName, prog)
-		}
-	}
-
 	spec = spec.Copy()
-	if err := spec.Variables["BPF_PROG_ADDR"].Set(addr); err != nil {
-		return fmt.Errorf("failed to set bpf prog addr: %w", err)
-	}
-
 	spec.Programs[tracingName].AttachTarget = prog
 	spec.Programs[tracingName].AttachTo = entryFn
 	coll, err := ebpf.NewCollectionWithOptions(spec, *opts)
