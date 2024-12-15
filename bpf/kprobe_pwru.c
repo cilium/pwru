@@ -471,6 +471,24 @@ get_tracing_fp(void)
 	return fp;
 }
 
+#ifdef bpf_target_arm64
+static __always_inline u64 detect_tramp_fp(void);
+#endif
+
+static __always_inline u64
+get_tramp_fp(void) {
+	u64 fp_tramp = 0;
+
+#ifdef bpf_target_x86
+	u64 fp = get_tracing_fp();
+	bpf_probe_read_kernel(&fp_tramp, sizeof(fp_tramp), (void *) fp);
+#elif defined(bpf_target_arm64)
+	fp_tramp = detect_tramp_fp();
+#endif
+
+	return fp_tramp;
+}
+
 static __always_inline u64
 get_kprobe_fp(struct pt_regs *ctx)
 {
@@ -480,7 +498,7 @@ get_kprobe_fp(struct pt_regs *ctx)
 static __always_inline u64
 get_stackid(void *ctx, const bool is_kprobe) {
 	u64 caller_fp;
-	u64 fp = is_kprobe ? get_kprobe_fp(ctx) : get_tracing_fp();
+	u64 fp = is_kprobe ? get_kprobe_fp(ctx) : get_tramp_fp();
 	for (int depth = 0; depth < MAX_STACK_DEPTH; depth++) {
 		if (bpf_probe_read_kernel(&caller_fp, sizeof(caller_fp), (void *)fp) < 0)
 			break;
