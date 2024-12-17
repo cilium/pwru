@@ -107,7 +107,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 						if strct.Name == "sk_buff" && i <= 5 {
 							name := fnName
 							if kprobeMulti && it.kmod != "" {
-								name = fmt.Sprintf("%s [%s]", fnName, it.kmod)
+								name = fmt.Sprintf("%s[%s]", fnName, it.kmod)
 							}
 							funcs[name] = i
 							continue
