@@ -36,9 +36,10 @@ const (
 var Version string = "version unknown"
 
 type FilterCfg struct {
-	FilterNetns   uint32
-	FilterMark    uint32
-	FilterIfindex uint32
+	FilterNetns    uint32
+	FilterMark     uint32
+	FilterMarkMask uint32
+	FilterIfindex  uint32
 
 	OutputFlags uint8
 	FilterFlags uint8
@@ -49,7 +50,8 @@ type FilterCfg struct {
 
 func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	cfg = FilterCfg{
-		FilterMark: flags.FilterMark,
+		FilterMark:     flags.FilterMark,
+		FilterMarkMask: flags.FilterMarkMask,
 	}
 	cfg.FilterFlags |= IsSetMask
 	if flags.OutputSkb {
