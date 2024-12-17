@@ -7,6 +7,7 @@ package pwru
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	flag "github.com/spf13/pflag"
@@ -27,6 +28,7 @@ type Flags struct {
 
 	FilterNetns             string
 	FilterMark              uint32
+	FilterMarkMask          uint32
 	FilterFunc              string
 	FilterNonSkbFuncs       []string
 	FilterTrackSkb          bool
@@ -67,7 +69,7 @@ func (f *Flags) SetFlags() {
 	flag.StringVar(&f.FilterFunc, "filter-func", "", "filter kernel functions to be probed by name (exact match, supports RE2 regular expression)")
 	flag.StringSliceVar(&f.FilterNonSkbFuncs, "filter-non-skb-funcs", nil, "filter non-skb kernel functions to be probed (--filter-track-skb-by-stackid will be enabled)")
 	flag.StringVar(&f.FilterNetns, "filter-netns", "", "filter netns (\"/proc/<pid>/ns/net\", \"inode:<inode>\")")
-	flag.Uint32Var(&f.FilterMark, "filter-mark", 0, "filter skb mark")
+	flag.Var(newMarkFlagValue(&f.FilterMark, &f.FilterMarkMask), "filter-mark", "filter skb mark (format: mark[/mask], e.g., 0xa00/0xf00)")
 	flag.BoolVar(&f.FilterTrackSkb, "filter-track-skb", false, "trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)")
 	flag.BoolVar(&f.FilterTrackSkbByStackid, "filter-track-skb-by-stackid", false, "trace a packet even after it is kfreed (e.g., traffic going through bridge)")
 	flag.BoolVar(&f.FilterTraceTc, "filter-trace-tc", false, "trace TC bpf progs")
@@ -154,4 +156,59 @@ type Event struct {
 	ParamSecond   uint64
 	ParamThird    uint64
 	CPU           uint32
+}
+
+type markFlagValue struct {
+	mark *uint32
+	mask *uint32
+}
+
+func newMarkFlagValue(mark, mask *uint32) *markFlagValue {
+	return &markFlagValue{mark: mark, mask: mask}
+}
+
+func (f *markFlagValue) String() string {
+	if *f.mask == 0 {
+		return fmt.Sprintf("0x%x", *f.mark)
+	}
+	return fmt.Sprintf("0x%x/0x%x", *f.mark, *f.mask)
+}
+
+func (f *markFlagValue) Set(value string) error {
+	parts := strings.Split(value, "/")
+	
+	mark, err := parseUint32HexOrDecimal(parts[0])
+	if err != nil {
+		return fmt.Errorf("invalid mark value: %v", err)
+	}
+	*f.mark = mark
+	*f.mask = 0xffffffff
+
+	if len(parts) > 1 {
+		mask, err := parseUint32HexOrDecimal(parts[1])
+		if err != nil {
+			return fmt.Errorf("invalid mask value: %v", err)
+		}
+		*f.mask = mask
+	}
+	
+	return nil
+}
+
+func (f *markFlagValue) Type() string {
+	return "mark[/mask]"
+}
+
+func parseUint32HexOrDecimal(s string) (uint32, error) {
+	base := 10
+	if strings.HasPrefix(strings.ToLower(s), "0x") {
+		s = s[2:]
+		base = 16
+	}
+	
+	val, err := strconv.ParseUint(s, base, 32)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(val), nil
 }

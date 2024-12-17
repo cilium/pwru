@@ -136,6 +136,7 @@ struct {
 struct config {
 	u32 netns;
 	u32 mark;
+	u32 mask;
 	u32 ifindex;
 	u8 output_meta: 1;
 	u8 output_tuple: 1;
@@ -218,7 +219,7 @@ filter_meta(struct sk_buff *skb) {
 	if (cfg->netns && get_netns(skb) != cfg->netns) {
 			return false;
 	}
-	if (cfg->mark && BPF_CORE_READ(skb, mark) != cfg->mark) {
+	if (cfg->mark && cfg->mask && (BPF_CORE_READ(skb, mark) & cfg->mask) != cfg->mark) {
 		return false;
 	}
 	if (cfg->ifindex != 0 && BPF_CORE_READ(skb, dev, ifindex) != cfg->ifindex) {
