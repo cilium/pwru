@@ -98,6 +98,11 @@ func main() {
 		useKprobeMulti = true
 	}
 
+	// If --filter-trace-only-bpf is set, then trace only TC and XDP
+	if flags.FilterTraceOnlyBpf {
+		flags.FilterTraceTc = true
+		flags.FilterTraceXdp = true
+	}
 	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods, useKprobeMulti)
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
