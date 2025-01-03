@@ -31,9 +31,10 @@ import (
 const absoluteTS string = "15:04:05.000"
 
 const (
-	eventTypeKprobe     = 0
-	eventTypeTracingTc  = 1
-	eventTypeTracingXdp = 2
+	eventTypeKprobe = iota
+	eventTypeKprobeMulti
+	eventTypeTracingTc
+	eventTypeTracingXdp
 )
 
 type output struct {
@@ -261,7 +262,7 @@ func getAddrByArch(event *Event, o *output) (addr uint64) {
 	switch runtime.GOARCH {
 	case "amd64":
 		addr = event.Addr
-		if !o.kprobeMulti && event.Type == eventTypeKprobe {
+		if event.Type == eventTypeKprobe {
 			addr -= 1
 		}
 	case "arm64":

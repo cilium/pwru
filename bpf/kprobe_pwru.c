@@ -68,9 +68,10 @@ struct tuple {
 } __attribute__((packed));
 
 enum event_type {
-	EVENT_TYPE_KPROBE = 0,
-	EVENT_TYPE_TC     = 1,
-	EVENT_TYPE_XDP    = 2,
+	EVENT_TYPE_KPROBE	= 0,
+	EVENT_TYPE_KPROBE_MULTI	= 1,
+	EVENT_TYPE_TC		= 2,
+	EVENT_TYPE_XDP		= 3,
 };
 
 struct event_t {
@@ -515,7 +516,8 @@ cont:
 }
 
 static __always_inline int
-kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, const bool has_get_func_ip, u64 *_stackid) {
+kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, const bool has_get_func_ip,
+	   u64 *_stackid, const bool kprobe_multi) {
 	struct event_t event = {};
 
 	if (!handle_everything(skb, ctx, &event, _stackid, true))
@@ -523,28 +525,30 @@ kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, const bool has_get_func_ip,
 
 	event.skb_addr = (u64) skb;
 	event.addr = has_get_func_ip ? bpf_get_func_ip(ctx) : PT_REGS_IP(ctx);
+	event.type = kprobe_multi ? EVENT_TYPE_KPROBE_MULTI: EVENT_TYPE_KPROBE;
 	event.param_second = PT_REGS_PARM2(ctx);
 	event.param_third = PT_REGS_PARM3(ctx);
 	if (CFG.output_caller)
 		bpf_probe_read_kernel(&event.caller_addr, sizeof(event.caller_addr), (void *)PT_REGS_SP(ctx));
+
 
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
 	return BPF_OK;
 }
 
-#define PWRU_ADD_KPROBE(X)                                                  \
-  SEC("kprobe/skb-" #X)                                                     \
-  int kprobe_skb_##X(struct pt_regs *ctx) {                                 \
-    struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM##X(ctx);          \
-    return kprobe_skb(skb, ctx, false, NULL);                               \
-  }                                                                         \
-                                                                            \
-  SEC("kprobe.multi/skb-" #X)                                               \
-  int kprobe_multi_skb_##X(struct pt_regs *ctx) {                           \
-    struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM##X(ctx);          \
-    return kprobe_skb(skb, ctx, true, NULL);                                \
-  }
+#define PWRU_ADD_KPROBE(X)							\
+SEC("kprobe/skb-" #X)								\
+	int kprobe_skb_##X(struct pt_regs *ctx) {				\
+		struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM##X(ctx);	\
+		return kprobe_skb(skb, ctx, false, NULL, false);		\
+	}									\
+										\
+	SEC("kprobe.multi/skb-" #X)						\
+	int kprobe_multi_skb_##X(struct pt_regs *ctx) {				\
+		struct sk_buff *skb = (struct sk_buff *) PT_REGS_PARM##X(ctx);	\
+		return kprobe_skb(skb, ctx, true, NULL, true);			\
+	}
 
 PWRU_ADD_KPROBE(1)
 PWRU_ADD_KPROBE(2)
@@ -560,7 +564,7 @@ int kprobe_skb_by_stackid(struct pt_regs *ctx) {
 
 	struct sk_buff **skb = bpf_map_lookup_elem(&stackid_skb, &stackid);
 	if (skb && *skb)
-		return kprobe_skb(*skb, ctx, false, &stackid);
+		return kprobe_skb(*skb, ctx, false, &stackid, false);
 
 	return BPF_OK;
 }
