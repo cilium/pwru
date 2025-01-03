@@ -139,6 +139,13 @@ func main() {
 		}
 	}
 
+	// Skip the skb funcs when --filter-trace-only-bpf is enabled
+	if flags.FilterTraceOnlyBpf {
+		for i := 1; i <= 5; i++ {
+			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_skb_%d", i))
+			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_multi_skb_%d", i))
+		}
+	}
 	for name, program := range bpfSpec.Programs {
 		// Skip the skb-tracking ones that should not inject pcap-filter.
 		switch name {
