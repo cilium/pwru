@@ -486,7 +486,7 @@ func (o *output) Print(event *Event) {
 		fmt.Fprintf(o.writer, " %s", getTuple(event.TunnelTuple, o.flags.OutputTCPFlags))
 	}
 
-	if event.PrintBpfmapId > 0 {
+	if o.flags.OutputBpfmap && event.PrintBpfmapId > 0 {
 		fmt.Fprintf(o.writer, "%s", getBpfMapData(event, o))
 	}
 
