@@ -1076,4 +1076,26 @@ int kprobe_bpf_map_update_elem(struct pt_regs *ctx) {
 	return BPF_OK;
 }
 
+SEC("kprobe/bpf_map_delete_elem")
+int kprobe_bpf_map_delete_elem(struct pt_regs *ctx) {
+	u64 stackid = get_stackid(ctx, true);
+
+	struct sk_buff **skb = bpf_map_lookup_elem(&stackid_skb, &stackid);
+	if (skb && *skb) {
+		struct event_t event = {};
+
+		event.addr = PT_REGS_IP(ctx);
+		if (!handle_everything(*skb, ctx, &event, &stackid, true))
+			return BPF_OK;
+
+		static struct print_bpfmap_value bpfmap = {};
+		set_common_bpfmap_info(ctx, &event.print_bpfmap_id, &bpfmap);
+
+		bpf_map_update_elem(&print_bpfmap_map, &event.print_bpfmap_id, &bpfmap, BPF_ANY);
+		bpf_map_push_elem(&events, &event, BPF_EXIST);
+	}
+
+	return BPF_OK;
+}
+
 char __license[] SEC("license") = "Dual BSD/GPL";
