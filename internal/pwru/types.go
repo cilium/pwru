@@ -5,6 +5,7 @@
 package pwru
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
@@ -193,6 +194,7 @@ type Event struct {
 	Timestamp     uint64
 	PrintSkbId    uint64
 	PrintShinfoId uint64
+	PrintBpfmapId uint64
 	Meta          Meta
 	Tuple         Tuple
 	TunnelTuple   Tuple
@@ -256,4 +258,20 @@ func parseUint32HexOrDecimal(s string) (uint32, error) {
 		return 0, err
 	}
 	return uint32(val), nil
+}
+
+type printBpfmapValue struct {
+	Id        uint32
+	Name      [16]byte
+	KeySize   uint32
+	ValueSize uint32
+	Key       [256]byte
+	Value     [256]byte
+}
+
+func (i *printBpfmapValue) String() string {
+	key := fmt.Sprintf("%s", hex.Dump(i.Key[:i.KeySize]))
+	value := fmt.Sprintf("%s", hex.Dump(i.Value[:i.ValueSize]))
+	return fmt.Sprintf("map_id: %d\nmap_name: %s\nkey(%d):\n%svalue(%d):\n%s",
+		i.Id, i.Name, i.KeySize, key, i.ValueSize, value)
 }
