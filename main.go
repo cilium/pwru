@@ -141,7 +141,8 @@ func main() {
 			"fexit_skb_copy",
 			"kprobe_veth_convert_skb_to_xdp_buff",
 			"kretprobe_veth_convert_skb_to_xdp_buff",
-			"fexit_xdp":
+			"fexit_xdp",
+			"kretprobe_bpf_map_lookup_elem":
 			continue
 		}
 		if name == "fentry_xdp" {
