@@ -98,7 +98,7 @@ func main() {
 		useKprobeMulti = true
 	}
 
-	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods, useKprobeMulti)
+	funcs, bpfmapFuncs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods, useKprobeMulti, false)
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
 	}
@@ -263,7 +263,7 @@ func main() {
 	}
 
 	if nonSkbFuncs := flags.FilterNonSkbFuncs; len(nonSkbFuncs) != 0 {
-		k := pwru.NewNonSkbFuncsKprober(nonSkbFuncs, funcs, coll)
+		k := pwru.NewNonSkbFuncsKprober(nonSkbFuncs, funcs, bpfmapFuncs, coll)
 		defer k.DetachKprobes()
 	}
 
