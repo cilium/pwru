@@ -458,8 +458,8 @@ func (o *output) Print(event *Event) {
 		fmt.Fprintf(o.writer, "%s", getShinfoData(event, o))
 	}
 
-	if event.PrintBpfmapId > 0 {
-		fmt.Fprintf(o.writer, "\n%s", getBpfMapData(event, o))
+	if o.flags.OutputBpfmap {
+		fmt.Fprintf(o.writer, "%s", getBpfMapData(event, o))
 	}
 
 	fmt.Fprintln(o.writer)
