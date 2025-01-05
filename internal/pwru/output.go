@@ -5,6 +5,8 @@
 package pwru
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,6 +45,7 @@ type output struct {
 	printSkbMap    *ebpf.Map
 	printShinfoMap *ebpf.Map
 	printStackMap  *ebpf.Map
+	printBpfmapMap *ebpf.Map
 	addr2name      Addr2Name
 	skbMetadata    []*SkbMetadata
 	xdpMetadata    []*SkbMetadata
@@ -92,7 +95,7 @@ func centerAlignString(s string, width int) string {
 	return fmt.Sprintf("%s%s%s", strings.Repeat(" ", leftPadding), s, strings.Repeat(" ", rightPadding))
 }
 
-func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap *ebpf.Map, addr2Name Addr2Name, skbMds, xdpMds []*SkbMetadata, kprobeMulti bool, btfSpec *btf.Spec) (*output, error) {
+func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap, printBpfmapMap *ebpf.Map, addr2Name Addr2Name, skbMds, xdpMds []*SkbMetadata, kprobeMulti bool, btfSpec *btf.Spec) (*output, error) {
 	writer := os.Stdout
 
 	if flags.OutputFile != "" {
@@ -122,6 +125,7 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap *ebpf.Ma
 		printSkbMap:    printSkbMap,
 		printShinfoMap: printShinfoMap,
 		printStackMap:  printStackMap,
+		printBpfmapMap: printBpfmapMap,
 		addr2name:      addr2Name,
 		skbMetadata:    skbMds,
 		xdpMetadata:    xdpMds,
@@ -482,6 +486,10 @@ func (o *output) Print(event *Event) {
 		fmt.Fprintf(o.writer, " %s", getTuple(event.TunnelTuple, o.flags.OutputTCPFlags))
 	}
 
+	if event.PrintBpfmapId > 0 {
+		fmt.Fprintf(o.writer, "%s", getBpfMapData(event, o))
+	}
+
 	fmt.Fprintln(o.writer)
 }
 
@@ -640,4 +648,18 @@ func getIfacesInNetNs(path string) (map[uint32]string, error) {
 	}
 
 	return ifaces, nil
+}
+
+func getBpfMapData(event *Event, o *output) (bpfMapData string) {
+	id := uint64(event.PrintBpfmapId)
+	b, err := o.printBpfmapMap.LookupBytes(&id)
+	if err != nil {
+		return ""
+	}
+	bpfmap := printBpfmapValue{}
+	if err = binary.Read(bytes.NewBuffer(b), byteorder.Native, &bpfmap); err != nil {
+		return ""
+	}
+	defer o.printBpfmapMap.Delete(&id)
+	return "\n" + bpfmap.String()
 }

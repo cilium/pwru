@@ -98,7 +98,7 @@ func main() {
 		useKprobeMulti = true
 	}
 
-	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods, useKprobeMulti)
+	funcs, bpfmapFuncs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods, useKprobeMulti, flags.OutputBpfmap)
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
 	}
@@ -150,7 +150,8 @@ func main() {
 			"fexit_skb_copy",
 			"kprobe_veth_convert_skb_to_xdp_buff",
 			"kretprobe_veth_convert_skb_to_xdp_buff",
-			"fexit_xdp":
+			"fexit_xdp",
+			"kretprobe_bpf_map_lookup_elem":
 			continue
 		case "fentry_xdp":
 			if err := libpcap.InjectL2Filter(program, flags.FilterPcap); err != nil {
@@ -290,7 +291,7 @@ func main() {
 	}
 
 	if nonSkbFuncs := flags.FilterNonSkbFuncs; len(nonSkbFuncs) != 0 {
-		k := pwru.NewNonSkbFuncsKprober(nonSkbFuncs, funcs, coll)
+		k := pwru.NewNonSkbFuncsKprober(nonSkbFuncs, funcs, bpfmapFuncs, coll)
 		defer k.DetachKprobes()
 	}
 
@@ -312,7 +313,8 @@ func main() {
 	printSkbMap := coll.Maps["print_skb_map"]
 	printShinfoMap := coll.Maps["print_shinfo_map"]
 	printStackMap := coll.Maps["print_stack_map"]
-	output, err := pwru.NewOutput(&flags, printSkbMap, printShinfoMap, printStackMap, addr2name, skbMds, xdpMds, useKprobeMulti, btfSpec)
+	printBpfmapMap := coll.Maps["print_bpfmap_map"]
+	output, err := pwru.NewOutput(&flags, printSkbMap, printShinfoMap, printStackMap, printBpfmapMap, addr2name, skbMds, xdpMds, useKprobeMulti, btfSpec)
 	if err != nil {
 		log.Fatalf("Failed to create outputer: %s", err)
 	}
