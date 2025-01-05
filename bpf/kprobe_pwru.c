@@ -174,6 +174,13 @@ struct {
 	__uint(value_size, MAX_STACK_DEPTH * sizeof(u64));
 } print_stack_map SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct event_t);
+} event_stash SEC(".maps");
+
 struct print_skb_value {
 	u32 len;
 	char str[PRINT_SKB_STR_SIZE];
@@ -1095,6 +1102,55 @@ int kprobe_bpf_map_delete_elem(struct pt_regs *ctx) {
 		bpf_map_push_elem(&events, &event, BPF_EXIST);
 	}
 
+	return BPF_OK;
+}
+
+SEC("kprobe/bpf_map_lookup_elem")
+int kprobe_bpf_map_lookup_elem(struct pt_regs *ctx) {
+	u64 stackid = get_stackid(ctx, true);
+
+	struct sk_buff **skb = bpf_map_lookup_elem(&stackid_skb, &stackid);
+	if (skb && *skb) {
+		struct event_t event = {};
+
+		event.addr = PT_REGS_IP(ctx);
+		if (!handle_everything(*skb, ctx, &event, &stackid, true))
+			return BPF_OK;
+
+		static struct print_bpfmap_value bpfmap = {};
+		set_common_bpfmap_info(ctx, &event.print_bpfmap_id, &bpfmap);
+
+		bpf_map_update_elem(&print_bpfmap_map, &event.print_bpfmap_id, &bpfmap, BPF_ANY);
+		bpf_map_update_elem(&event_stash, &ZERO, &event, BPF_ANY);
+	}
+
+	return BPF_OK;
+}
+
+SEC("kretprobe/bpf_map_lookup_elem")
+int kretprobe_bpf_map_lookup_elem(struct pt_regs *ctx) {
+	/* Two assumptions:
+	 * 1. CPU won't be preempted between kprobe and kretprobe of the same
+	 * lookup operation.
+	 * 2. Lookup won't be recursive.
+	 *
+	 * I believe both are true in the current implementation of BPF.
+	 * Therefore, using PERCPU array to stash the event is safe.
+	 */
+	struct event_t *event = bpf_map_lookup_elem(&event_stash, &ZERO);
+	if (!event)
+		return BPF_OK;
+
+	struct print_bpfmap_value *bpfmap = bpf_map_lookup_elem(&print_bpfmap_map,
+								   &event->print_bpfmap_id);
+	if (!bpfmap)
+		return BPF_OK;
+
+	bpf_probe_read_kernel(&bpfmap->value,
+			      sizeof(bpfmap->value),
+			      (void *)PT_REGS_RC(ctx));
+
+	bpf_map_push_elem(&events, event, BPF_EXIST);
 	return BPF_OK;
 }
 
