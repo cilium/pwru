@@ -643,6 +643,12 @@ cont:
 		bpf_map_update_elem(&skb_stackid, &skb, &stackid, BPF_ANY);
 	}
 
+	if (CFG.output_caller)
+		bpf_probe_read_kernel(&event->caller_addr,
+				      sizeof(event->caller_addr),
+				      (void *)PT_REGS_SP((struct pt_regs *)ctx));
+
+	event->skb_addr = skb_addr;
 	event->pid = bpf_get_current_pid_tgid() >> 32;
 	event->ts = bpf_ktime_get_ns();
 	event->cpu_id = bpf_get_smp_processor_id();
@@ -675,14 +681,10 @@ kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx,
 	if (!handle_everything(skb, ctx, &event, _stackid, true))
 		return BPF_OK;
 
-	event.skb_addr = (u64) skb;
 	event.addr = get_addr(ctx, true);
 	event.type = kprobe_multi ? EVENT_TYPE_KPROBE_MULTI: EVENT_TYPE_KPROBE;
 	event.param_second = PT_REGS_PARM2(ctx);
 	event.param_third = PT_REGS_PARM3(ctx);
-	if (CFG.output_caller)
-		bpf_probe_read_kernel(&event.caller_addr, sizeof(event.caller_addr), (void *)PT_REGS_SP(ctx));
-
 
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
@@ -868,7 +870,6 @@ int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 	if (!handle_everything(skb, ctx, &event, NULL, false))
 		return BPF_OK;
 
-	event.skb_addr = (u64) skb;
 	event.addr = get_addr(ctx, false);
 	event.type = EVENT_TYPE_TC;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
