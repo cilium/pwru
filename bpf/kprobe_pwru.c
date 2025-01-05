@@ -83,6 +83,7 @@ struct event_t {
 	u64 ts;
 	u64 print_skb_id;
 	u64 print_shinfo_id;
+	u64 print_bpfmap_id;
 	struct skb_meta meta;
 	struct tuple tuple;
 	s64 print_stack_id;
@@ -175,6 +176,14 @@ struct print_shinfo_value {
 	u32 len;
 	char str[PRINT_SHINFO_STR_SIZE];
 };
+struct print_bpfmap_value {
+	u32 id;
+	char name[16];
+	u32 key_size;
+	u32 value_size;
+	u8 key[256];
+	u8 value[256];
+} __attribute__((packed));
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
 	__uint(max_entries, 1);
@@ -199,6 +208,18 @@ struct {
 	__type(key, u64);
 	__type(value, struct print_shinfo_value);
 } print_shinfo_map SEC(".maps");
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, u32);
+} print_bpfmap_id_map SEC(".maps");
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__type(key, u64);
+	__type(value, struct print_bpfmap_value);
+} print_bpfmap_map SEC(".maps");
 
 static __always_inline u32
 get_netns(struct sk_buff *skb) {

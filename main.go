@@ -284,7 +284,8 @@ func main() {
 	printSkbMap := coll.Maps["print_skb_map"]
 	printShinfoMap := coll.Maps["print_shinfo_map"]
 	printStackMap := coll.Maps["print_stack_map"]
-	output, err := pwru.NewOutput(&flags, printSkbMap, printShinfoMap, printStackMap, addr2name, useKprobeMulti, btfSpec)
+	printBpfmapMap := coll.Maps["print_bpfmap_map"]
+	output, err := pwru.NewOutput(&flags, printSkbMap, printShinfoMap, printStackMap, printBpfmapMap, addr2name, useKprobeMulti, btfSpec)
 	if err != nil {
 		log.Fatalf("Failed to create outputer: %s", err)
 	}
