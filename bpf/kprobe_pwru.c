@@ -1037,4 +1037,43 @@ int kretprobe_veth_convert_skb_to_xdp_buff(struct pt_regs *ctx) {
 	return BPF_OK;
 }
 
+static __always_inline void
+set_common_bpfmap_info(struct pt_regs *ctx, u64 *event_id,
+		       struct print_bpfmap_value *bpfmap) {
+	struct bpf_map *map = (struct bpf_map *)PT_REGS_PARM1(ctx);
+
+	*event_id = sync_fetch_and_add(&print_bpfmap_id_map);
+	BPF_CORE_READ_INTO(&bpfmap->id, map, id);
+	BPF_CORE_READ_STR_INTO(&bpfmap->name, map, name);
+	BPF_CORE_READ_INTO(&bpfmap->key_size, map, key_size);
+	BPF_CORE_READ_INTO(&bpfmap->value_size, map, value_size);
+	bpf_probe_read_kernel(&bpfmap->key, sizeof(bpfmap->key), (void *)PT_REGS_PARM2(ctx));
+}
+
+SEC("kprobe/bpf_map_update_elem")
+int kprobe_bpf_map_update_elem(struct pt_regs *ctx) {
+	u64 stackid = get_stackid(ctx, true);
+
+	struct sk_buff **skb = bpf_map_lookup_elem(&stackid_skb, &stackid);
+	if (skb && *skb) {
+		struct event_t event = {};
+
+		event.addr = PT_REGS_IP(ctx);
+		if (!handle_everything(*skb, ctx, &event, &stackid, true))
+			return BPF_OK;
+
+
+		static struct print_bpfmap_value bpfmap = {};
+		set_common_bpfmap_info(ctx, &event.print_bpfmap_id, &bpfmap);
+		bpf_probe_read_kernel(&bpfmap.value,
+				      sizeof(bpfmap.value),
+				      (void *)PT_REGS_PARM3(ctx));
+
+		bpf_map_update_elem(&print_bpfmap_map, &event.print_bpfmap_id, &bpfmap, BPF_ANY);
+		bpf_map_push_elem(&events, &event, BPF_EXIST);
+	}
+
+	return BPF_OK;
+}
+
 char __license[] SEC("license") = "Dual BSD/GPL";
