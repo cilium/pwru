@@ -89,7 +89,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti, bpfma
 	for _, it := range iters {
 		for typ, err := range it.iter {
 			if err != nil {
-				return nil, fmt.Errorf("failed to iterate through btf types: %v", err)
+				return nil, nil, fmt.Errorf("failed to iterate through btf types: %v", err)
 			}
 
 			fn, ok := typ.(*btf.Func)

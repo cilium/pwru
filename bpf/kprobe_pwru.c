@@ -448,7 +448,7 @@ static __always_inline u64
 sync_fetch_and_add(void *id_map) {
 	u32 *id = bpf_map_lookup_elem(id_map, &ZERO);
 	if (id)
-		return ((*id)++) | ((u64)bpf_get_smp_processor_id() << 32);
+		return ((*id)++) | ((u64)(bpf_get_smp_processor_id() + 1) << 32);
 	return 0;
 }
 
