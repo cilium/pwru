@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
@@ -49,8 +50,9 @@ func getAvailableFilterFunctions() (map[string]struct{}, error) {
 	return availableFuncs, nil
 }
 
-func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) (Funcs, error) {
+func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti, bpfmap bool) (Funcs, map[string]*btf.FuncProto, error) {
 	funcs := Funcs{}
+	bpfmapFuncs := map[string]*btf.FuncProto{}
 
 	type iterator struct {
 		kmod string
@@ -59,7 +61,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 
 	reg, err := regexp.Compile(pattern)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile regular expression %v", err)
+		return nil, nil, fmt.Errorf("failed to compile regular expression %v", err)
 	}
 
 	var availableFuncs map[string]struct{}
@@ -73,13 +75,13 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 		path := filepath.Join("/sys/kernel/btf", module)
 		f, err := os.Open(path)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open %s: %v", path, err)
+			return nil, nil, fmt.Errorf("failed to open %s: %v", path, err)
 		}
 		defer f.Close()
 
 		modSpec, err := btf.LoadSplitSpecFromReader(f, spec)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load %s btf: %v", module, err)
+			return nil, nil, fmt.Errorf("failed to load %s btf: %v", module, err)
 		}
 		iters = append(iters, iterator{module, modSpec.All()})
 	}
@@ -112,6 +114,17 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 			fnProto := fn.Type.(*btf.FuncProto)
 			i := 1
 			for _, p := range fnProto.Params {
+				if bpfmap && i == 1 {
+					if ptr, ok := p.Type.(*btf.Pointer); ok {
+						if strct, ok := ptr.Target.(*btf.Struct); ok {
+							if strct.Name == "bpf_map" {
+								bpfmapFuncs[fnName] = fnProto
+							}
+						}
+					} else if strings.HasSuffix(p.Name, "map") && p.Type.TypeName() == "u64" {
+						bpfmapFuncs[fnName] = fnProto
+					}
+				}
 				if ptr, ok := p.Type.(*btf.Pointer); ok {
 					if strct, ok := ptr.Target.(*btf.Struct); ok {
 						if strct.Name == "sk_buff" && i <= 5 {
@@ -129,7 +142,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 		}
 	}
 
-	return funcs, nil
+	return funcs, bpfmapFuncs, nil
 }
 
 func GetFuncsByPos(funcs Funcs) map[int][]string {
