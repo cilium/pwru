@@ -51,6 +51,7 @@ type Flags struct {
 	OutputSkb        bool
 	OutputShinfo     bool
 	OutputStack      bool
+	OutputBpfmap     bool
 	OutputCaller     bool
 	OutputLimitLines uint64
 	OutputSkbCB      bool
@@ -100,6 +101,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputShinfo, "output-skb-shared-info", false, "print skb shared info")
 	flag.BoolVar(&f.OutputTunnel, "output-tunnel", false, "print encapsulated tunnel header data")
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
+	flag.BoolVar(&f.OutputBpfmap, "output-bpfmap", false, "print function arguments related to bpf maps")
 	flag.BoolVar(&f.OutputCaller, "output-caller", false, "print caller function name")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
 	flag.BoolVar(&f.OutputSkbCB, "output-skb-cb", false, "print skb->cb")
