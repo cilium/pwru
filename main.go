@@ -170,9 +170,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to get pwru config: %v", err)
 	}
-	if err := bpfSpec.RewriteConstants(map[string]interface{}{
-		"CFG": pwruConfig,
-	}); err != nil {
+	if err := bpfSpec.Variables["CFG"].Set(pwruConfig); err != nil {
 		log.Fatalf("Failed to rewrite config: %v", err)
 	}
 
