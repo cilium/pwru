@@ -70,7 +70,7 @@ jobs:
           test-name: ${{ matrix.kernel }}-basic-ipv4
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
           traffic-setup: |
-            iptables -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 --dport 8080 -j DROP
+            iptables -w 10 -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 --dport 8080 -j DROP
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.1:8080 || true
           expected-output-pattern: '1.0.0.1:8080.*(kfree_skb_reason|kfree_skb|sk_skb_reason_drop\b)'
 
@@ -90,7 +90,7 @@ jobs:
           test-name: ${{ matrix.kernel }}-advanced-ipv4
           pwru-pcap-filter: 'tcp[tcpflags] = tcp-syn'
           traffic-setup: |
-            iptables -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.2/32 --dport 8080 -j DROP
+            iptables -w 10 -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.2/32 --dport 8080 -j DROP
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.2:8080 || true
           expected-output-pattern: '1.0.0.2:8080.*(kfree_skb_reason|kfree_skb|sk_skb_reason_drop\b)'
 
@@ -119,7 +119,7 @@ jobs:
           pwru-flags: --filter-track-skb
           pwru-pcap-filter: dst host 10.10.20.99
           traffic-setup: |
-            iptables -t nat -I OUTPUT 1 -d 10.10.20.99/32 -j DNAT --to-destination 10.10.14.2
+            iptables -w 10 -t nat -I OUTPUT 1 -d 10.10.20.99/32 -j DNAT --to-destination 10.10.14.2
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://10.10.20.99:80 || true
           expected-output-pattern: '10.10.14.2:80'
 
