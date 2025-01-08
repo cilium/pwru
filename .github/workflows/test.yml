@@ -109,7 +109,7 @@ jobs:
         with:
           test-name: ${{ matrix.kernel }}-pcap-filter-stack
           pwru-pcap-filter: '(((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)'
-          traffic-setup: curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.1.1.1 || true
+          traffic-setup: curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.1.1.1 || true; sleep 5
           expected-output-pattern: '1.1.1.1:80'
 
       - name: Test --filter-track-skb
