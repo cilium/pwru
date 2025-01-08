@@ -155,7 +155,7 @@ struct config {
 	u32 shinfo_btf_id;
 } __attribute__((packed));
 
-static volatile const struct config CFG;
+volatile const struct config CFG;
 #define cfg (&CFG)
 
 #define MAX_STACK_DEPTH 50
