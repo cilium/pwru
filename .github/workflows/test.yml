@@ -54,6 +54,23 @@ jobs:
           name: pwru
           path: pwru
 
+      - name: Derive kernel version
+        id: kernel
+        run: |
+          if [[ "${{ matrix.kernel }}" == bpf-next* ]]; then
+            VSN="42.0"
+          else
+            VSN=$(echo -n ${{ matrix.kernel }} | cut -d- -f1)
+          fi
+
+          major=$(echo -n $VSN | cut -d. -f1)
+          minor=$(echo -n $VSN | cut -d. -f2)
+          if (( $minor < 10 )); then
+            minor="0${minor}"
+          fi
+
+          echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
+
       - name: Provision LVH VMs
         uses: cilium/little-vm-helper@97c89f004bd0ab4caeacfe92ebc956e13e362e6b # v0.0.19
         with:
@@ -151,6 +168,18 @@ jobs:
           traffic-setup: |
             ping -W1 -c1 127.0.0.1 || true
           expected-output-pattern: 'icmp'
+
+      - name: Test --backend=kprobe-multi
+        if: ${{ steps.kernel.outputs.vsn >= 518 }}
+        uses: ./.github/actions/pwru-test
+        with:
+          test-name: ${{ matrix.kernel }}-kprobe-multi-basic
+          pwru-flags: --backend=kprobe-multi
+          pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
+          traffic-setup: |
+            iptables -w 10 -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 --dport 8080 -j DROP
+            curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.1:8080 || true
+          expected-output-pattern: '1.0.0.1:8080.*(kfree_skb_reason|kfree_skb|sk_skb_reason_drop\b)'
 
       - name: Fetch artifacts
         if: ${{ !success() }}
