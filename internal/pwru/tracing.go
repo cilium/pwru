@@ -92,10 +92,8 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 	}
 
 	spec = spec.Copy()
-	if err := spec.RewriteConstants(map[string]any{
-		"BPF_PROG_ADDR": addr,
-	}); err != nil {
-		return fmt.Errorf("failed to rewrite bpf prog addr: %w", err)
+	if err := spec.Variables["BPF_PROG_ADDR"].Set(addr); err != nil {
+		return fmt.Errorf("failed to set bpf prog addr: %w", err)
 	}
 
 	spec.Programs[tracingName].AttachTarget = prog

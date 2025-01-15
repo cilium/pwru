@@ -30,7 +30,7 @@
 const static bool TRUE = true;
 const static u32 ZERO = 0;
 
-volatile const static __u64 BPF_PROG_ADDR = 0;
+volatile const __u64 BPF_PROG_ADDR = 0;
 
 enum {
 	TRACKED_BY_FILTER = (1 << 0),
