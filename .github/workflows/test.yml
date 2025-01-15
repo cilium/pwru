@@ -174,7 +174,7 @@ jobs:
         uses: ./.github/actions/pwru-test
         with:
           test-name: ${{ matrix.kernel }}-kprobe-multi-basic
-          pwru-flags: --backend=kprobe-multi
+          pwru-flags: --backend=kprobe-multi --filter-trace-tc --filter-track-bpf-helpers --filter-trace-xdp
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
           traffic-setup: |
             iptables -w 10 -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 --dport 8080 -j DROP
