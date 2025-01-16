@@ -117,7 +117,6 @@ func main() {
 	var opts ebpf.CollectionOptions
 	opts.Programs.KernelTypes = btfSpec
 	opts.Programs.LogLevel = ebpf.LogLevelInstruction
-	opts.Programs.LogSize = ebpf.DefaultVerifierLogSize * 100
 
 	bpfSpec, err := LoadKProbePWRU()
 	if err != nil {
