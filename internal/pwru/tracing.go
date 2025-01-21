@@ -92,9 +92,7 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 	}
 
 	spec = spec.Copy()
-	if err := spec.RewriteConstants(map[string]any{
-		"BPF_PROG_ADDR": addr,
-	}); err != nil {
+	if err := spec.Variables["BPF_PROG_ADDR"].Set(addr); err != nil {
 		return fmt.Errorf("failed to rewrite bpf prog addr: %w", err)
 	}
 
@@ -134,6 +132,7 @@ func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	// with the kprobes.
 	replacedMaps := maps.Clone(coll.Maps)
 	delete(replacedMaps, ".rodata")
+	delete(replacedMaps, ".bss")
 	opts.MapReplacements = replacedMaps
 
 	var errg errgroup.Group
