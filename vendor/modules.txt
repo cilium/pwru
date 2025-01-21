@@ -1,7 +1,7 @@
 # github.com/VividCortex/ewma v1.2.0
 ## explicit; go 1.12
 github.com/VividCortex/ewma
-# github.com/cheggaaa/pb/v3 v3.1.5
+# github.com/cheggaaa/pb/v3 v3.1.6
 ## explicit; go 1.17
 github.com/cheggaaa/pb/v3
 github.com/cheggaaa/pb/v3/termutil
@@ -27,7 +27,7 @@ github.com/cilium/ebpf/rlimit
 # github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
 ## explicit; go 1.16
 github.com/cloudflare/cbpfc
-# github.com/fatih/color v1.15.0
+# github.com/fatih/color v1.18.0
 ## explicit; go 1.17
 github.com/fatih/color
 # github.com/google/go-cmp v0.6.0
@@ -44,13 +44,13 @@ github.com/josharian/native
 ## explicit; go 1.20
 github.com/jsimonetti/rtnetlink
 github.com/jsimonetti/rtnetlink/internal/unix
-# github.com/mattn/go-colorable v0.1.13
-## explicit; go 1.15
+# github.com/mattn/go-colorable v0.1.14
+## explicit; go 1.18
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.19
+# github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
-# github.com/mattn/go-runewidth v0.0.15
+# github.com/mattn/go-runewidth v0.0.16
 ## explicit; go 1.9
 github.com/mattn/go-runewidth
 # github.com/mdlayher/netlink v1.7.2
