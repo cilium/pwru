@@ -2,37 +2,54 @@ package libpcap
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
 	"github.com/cloudflare/cbpfc"
 )
 
-func InjectL2Filter(program *ebpf.ProgramSpec, filterExpr string) (err error) {
-	return injectFilter(program, filterExpr, false)
+func InjectL2TunnelFilter(program *ebpf.ProgramSpec, filterExpr, l2TunnelFilterExpr string) (err error) {
+	return injectFilter(program, filterExpr, false, true)
 }
 
-func InjectFilters(program *ebpf.ProgramSpec, filterExpr string) (err error) {
-	if err = injectFilter(program, filterExpr, false); err != nil {
+func InjectL2Filter(program *ebpf.ProgramSpec, filterExpr string) (err error) {
+	return injectFilter(program, filterExpr, false, false)
+}
+
+func InjectFilters(program *ebpf.ProgramSpec, filterExpr, tunnelFilterExpr string) (err error) {
+	if err = injectFilter(program, filterExpr, false, false); err != nil {
 		return
 	}
-	if err = injectFilter(program, filterExpr, true); err != nil {
+	if err = injectFilter(program, filterExpr, true, false); err != nil {
 		// This could happen for l2 only filters such as "arp". In this
 		// case we don't want to exit with an error, but instead inject
 		// a deny-all filter to reject all l3 skbs.
-		return injectFilter(program, "__pwru_reject_all__", true)
+		return injectFilter(program, "__pwru_reject_all__", true, false)
 	}
-	return
+	// Attach any tunnel filters.
+	if err := injectFilter(program, tunnelFilterExpr, false, true); err != nil {
+		return fmt.Errorf("l2 tunnel filter: %w", err)
+	}
+	if err := injectFilter(program, tunnelFilterExpr, true, true); err != nil {
+		return fmt.Errorf("l3 tunnel filter: %w", err)
+	}
+	return nil
 }
 
-func injectFilter(program *ebpf.ProgramSpec, filterExpr string, l3 bool) (err error) {
+func injectFilter(program *ebpf.ProgramSpec, filterExpr string, l3 bool, tunnel bool) (err error) {
 	if filterExpr == "" {
 		return
 	}
 
-	suffix := "_l2"
+	tunnelSuffix := ""
+	if tunnel {
+		tunnelSuffix = "_tunnel"
+	}
+
+	suffix := tunnelSuffix + "_l2"
 	if l3 {
-		suffix = "_l3"
+		suffix = tunnelSuffix + "_l3"
 	}
 	injectIdx := -1
 	for idx, inst := range program.Instructions {
