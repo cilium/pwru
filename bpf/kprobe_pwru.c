@@ -85,6 +85,7 @@ struct event_t {
 	u64 print_shinfo_id;
 	struct skb_meta meta;
 	struct tuple tuple;
+	struct tuple tunnel_tuple;
 	s64 print_stack_id;
 	u64 param_second;
 	u64 param_third;
@@ -146,7 +147,7 @@ struct config {
 	u8 output_stack: 1;
 	u8 output_caller: 1;
 	u8 output_cb: 1;
-	u8 output_unused: 1;
+	u8 output_tunnel: 1;
 	u8 is_set: 1;
 	u8 track_skb: 1;
 	u8 track_skb_by_stackid: 1;
@@ -259,8 +260,47 @@ filter_pcap_l2(struct sk_buff *skb)
 	return filter_pcap_ebpf_l2((void *)skb, (void *)skb, (void *)skb, data, data_end);
 }
 
+static __noinline bool
+filter_pcap_ebpf_tunnel_l2(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
+{
+	return data != data_end && _skb == __skb && __skb == ___skb;
+}
+
+static __noinline bool
+filter_pcap_ebpf_tunnel_l3(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
+{
+	return data != data_end && _skb == __skb && __skb == ___skb;
+}
+
+static __always_inline bool
+filter_pcap_tunnel_l2(struct sk_buff *skb)
+{
+	u16 tunnel_l3_off = BPF_CORE_READ(skb, inner_network_header);
+	// If we don't have a tunnel network header, assume its not tunnel traffic.
+	// We'll let the injected pcap program handle figuring out the transport
+	// headers.
+	// Return true as the tunnel pcap should only filter on tunnel traffic.
+	if (tunnel_l3_off == 0)
+		return true;
+
+	void *skb_head = BPF_CORE_READ(skb, head);
+	void *data = skb_head;
+	void *data_end = skb_head + BPF_CORE_READ(skb, tail);
+
+	if (!filter_pcap_ebpf_tunnel_l2((void *)skb, (void *)skb, (void *)skb, 
+				 data + BPF_CORE_READ(skb, inner_mac_header), data_end)) {
+		return false;
+	}
+
+	return filter_pcap_ebpf_tunnel_l3((void *)skb, (void *)skb, (void *)skb, 
+				   data + BPF_CORE_READ(skb, inner_network_header), data_end);
+}
+
 static __always_inline bool
 filter_pcap(struct sk_buff *skb) {
+	if (!filter_pcap_tunnel_l2(skb)) {
+		return false;
+	}
 	if (BPF_CORE_READ(skb, mac_len) == 0)
 		return filter_pcap_l3(skb);
 	return filter_pcap_l2(skb);
@@ -334,6 +374,19 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 
 	bool is_ipv4 = ip_vsn == 4;
 	__set_tuple(tpl, skb_head, l3_off, is_ipv4);
+}
+
+static __always_inline void
+set_tunnel(struct sk_buff *skb, struct tuple *tpl, struct tuple *tunnel_tpl) {
+	u16 tunnel_l3_off = BPF_CORE_READ(skb, inner_network_header);
+	// If we don't have a tunnel network header, assume its not tunnel traffic.
+	if (tunnel_l3_off == 0)
+		return;
+	void *skb_head = BPF_CORE_READ(skb, head);
+	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + tunnel_l3_off);
+	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
+	bool is_ipv4 = ip_vsn == 4;
+	__set_tuple(tunnel_tpl, skb_head, tunnel_l3_off, is_ipv4);
 }
 
 static __always_inline u64
@@ -434,6 +487,10 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 
 	if (cfg->output_tuple) {
 		set_tuple(skb, &event->tuple);
+	}
+
+	if (cfg->output_tunnel) {
+		set_tunnel(skb, &event->tuple, &event->tunnel_tuple);
 	}
 
 	if (cfg->output_skb) {

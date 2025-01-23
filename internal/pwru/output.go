@@ -67,6 +67,7 @@ type jsonPrinter struct {
 	Len         uint32      `json:"len,omitempty"`
 	Cb          [5]uint32   `json:"cb,omitempty"`
 	Tuple       *jsonTuple  `json:"tuple,omitempty"`
+	TunnelTuple *jsonTuple  `json:"tunnel_tuple,omitempty"`
 	Stack       interface{} `json:"stack,omitempty"`
 	SkbMetadata interface{} `json:"skb_metadata,omitempty"`
 }
@@ -155,6 +156,9 @@ func (o *output) PrintHeader() {
 	if o.flags.OutputCaller {
 		fmt.Fprintf(o.writer, " %s", "CALLER")
 	}
+	if o.flags.OutputTunnel {
+		fmt.Fprintf(o.writer, " %s", "TUNNEL")
+	}
 	fmt.Fprintf(o.writer, "\n")
 }
 
@@ -207,6 +211,16 @@ func (o *output) PrintJson(event *Event) {
 		t.Proto = event.Tuple.L4Proto
 		t.Flags = event.Tuple.TCPFlag.String()
 		d.Tuple = t
+	}
+
+	if o.flags.OutputTuple {
+		t := &jsonTuple{}
+		t.Saddr = addrToStr(event.TunnelTuple.L3Proto, event.TunnelTuple.Saddr)
+		t.Daddr = addrToStr(event.TunnelTuple.L3Proto, event.TunnelTuple.Daddr)
+		t.Sport = byteorder.NetworkToHost16(event.TunnelTuple.Sport)
+		t.Dport = byteorder.NetworkToHost16(event.TunnelTuple.Dport)
+		t.Proto = event.TunnelTuple.L4Proto
+		d.TunnelTuple = t
 	}
 
 	if o.flags.OutputStack && event.PrintStackId > 0 {
@@ -273,18 +287,22 @@ func getAddrByArch(event *Event, o *output) (addr uint64) {
 	return addr
 }
 
-func getTupleData(event *Event, outputTCPFlags bool) (tupleData string) {
+func getTuple(tpl Tuple, outputTCPFlags bool) (tupleData string) {
 	var l4Info string
-	if event.Tuple.L4Proto == syscall.IPPROTO_TCP && event.Tuple.TCPFlag != 0 && outputTCPFlags {
-		l4Info = fmt.Sprintf("%s:%s", protoToStr(event.Tuple.L4Proto), event.Tuple.TCPFlag)
+	if tpl.L4Proto == syscall.IPPROTO_TCP && tpl.TCPFlag != 0 && outputTCPFlags {
+		l4Info = fmt.Sprintf("%s:%s", protoToStr(tpl.L4Proto), tpl.TCPFlag)
 	} else {
-		l4Info = protoToStr(event.Tuple.L4Proto)
+		l4Info = protoToStr(tpl.L4Proto)
 	}
 	tupleData = fmt.Sprintf("%s:%d->%s:%d(%s)",
-		addrToStr(event.Tuple.L3Proto, event.Tuple.Saddr), byteorder.NetworkToHost16(event.Tuple.Sport),
-		addrToStr(event.Tuple.L3Proto, event.Tuple.Daddr), byteorder.NetworkToHost16(event.Tuple.Dport),
+		addrToStr(tpl.L3Proto, tpl.Saddr), byteorder.NetworkToHost16(tpl.Sport),
+		addrToStr(tpl.L3Proto, tpl.Daddr), byteorder.NetworkToHost16(tpl.Dport),
 		l4Info)
 	return tupleData
+}
+
+func getTupleData(event *Event, outputTCPFlags bool) (tupleData string) {
+	return getTuple(event.Tuple, outputTCPFlags)
 }
 
 func getStackData(event *Event, o *output) (stackData string) {
@@ -460,6 +478,10 @@ func (o *output) Print(event *Event) {
 
 	if o.flags.OutputShinfo {
 		fmt.Fprintf(o.writer, "%s", getShinfoData(event, o))
+	}
+
+	if o.flags.OutputTunnel {
+		fmt.Fprintf(o.writer, " %s", getTuple(event.TunnelTuple, o.flags.OutputTCPFlags))
 	}
 
 	fmt.Fprintln(o.writer)

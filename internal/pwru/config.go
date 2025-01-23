@@ -23,6 +23,7 @@ const (
 	OutputStackMask
 	OutputCallerMask
 	OutputCbMask
+	OutputTunnelMask
 )
 
 const (
@@ -65,6 +66,9 @@ func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	}
 	if flags.OutputTuple {
 		cfg.OutputFlags |= OutputTupleMask
+	}
+	if flags.OutputTunnel {
+		cfg.OutputFlags |= OutputTunnelMask
 	}
 	if flags.OutputStack {
 		cfg.OutputFlags |= OutputStackMask
