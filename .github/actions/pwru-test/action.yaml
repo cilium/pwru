@@ -10,7 +10,10 @@ inputs:
   pwru-pcap-filter:
     required: false
     type: string
-  traffic-setup:
+  setup:
+    required: false
+    type: string
+  gen-traffic:
     required: false
     type: string
   expected-output-pattern:
@@ -27,6 +30,8 @@ runs:
         cmd: |
           set -x
 
+          ${{ inputs.setup }}
+
           /host/pwru/pwru \
             --output-tuple \
             --output-file=/tmp/pwru-${{ inputs.test-name }}.log \
@@ -38,7 +43,7 @@ runs:
 
           while [ ! -f /tmp/pwru-${{ inputs.test-name }}.ready ]; do sleep 1; done
 
-          ${{ inputs.traffic-setup }}
+          ${{ inputs.gen-traffic }}
 
           kill \$PWRU_PID
           wait \$PWRU_PID
