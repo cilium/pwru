@@ -4,7 +4,7 @@ go 1.23.1
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.6
-	github.com/cilium/ebpf v0.17.1
+	github.com/cilium/ebpf v0.17.2
 	github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
 	github.com/jsimonetti/rtnetlink v1.4.2
 	github.com/spf13/pflag v1.0.5
