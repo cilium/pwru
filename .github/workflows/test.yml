@@ -36,6 +36,17 @@ jobs:
         name: pwru
         path: pwru
 
+    - name: Build test-app
+      run: |
+        cd test-app
+        go build .
+
+    - name: Store test-app
+      uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b
+      with:
+        name: test-app
+        path: test-app/test-app
+
   test:
     runs-on: ubuntu-latest
     name: Test
@@ -53,6 +64,12 @@ jobs:
         with:
           name: pwru
           path: pwru
+
+      - name: Retrieve stored test-app executable
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+        with:
+          name: test-app
+          path: test-app
 
       - name: Derive kernel version
         id: kernel
@@ -80,6 +97,7 @@ jobs:
           install-dependencies: 'true'
           cmd: |
             chmod +x /host/pwru/pwru
+            chmod +x /host/test-app/test-app
 
       - name: Test basic IPv4
         uses: ./.github/actions/pwru-test
@@ -182,6 +200,24 @@ jobs:
           pwru-flags: --backend=kprobe-multi
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
           setup: |
+            iptables -w 10 -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 --dport 8080 -j DROP
+          gen-traffic: |
+            curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.1:8080 || true
+          expected-output-pattern: '1.0.0.1:8080.*(kfree_skb_reason|kfree_skb|sk_skb_reason_drop\b)'
+
+      - name: Test --filter-track-{tc,xdp}
+        if: ${{ steps.kernel.outputs.vsn >= 606 }}
+        uses: ./.github/actions/pwru-test
+        with:
+          test-name: ${{ matrix.kernel }}-filter-trace-tc-xdp
+          pwru-flags: --filter-trace-tc --filter-trace-xdp
+          pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
+          setup: |
+            # install test-app
+            ip link add dummy0 type dummy
+            ip link set dummy0 up
+            /host/test-app/test-app --attach-type xdp --iface dummy0
+            /host/test-app/test-app --attach-type tc --iface dummy0
             iptables -w 10 -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 --dport 8080 -j DROP
           gen-traffic: |
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.1:8080 || true
