@@ -16,6 +16,7 @@ import (
 
 	"github.com/cheggaaa/pb/v3"
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/link"
 	"golang.org/x/sync/errgroup"
 )
@@ -247,7 +248,7 @@ func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Add
 	return &k
 }
 
-func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, coll *ebpf.Collection) *kprober {
+func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, bpfmapFuncs map[string]*btf.FuncProto, coll *ebpf.Collection) *kprober {
 	slices.Sort(nonSkbFuncs)
 	nonSkbFuncs = slices.Compact(nonSkbFuncs)
 
@@ -261,6 +262,50 @@ func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, coll *ebpf.Collect
 
 		if strings.HasSuffix(fn, "[bpf]") {
 			// Skip bpf progs
+			continue
+		}
+
+		if _, ok := bpfmapFuncs[fn]; ok {
+			if strings.HasSuffix(fn, "_lookup_elem") {
+				kp, err := link.Kprobe(fn, coll.Programs["kprobe_bpf_map_lookup_elem"], nil)
+				if err != nil {
+					if !errors.Is(err, os.ErrNotExist) {
+						log.Printf("Failed to attach bpf_map_lookup_elem kprobe %s: %s\n", fn, err)
+					}
+					continue
+				}
+				k.links = append(k.links, kp)
+
+				krp, err := link.Kretprobe(fn, coll.Programs["kretprobe_bpf_map_lookup_elem"], nil)
+				if err != nil {
+					if errors.Is(err, os.ErrNotExist) {
+						log.Printf("Failed to open bpf_map_lookup_elem kretprobe %s: %s\n", fn, err)
+					}
+					continue
+				}
+				k.links = append(k.links, krp)
+
+			} else if strings.HasSuffix(fn, "_update_elem") {
+				kp, err := link.Kprobe(fn, coll.Programs["kprobe_bpf_map_update_elem"], nil)
+				if err != nil {
+					if errors.Is(err, os.ErrNotExist) {
+						log.Printf("Failed to open bpf_map_update_elem kprobe %s: %s\n", fn, err)
+					}
+					continue
+				}
+				k.links = append(k.links, kp)
+
+			} else if strings.HasSuffix(fn, "_delete_elem") {
+				kp, err := link.Kprobe(fn, coll.Programs["kprobe_bpf_map_delete_elem"], nil)
+				if err != nil {
+					if errors.Is(err, os.ErrNotExist) {
+						log.Printf("Failed to open bpf_map_delete_elem kprobe %s: %s\n", fn, err)
+					}
+					continue
+				}
+				k.links = append(k.links, kp)
+			}
+
 			continue
 		}
 
