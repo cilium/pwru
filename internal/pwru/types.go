@@ -38,6 +38,9 @@ type Flags struct {
 	FilterTrackBpfHelpers   bool
 	FilterIfname            string
 	FilterPcap              string
+	FilterTunnelPcap        string
+	FilterTunnelPcapL3      string
+	FilterTunnelPcapL2      string
 	FilterKprobeBatch       uint
 
 	OutputTS         string
@@ -52,6 +55,7 @@ type Flags struct {
 	OutputFile       string
 	OutputJson       bool
 	OutputTCPFlags   bool
+	OutputTunnel     bool
 
 	KMods    []string
 	AllKMods bool
@@ -74,6 +78,8 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.FilterTrackSkb, "filter-track-skb", false, "trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)")
 	flag.BoolVar(&f.FilterTrackSkbByStackid, "filter-track-skb-by-stackid", false, "trace a packet even after it is kfreed (e.g., traffic going through bridge)")
 	flag.BoolVar(&f.FilterTraceTc, "filter-trace-tc", false, "trace TC bpf progs")
+	flag.StringVar(&f.FilterTunnelPcapL2, "filter-tunnel-pcap-l2", "", "pcap expression for vxlan tunnel")
+	flag.StringVar(&f.FilterTunnelPcapL3, "filter-tunnel-pcap-l3", "", "pcap expression for vxlan tunnel (l3)")
 	flag.BoolVar(&f.FilterTraceXdp, "filter-trace-xdp", false, "trace XDP bpf progs")
 	flag.BoolVar(&f.FilterTrackBpfHelpers, "filter-track-bpf-helpers", false, "trace BPF helper functions")
 	flag.StringVar(&f.FilterIfname, "filter-ifname", "", "filter skb ifname in --filter-netns (if not specified, use current netns)")
@@ -83,6 +89,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputTuple, "output-tuple", true, "print L4 tuple")
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 	flag.BoolVar(&f.OutputShinfo, "output-skb-shared-info", false, "print skb shared info")
+	flag.BoolVar(&f.OutputTunnel, "output-tunnel", false, "print encapsulated tunnel header data")
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
 	flag.BoolVar(&f.OutputCaller, "output-caller", false, "print caller function name")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
@@ -143,6 +150,11 @@ func (f tcpFlag) String() string {
 	return strings.Join(flags, "|")
 }
 
+type L2Tuple struct {
+	Dest [6]byte
+	Src  [6]byte
+}
+
 type Tuple struct {
 	Saddr   [16]byte
 	Daddr   [16]byte
@@ -178,6 +190,8 @@ type Event struct {
 	PrintShinfoId uint64
 	Meta          Meta
 	Tuple         Tuple
+	TunnelTuple   Tuple
+	L2Tuple       L2Tuple
 	PrintStackId  int64
 	ParamSecond   uint64
 	ParamThird    uint64
