@@ -9,7 +9,7 @@ on:
 jobs:
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
@@ -27,8 +27,8 @@ jobs:
 
     - name: Generate and build
       run: |
-        make release
-        tar xfv release/pwru-linux-amd64.tar.gz
+        ARCHS=arm64 make release
+        tar xfv release/pwru-linux-arm64.tar.gz
 
     - name: Store executable
       uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b
@@ -36,19 +36,19 @@ jobs:
         name: pwru
         path: pwru
 
-    - name: Build test-app
-      run: |
-        cd test-app
-        go build .
+    # - name: Build test-app
+    #   run: |
+    #     cd test-app
+    #     go build .
 
-    - name: Store test-app
-      uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b
-      with:
-        name: test-app
-        path: test-app/test-app
+    # - name: Store test-app
+    #   uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b
+    #   with:
+    #     name: test-app
+    #     path: test-app/test-app
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     name: Test
     needs: build
     strategy:
@@ -65,11 +65,11 @@ jobs:
           name: pwru
           path: pwru
 
-      - name: Retrieve stored test-app executable
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
-        with:
-          name: test-app
-          path: test-app
+      # - name: Retrieve stored test-app executable
+      #   uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
+      #   with:
+      #     name: test-app
+      #     path: test-app
 
       - name: Derive kernel version
         id: kernel
