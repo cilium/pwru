@@ -11,7 +11,7 @@ VERSION=$(shell git describe --tags --always)
 LIBPCAP_ARCH ?= x86_64-unknown-linux-gnu
 # For compiling libpcap and CGO
 CC ?= gcc
-ARCHS ?= amd64 arm64
+ARCHS ?= arm64
 
 TEST_TIMEOUT ?= 5s
 .DEFAULT_GOAL := pwru
