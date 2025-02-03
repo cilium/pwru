@@ -14,6 +14,7 @@ require (
 	golang.org/x/net v0.34.0
 	golang.org/x/sync v0.10.0
 	golang.org/x/sys v0.29.0
+	rsc.io/c2go v0.0.0-20170620140410-520c22818a08
 )
 
 require (
