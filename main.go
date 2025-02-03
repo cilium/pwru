@@ -20,6 +20,7 @@ import (
 	"github.com/cilium/ebpf/rlimit"
 	"golang.org/x/sys/unix"
 
+	"github.com/cilium/pwru/internal/libcc"
 	"github.com/cilium/pwru/internal/libpcap"
 	"github.com/cilium/pwru/internal/pwru"
 )
@@ -133,18 +134,23 @@ func main() {
 		}
 	}
 
+	bpfProgFilterInjectTargets := map[string]string{
+		"kprobe_skb_lifetime_termination":        "skip",
+		"fexit_skb_clone":                        "skip",
+		"fexit_skb_copy":                         "skip",
+		"kprobe_veth_convert_skb_to_xdp_buff":    "skip",
+		"kretprobe_veth_convert_skb_to_xdp_buff": "skip",
+		"fexit_xdp":                              "skip",
+
+		"fentry_xdp": "xdp",
+	}
+
 	for name, program := range bpfSpec.Programs {
-		// Skip the skb-tracking ones that should not inject pcap-filter.
-		switch name {
-		case "kprobe_skb_lifetime_termination",
-			"fexit_skb_clone",
-			"fexit_skb_copy",
-			"kprobe_veth_convert_skb_to_xdp_buff",
-			"kretprobe_veth_convert_skb_to_xdp_buff",
-			"fexit_xdp":
+		injectTarget := bpfProgFilterInjectTargets[name]
+		if injectTarget == "skip" {
 			continue
 		}
-		if name == "fentry_xdp" {
+		if injectTarget == "xdp" {
 			if err := libpcap.InjectL2Filter(program, flags.FilterPcap); err != nil {
 				log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
 			}
@@ -152,6 +158,23 @@ func main() {
 		}
 		if err = libpcap.InjectFilters(program, flags.FilterPcap); err != nil {
 			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
+		}
+	}
+
+	for name, program := range bpfSpec.Programs {
+		injectTarget := bpfProgFilterInjectTargets[name]
+		if injectTarget == "skip" {
+			continue
+		}
+
+		if injectTarget == "xdp" {
+			if err := libcc.InjectXdpFilter(btfSpec, program, flags.FilterXdpExpr); err != nil {
+				log.Fatalf("Failed to inject xdp filter for %s: %v", name, err)
+			}
+		} else {
+			if err = libcc.InjectSkbFilter(btfSpec, program, flags.FilterSkbExpr); err != nil {
+				log.Fatalf("Failed to inject skb filter for %s: %v", name, err)
+			}
 		}
 	}
 
