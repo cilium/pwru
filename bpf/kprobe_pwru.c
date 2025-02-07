@@ -230,6 +230,12 @@ filter_meta(struct sk_buff *skb) {
 }
 
 static __noinline bool
+filter_skb_expr(struct sk_buff *skb)
+{
+	return skb != NULL;
+}
+
+static __noinline bool
 filter_pcap_ebpf_l3(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
 {
 	return data != data_end && _skb == __skb && __skb == ___skb;
@@ -268,7 +274,7 @@ filter_pcap(struct sk_buff *skb) {
 
 static __always_inline bool
 filter(struct sk_buff *skb) {
-	return filter_pcap(skb) && filter_meta(skb);
+	return filter_pcap(skb) && filter_meta(skb) && filter_skb_expr(skb);
 }
 
 static __always_inline void
@@ -649,6 +655,12 @@ filter_xdp_meta(struct xdp_buff *xdp) {
 	return filter_xdp_netns(xdp) && filter_xdp_ifindex(xdp);
 }
 
+static __noinline bool
+filter_xdp_expr(struct xdp_buff *xdp)
+{
+	return xdp != NULL;
+}
+
 static __always_inline bool
 filter_xdp_pcap(struct xdp_buff *xdp) {
 	void *data = (void *)(long) BPF_CORE_READ(xdp, data);
@@ -658,7 +670,7 @@ filter_xdp_pcap(struct xdp_buff *xdp) {
 
 static __always_inline bool
 filter_xdp(struct xdp_buff *xdp) {
-	return filter_xdp_pcap(xdp) && filter_xdp_meta(xdp);
+	return filter_xdp_pcap(xdp) && filter_xdp_meta(xdp) && filter_xdp_expr(xdp);
 }
 
 static __always_inline void
