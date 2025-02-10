@@ -9,8 +9,9 @@
 #include "bpf/bpf_endian.h"
 #include "bpf/bpf_ipv6.h"
 
-#define PRINT_SKB_STR_SIZE    2048
-#define PRINT_SHINFO_STR_SIZE PRINT_SKB_STR_SIZE
+#define PERCPU_BIG_BUFF_SIZE  2048
+#define PRINT_SKB_STR_SIZE    (PERCPU_BIG_BUFF_SIZE - sizeof(u32))
+#define PRINT_SHINFO_STR_SIZE (PERCPU_BIG_BUFF_SIZE - sizeof(u32))
 
 #define ETH_P_IP              0x800
 #define ETH_P_IPV6            0x86dd
@@ -200,6 +201,13 @@ struct {
 	__type(key, u64);
 	__type(value, struct print_shinfo_value);
 } print_shinfo_map SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__type(key, u32);
+	__type(value, u8[PERCPU_BIG_BUFF_SIZE]);
+	__uint(max_entries, 1);
+} percpu_big_buff SEC(".maps");
 
 static __always_inline u32
 get_netns(struct sk_buff *skb) {
@@ -400,26 +408,32 @@ sync_fetch_and_add(void *id_map) {
 static __always_inline void
 set_skb_btf(struct sk_buff *skb, u64 *event_id) {
 	struct btf_ptr p = {};
-	static struct print_skb_value v = {};
+	struct print_skb_value *v = (struct print_skb_value *)bpf_map_lookup_elem(&percpu_big_buff, &ZERO);
+	if (!v)
+		return;
+
 	u64 id;
 
 	p.type_id = cfg->skb_btf_id;
 	p.ptr = skb;
 	*event_id = sync_fetch_and_add(&print_skb_id_map);
 
-	v.len = bpf_snprintf_btf(v.str, PRINT_SKB_STR_SIZE, &p, sizeof(p), 0);
-	if (v.len < 0) {
+	v->len = bpf_snprintf_btf(v->str, PRINT_SKB_STR_SIZE, &p, sizeof(p), 0);
+	if (v->len < 0) {
 		return;
 	}
 
-	bpf_map_update_elem(&print_skb_map, event_id, &v, BPF_ANY);
+	bpf_map_update_elem(&print_skb_map, event_id, v, BPF_ANY);
 }
 
 static __always_inline void
 set_shinfo_btf(struct sk_buff *skb, u64 *event_id) {
 	struct skb_shared_info *shinfo;
 	struct btf_ptr p = {};
-	static struct print_shinfo_value v = {};
+	struct print_shinfo_value *v = (struct print_shinfo_value *)bpf_map_lookup_elem(&percpu_big_buff, &ZERO);
+	if (!v)
+		return;
+
 	unsigned char *head;
 	unsigned int end;
 
@@ -439,12 +453,12 @@ set_shinfo_btf(struct sk_buff *skb, u64 *event_id) {
 
 	*event_id = sync_fetch_and_add(&print_shinfo_id_map);
 
-	v.len = bpf_snprintf_btf(v.str, PRINT_SHINFO_STR_SIZE, &p, sizeof(p), 0);
-	if (v.len < 0) {
+	v->len = bpf_snprintf_btf(v->str, PRINT_SHINFO_STR_SIZE, &p, sizeof(p), 0);
+	if (v->len < 0) {
 		return;
 	}
 
-	bpf_map_update_elem(&print_shinfo_map, event_id, &v, BPF_ANY);
+	bpf_map_update_elem(&print_shinfo_map, event_id, v, BPF_ANY);
 }
 
 static __always_inline u64

@@ -333,7 +333,11 @@ func getSkbData(event *Event, o *output) (skbData string) {
 		return ""
 	}
 
-	return "\n" + string(b[4:])
+	dataLen := byteorder.Native.Uint32(b[:4])
+	if dataLen+4 > uint32(len(b)) {
+		dataLen = uint32(len(b)) - 4
+	}
+	return "\n" + string(b[4:dataLen+4])
 }
 
 func getShinfoData(event *Event, o *output) (shinfoData string) {
@@ -350,7 +354,11 @@ func getShinfoData(event *Event, o *output) (shinfoData string) {
 		return ""
 	}
 
-	return "\n" + string(b[4:])
+	dataLen := byteorder.Native.Uint32(b[:4])
+	if dataLen+4 > uint32(len(b)) {
+		dataLen = uint32(len(b)) - 4
+	}
+	return "\n" + string(b[4:dataLen+4])
 }
 
 func getMetaData(event *Event, o *output) (metaData string) {
