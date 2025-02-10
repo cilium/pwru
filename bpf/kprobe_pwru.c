@@ -399,7 +399,7 @@ sync_fetch_and_add(void *id_map) {
 
 static __always_inline void
 set_skb_btf(struct sk_buff *skb, u64 *event_id) {
-	static struct btf_ptr p = {};
+	struct btf_ptr p = {};
 	static struct print_skb_value v = {};
 	u64 id;
 
@@ -418,7 +418,7 @@ set_skb_btf(struct sk_buff *skb, u64 *event_id) {
 static __always_inline void
 set_shinfo_btf(struct sk_buff *skb, u64 *event_id) {
 	struct skb_shared_info *shinfo;
-	static struct btf_ptr p = {};
+	struct btf_ptr p = {};
 	static struct print_shinfo_value v = {};
 	unsigned char *head;
 	unsigned int end;
