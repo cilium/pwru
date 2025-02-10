@@ -83,6 +83,7 @@ struct event_t {
 	u64 ts;
 	u64 print_skb_id;
 	u64 print_shinfo_id;
+	u64 print_bpfmap_id;
 	struct skb_meta meta;
 	struct tuple tuple;
 	s64 print_stack_id;
@@ -167,6 +168,13 @@ struct {
 	__uint(value_size, MAX_STACK_DEPTH * sizeof(u64));
 } print_stack_map SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct event_t);
+} event_stash SEC(".maps");
+
 struct print_skb_value {
 	u32 len;
 	char str[PRINT_SKB_STR_SIZE];
@@ -175,6 +183,14 @@ struct print_shinfo_value {
 	u32 len;
 	char str[PRINT_SHINFO_STR_SIZE];
 };
+struct print_bpfmap_value {
+	u32 id;
+	char name[16];
+	u32 key_size;
+	u32 value_size;
+	u8 key[256];
+	u8 value[256];
+} __attribute__((packed));
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
 	__uint(max_entries, 1);
@@ -199,6 +215,18 @@ struct {
 	__type(key, u64);
 	__type(value, struct print_shinfo_value);
 } print_shinfo_map SEC(".maps");
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, u32);
+} print_bpfmap_id_map SEC(".maps");
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__type(key, u64);
+	__type(value, struct print_bpfmap_value);
+} print_bpfmap_map SEC(".maps");
 
 static __always_inline u32
 get_netns(struct sk_buff *skb) {
@@ -340,7 +368,7 @@ static __always_inline u64
 sync_fetch_and_add(void *id_map) {
 	u32 *id = bpf_map_lookup_elem(id_map, &ZERO);
 	if (id)
-		return ((*id)++) | ((u64)bpf_get_smp_processor_id() << 32);
+		return ((*id)++) | ((u64)(bpf_get_smp_processor_id() + 1) << 32);
 	return 0;
 }
 
@@ -509,6 +537,12 @@ cont:
 		bpf_map_update_elem(&skb_stackid, &skb, &stackid, BPF_ANY);
 	}
 
+	if (CFG.output_caller)
+		bpf_probe_read_kernel(&event->caller_addr,
+				      sizeof(event->caller_addr),
+				      (void *)PT_REGS_SP((struct pt_regs *)ctx));
+
+	event->skb_addr = skb_addr;
 	event->pid = bpf_get_current_pid_tgid() >> 32;
 	event->ts = bpf_ktime_get_ns();
 	event->cpu_id = bpf_get_smp_processor_id();
@@ -524,14 +558,10 @@ kprobe_skb(struct sk_buff *skb, struct pt_regs *ctx, const bool has_get_func_ip,
 	if (!handle_everything(skb, ctx, &event, _stackid, true))
 		return BPF_OK;
 
-	event.skb_addr = (u64) skb;
 	event.addr = has_get_func_ip ? bpf_get_func_ip(ctx) : PT_REGS_IP(ctx);
 	event.type = kprobe_multi ? EVENT_TYPE_KPROBE_MULTI: EVENT_TYPE_KPROBE;
 	event.param_second = PT_REGS_PARM2(ctx);
 	event.param_third = PT_REGS_PARM3(ctx);
-	if (CFG.output_caller)
-		bpf_probe_read_kernel(&event.caller_addr, sizeof(event.caller_addr), (void *)PT_REGS_SP(ctx));
-
 
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
 
@@ -619,7 +649,6 @@ int BPF_PROG(fentry_tc, struct sk_buff *skb) {
 	if (!handle_everything(skb, ctx, &event, NULL, false))
 		return BPF_OK;
 
-	event.skb_addr = (u64) skb;
 	event.addr = BPF_PROG_ADDR;
 	event.type = EVENT_TYPE_TC;
 	bpf_map_push_elem(&events, &event, BPF_EXIST);
@@ -766,6 +795,116 @@ int kretprobe_veth_convert_skb_to_xdp_buff(struct pt_regs *ctx) {
 		bpf_map_update_elem(&skb_addresses, &skb_addr, &TRUE, BPF_ANY);
 		bpf_map_delete_elem(&veth_skbs, &pid_tgid);
 	}
+	return BPF_OK;
+}
+
+static __always_inline void
+set_common_bpfmap_info(struct pt_regs *ctx, u64 *event_id,
+		       struct print_bpfmap_value *bpfmap) {
+	struct bpf_map *map = (struct bpf_map *)PT_REGS_PARM1(ctx);
+
+	*event_id = sync_fetch_and_add(&print_bpfmap_id_map);
+	BPF_CORE_READ_INTO(&bpfmap->id, map, id);
+	BPF_CORE_READ_STR_INTO(&bpfmap->name, map, name);
+	BPF_CORE_READ_INTO(&bpfmap->key_size, map, key_size);
+	BPF_CORE_READ_INTO(&bpfmap->value_size, map, value_size);
+	bpf_probe_read_kernel(&bpfmap->key, sizeof(bpfmap->key), (void *)PT_REGS_PARM2(ctx));
+}
+
+SEC("kprobe/bpf_map_update_elem")
+int kprobe_bpf_map_update_elem(struct pt_regs *ctx) {
+	u64 stackid = get_stackid(ctx, true);
+
+	struct sk_buff **skb = bpf_map_lookup_elem(&stackid_skb, &stackid);
+	if (skb && *skb) {
+		struct event_t event = {};
+
+		event.addr = PT_REGS_IP(ctx);
+		if (!handle_everything(*skb, ctx, &event, &stackid, true))
+			return BPF_OK;
+
+
+		static struct print_bpfmap_value bpfmap = {};
+		set_common_bpfmap_info(ctx, &event.print_bpfmap_id, &bpfmap);
+		bpf_probe_read_kernel(&bpfmap.value,
+				      sizeof(bpfmap.value),
+				      (void *)PT_REGS_PARM3(ctx));
+
+		bpf_map_update_elem(&print_bpfmap_map, &event.print_bpfmap_id, &bpfmap, BPF_ANY);
+		bpf_map_push_elem(&events, &event, BPF_EXIST);
+	}
+
+	return BPF_OK;
+}
+
+SEC("kprobe/bpf_map_delete_elem")
+int kprobe_bpf_map_delete_elem(struct pt_regs *ctx) {
+	u64 stackid = get_stackid(ctx, true);
+
+	struct sk_buff **skb = bpf_map_lookup_elem(&stackid_skb, &stackid);
+	if (skb && *skb) {
+		struct event_t event = {};
+
+		event.addr = PT_REGS_IP(ctx);
+		if (!handle_everything(*skb, ctx, &event, &stackid, true))
+			return BPF_OK;
+
+		static struct print_bpfmap_value bpfmap = {};
+		set_common_bpfmap_info(ctx, &event.print_bpfmap_id, &bpfmap);
+
+		bpf_map_update_elem(&print_bpfmap_map, &event.print_bpfmap_id, &bpfmap, BPF_ANY);
+		bpf_map_push_elem(&events, &event, BPF_EXIST);
+	}
+
+	return BPF_OK;
+}
+
+SEC("kprobe/bpf_map_lookup_elem")
+int kprobe_bpf_map_lookup_elem(struct pt_regs *ctx) {
+	u64 stackid = get_stackid(ctx, true);
+
+	struct sk_buff **skb = bpf_map_lookup_elem(&stackid_skb, &stackid);
+	if (skb && *skb) {
+		struct event_t event = {};
+
+		event.addr = PT_REGS_IP(ctx);
+		if (!handle_everything(*skb, ctx, &event, &stackid, true))
+			return BPF_OK;
+
+		static struct print_bpfmap_value bpfmap = {};
+		set_common_bpfmap_info(ctx, &event.print_bpfmap_id, &bpfmap);
+
+		bpf_map_update_elem(&print_bpfmap_map, &event.print_bpfmap_id, &bpfmap, BPF_ANY);
+		bpf_map_update_elem(&event_stash, &ZERO, &event, BPF_ANY);
+	}
+
+	return BPF_OK;
+}
+
+SEC("kretprobe/bpf_map_lookup_elem")
+int kretprobe_bpf_map_lookup_elem(struct pt_regs *ctx) {
+	/* Two assumptions:
+	 * 1. CPU won't be preempted between kprobe and kretprobe of the same
+	 * lookup operation.
+	 * 2. Lookup won't be recursive.
+	 *
+	 * I believe both are true in the current implementation of BPF.
+	 * Therefore, using PERCPU array to stash the event is safe.
+	 */
+	struct event_t *event = bpf_map_lookup_elem(&event_stash, &ZERO);
+	if (!event)
+		return BPF_OK;
+
+	struct print_bpfmap_value *bpfmap = bpf_map_lookup_elem(&print_bpfmap_map,
+								   &event->print_bpfmap_id);
+	if (!bpfmap)
+		return BPF_OK;
+
+	bpf_probe_read_kernel(&bpfmap->value,
+			      sizeof(bpfmap->value),
+			      (void *)PT_REGS_RC(ctx));
+
+	bpf_map_push_elem(&events, event, BPF_EXIST);
 	return BPF_OK;
 }
 
