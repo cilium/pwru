@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"maps"
+	"runtime"
 	"sync"
 
 	"github.com/cilium/ebpf"
@@ -62,10 +63,9 @@ func (t *tracing) addLink(l link.Link) {
 }
 
 func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
-	opts *ebpf.CollectionOptions, prog *ebpf.Program, n2a BpfProgName2Addr,
-	tracingName string,
+	opts *ebpf.CollectionOptions, prog *ebpf.Program, tracingName string,
 ) error {
-	entryFn, progName, tag, err := getBpfProgInfo(prog)
+	entryFn, err := getBpfProgInfo(prog)
 	if err != nil {
 		if errors.Is(err, errNotFound) {
 			log.Printf("Skip tracing bpf prog %s because cannot find its entry function name", prog)
@@ -74,28 +74,7 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 		return fmt.Errorf("failed to get entry function name: %w", err)
 	}
 
-	// The addr may hold the wrong rip value, because two addresses could
-	// have one same symbol. As discussed before, that doesn't affect the
-	// symbol resolution because even a "wrong" rip can be matched to the
-	// right symbol. However, this could make a difference when we want to
-	// distinguish which exact bpf prog is called.
-	//   -- @jschwinger233
-
-	progKsym := fmt.Sprintf("bpf_prog_%s_%s[bpf]", tag, entryFn)
-	addr, ok := n2a[progKsym]
-	if !ok {
-		progKsym = fmt.Sprintf("bpf_prog_%s_%s[bpf]", tag, progName)
-		addr, ok = n2a[progKsym]
-		if !ok {
-			return fmt.Errorf("failed to find address for function %s of bpf prog %v", progName, prog)
-		}
-	}
-
 	spec = spec.Copy()
-	if err := spec.Variables["BPF_PROG_ADDR"].Set(addr); err != nil {
-		return fmt.Errorf("failed to set bpf prog addr: %w", err)
-	}
-
 	spec.Programs[tracingName].AttachTarget = prog
 	spec.Programs[tracingName].AttachTo = entryFn
 	coll, err := ebpf.NewCollectionWithOptions(spec, *opts)
@@ -125,9 +104,27 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 }
 
 func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
-	opts *ebpf.CollectionOptions, outputSkb bool, outputShinfo bool,
-	n2a BpfProgName2Addr, progs []*ebpf.Program, tracingName string,
+	opts *ebpf.CollectionOptions, progs []*ebpf.Program, tracingName string,
 ) error {
+	if len(progs) == 0 {
+		return nil
+	}
+
+	if runtime.GOARCH == "amd64" {
+		haveEndbr, err := haveEndbrInsn(progs[0])
+		if err != nil {
+			return fmt.Errorf("failed to check if the program has ENDBR instruction: %w", err)
+		}
+
+		endbrInsnSize := uint32(0)
+		if haveEndbr {
+			endbrInsnSize = 4
+		}
+		if err := spec.Variables["ENDBR_INSN_SIZE"].Set(endbrInsnSize); err != nil {
+			return fmt.Errorf("failed to set ENDBR_INSN_SIZE: %w", err)
+		}
+	}
+
 	// Reusing maps from previous collection is to handle the events together
 	// with the kprobes.
 	replacedMaps := maps.Clone(coll.Maps)
@@ -139,7 +136,7 @@ func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	for _, prog := range progs {
 		prog := prog
 		errg.Go(func() error {
-			return t.traceProg(spec, opts, prog, n2a, tracingName)
+			return t.traceProg(spec, opts, prog, tracingName)
 		})
 	}
 
@@ -151,10 +148,7 @@ func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	return nil
 }
 
-func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
-	opts *ebpf.CollectionOptions, outputSkb bool, outputShinfo bool,
-	n2a BpfProgName2Addr,
-) *tracing {
+func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec, opts *ebpf.CollectionOptions) *tracing {
 	log.Printf("Attaching tc-bpf progs...\n")
 
 	progs, err := listBpfProgs(ebpf.SchedCLS)
@@ -166,17 +160,14 @@ func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	t.progs = progs
 	t.links = make([]link.Link, 0, len(progs))
 
-	if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, progs, "fentry_tc"); err != nil {
+	if err := t.trace(coll, spec, opts, progs, "fentry_tc"); err != nil {
 		log.Fatalf("failed to trace TC progs: %v", err)
 	}
 
 	return &t
 }
 
-func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
-	opts *ebpf.CollectionOptions, outputSkb bool, outputShinfo bool,
-	n2a BpfProgName2Addr,
-) *tracing {
+func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec, opts *ebpf.CollectionOptions) *tracing {
 	log.Printf("Attaching xdp progs...\n")
 
 	progs, err := listBpfProgs(ebpf.XDP)
@@ -191,7 +182,7 @@ func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	{
 		spec := spec.Copy()
 		delete(spec.Programs, "fexit_xdp")
-		if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, progs, "fentry_xdp"); err != nil {
+		if err := t.trace(coll, spec, opts, progs, "fentry_xdp"); err != nil {
 			log.Fatalf("failed to trace XDP progs: %v", err)
 		}
 	}
@@ -199,7 +190,7 @@ func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	{
 		spec := spec.Copy()
 		delete(spec.Programs, "fentry_xdp")
-		if err := t.trace(coll, spec, opts, outputSkb, outputShinfo, n2a, progs, "fexit_xdp"); err != nil {
+		if err := t.trace(coll, spec, opts, progs, "fexit_xdp"); err != nil {
 			log.Fatalf("failed to trace XDP progs: %v", err)
 		}
 	}
