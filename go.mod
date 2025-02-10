@@ -10,7 +10,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/tklauser/ps v0.0.3
 	github.com/vishvananda/netns v0.0.5
-	golang.org/x/arch v0.13.0
+	golang.org/x/arch v0.14.0
 	golang.org/x/net v0.34.0
 	golang.org/x/sync v0.11.0
 	golang.org/x/sys v0.30.0
