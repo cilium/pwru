@@ -67,6 +67,11 @@ struct tuple {
 	u8 tcp_flags;
 } __attribute__((packed));
 
+struct l2tuple {
+	u8 dest[6];
+	u8 src[6];
+} __attribute__((packed));
+
 enum event_type {
 	EVENT_TYPE_KPROBE	= 0,
 	EVENT_TYPE_KPROBE_MULTI	= 1,
@@ -85,6 +90,8 @@ struct event_t {
 	u64 print_shinfo_id;
 	struct skb_meta meta;
 	struct tuple tuple;
+	struct tuple tunnel_tuple;
+	struct l2tuple l2_tuple;
 	s64 print_stack_id;
 	u64 param_second;
 	u64 param_third;
@@ -146,7 +153,7 @@ struct config {
 	u8 output_stack: 1;
 	u8 output_caller: 1;
 	u8 output_cb: 1;
-	u8 output_unused: 1;
+	u8 output_tunnel: 1;
 	u8 is_set: 1;
 	u8 track_skb: 1;
 	u8 track_skb_by_stackid: 1;
@@ -259,8 +266,55 @@ filter_pcap_l2(struct sk_buff *skb)
 	return filter_pcap_ebpf_l2((void *)skb, (void *)skb, (void *)skb, data, data_end);
 }
 
+static __noinline bool
+filter_pcap_ebpf_tunnel_l2(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
+{
+	return data != data_end && _skb == __skb && __skb == ___skb;
+}
+
+static __noinline bool
+filter_pcap_ebpf_tunnel_l3(void *_skb, void *__skb, void *___skb, void *data, void* data_end)
+{
+	return data != data_end && _skb == __skb && __skb == ___skb;
+}
+
+static __always_inline bool
+filter_pcap_tunnel_l2(struct sk_buff *skb)
+{
+	void *skb_head = BPF_CORE_READ(skb, head);
+	void *data = skb_head;
+	u16 l3_off = BPF_CORE_READ(skb, network_header);
+	struct iphdr *ip4 = (struct iphdr *) (data + l3_off);
+	u16 l4_off = l3_off + BPF_CORE_READ_BITFIELD_PROBED(ip4, ihl) * 4;
+	// For VXLAN, we only care about udp packets.
+	if (BPF_CORE_READ(ip4, protocol) != IPPROTO_UDP) {
+		return true; 
+	}
+	struct vxlan_metadata *vx = (struct vxlan_metadata*) (data + l4_off + 8);
+	// No VXLAN hdr means don't apply any tunnel filter, but return true to not
+	// filter non vxlan traffic.
+	if (BPF_CORE_READ(vx, gbp) != 8) {
+		return true;
+	}
+	data = (void*) (data + l4_off + 8 + 8);
+	struct ethhdr *eth = (struct ethhdr*) data;
+	if (BPF_CORE_READ(eth, h_proto) != bpf_htons(ETH_P_IP))
+		return false;
+	void *data_end = skb_head + BPF_CORE_READ(skb, tail);
+	if (!filter_pcap_ebpf_tunnel_l2((void *)skb, (void *)skb, (void *)skb, data, data_end)) {
+		return false;
+	}
+	struct iphdr *iph = (struct iphdr *) (data + sizeof(struct ethhdr));
+	u32 saddr = BPF_CORE_READ(iph, saddr);
+	data = (void*) (data + sizeof(struct ethhdr));
+	return filter_pcap_ebpf_tunnel_l3((void *)skb, (void *)skb, (void *)skb, data, data_end);
+}
+
 static __always_inline bool
 filter_pcap(struct sk_buff *skb) {
+	if (!filter_pcap_tunnel_l2(skb)) {
+		return false;
+	}
 	if (BPF_CORE_READ(skb, mac_len) == 0)
 		return filter_pcap_l3(skb);
 	return filter_pcap_l2(skb);
@@ -288,7 +342,31 @@ set_meta(struct sk_buff *skb, struct skb_meta *meta) {
 	}
 }
 
-static __always_inline void
+// Returns l4 offset
+static __always_inline u16
+__set_l3_tuple(void *data, u16 l3_off, bool is_ipv4, union addr *saddr, union addr *daddr, u16 *l3_proto, u8 *l4_proto)
+{
+	u16 l4_off;
+	if (is_ipv4) {
+		struct iphdr *ip4 = (struct iphdr *) (data + l3_off);
+		BPF_CORE_READ_INTO(saddr, ip4, saddr);
+		BPF_CORE_READ_INTO(daddr, ip4, daddr);
+		BPF_CORE_READ_INTO(l4_proto, ip4, protocol);
+		*l3_proto = ETH_P_IP;
+		l4_off = l3_off + BPF_CORE_READ_BITFIELD_PROBED(ip4, ihl) * 4;
+
+	} else {
+		struct ipv6hdr *ip6 = (struct ipv6hdr *) (data + l3_off);
+		BPF_CORE_READ_INTO(saddr, ip6, saddr);
+		BPF_CORE_READ_INTO(daddr, ip6, daddr);
+		BPF_CORE_READ_INTO(l4_proto, ip6, nexthdr);
+		*l3_proto = ETH_P_IPV6;
+		l4_off = l3_off + ipv6_hdrlen(ip6);
+	}
+	return l4_off;
+}
+
+static __always_inline u16 
 __set_tuple(struct tuple *tpl, void *data, u16 l3_off, bool is_ipv4) {
 	u16 l4_off;
 
@@ -314,15 +392,18 @@ __set_tuple(struct tuple *tpl, void *data, u16 l3_off, bool is_ipv4) {
 		tpl->sport= BPF_CORE_READ(tcp, source);
 		tpl->dport= BPF_CORE_READ(tcp, dest);
 		bpf_probe_read_kernel(&tpl->tcp_flags, sizeof(tpl->tcp_flags), (void *)tcp + offsetof(struct tcphdr, window) - 1);
+		return l4_off + sizeof(*tcp);
 	} else if (tpl->l4_proto == IPPROTO_UDP) {
 		struct udphdr *udp = (struct udphdr *) (data + l4_off);
 		tpl->sport= BPF_CORE_READ(udp, source);
 		tpl->dport= BPF_CORE_READ(udp, dest);
+		return l4_off + sizeof(*udp);
 	}
+	return l4_off;
 }
 
 static __always_inline void
-set_tuple(struct sk_buff *skb, struct tuple *tpl) {
+set_tuple(struct sk_buff *skb, struct tuple *tpl, struct tuple *tunnel_tpl, struct l2tuple *l2_tuple, bool output_tunnel) {
 	void *skb_head = BPF_CORE_READ(skb, head);
 	u16 l3_off = BPF_CORE_READ(skb, network_header);
 
@@ -333,7 +414,29 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 		return;
 
 	bool is_ipv4 = ip_vsn == 4;
-	__set_tuple(tpl, skb_head, l3_off, is_ipv4);
+	u16 l4_data_off = __set_tuple(tpl, skb_head, l3_off, is_ipv4);
+
+	if (!(output_tunnel && tpl->l4_proto == IPPROTO_UDP))
+		return;
+
+	struct vxlan_metadata *vx = (struct vxlan_metadata*) (skb_head + l4_data_off);
+
+	// Check if this looks like a vxlan header.
+	// TODO: Add option for doing similar checks for geneve via flag.
+	if (BPF_CORE_READ(vx, gbp) != 0x8)
+		return;
+
+	struct ethhdr *inner = (struct ethhdr*) (skb_head + l4_data_off + 2*sizeof(*vx));
+	BPF_CORE_READ_INTO(&l2_tuple->src, inner, h_source);
+	BPF_CORE_READ_INTO(&l2_tuple->dest, inner, h_dest);
+	if (BPF_CORE_READ(inner, h_proto) != bpf_htons(ETH_P_IP))
+		return;
+
+	l3_hdr = (struct iphdr *) (skb_head + l3_off);
+	ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
+	is_ipv4 = ip_vsn == 4;
+	l3_off = l4_data_off + 2 * sizeof(*vx) + sizeof(struct ethhdr);
+	__set_tuple(tunnel_tpl, skb_head, l3_off, is_ipv4);
 }
 
 static __always_inline u64
@@ -433,7 +536,7 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 	}
 
 	if (cfg->output_tuple) {
-		set_tuple(skb, &event->tuple);
+		set_tuple(skb, &event->tuple, &event->tunnel_tuple, &event->l2_tuple, cfg->output_tunnel);
 	}
 
 	if (cfg->output_skb) {
