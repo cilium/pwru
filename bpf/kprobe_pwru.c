@@ -9,7 +9,7 @@
 #include "bpf/bpf_endian.h"
 #include "bpf/bpf_ipv6.h"
 
-#define PERCPU_BIG_BUFF_SIZE  2048
+#define PERCPU_BIG_BUFF_SIZE  4096
 #define PRINT_SKB_STR_SIZE    (PERCPU_BIG_BUFF_SIZE - sizeof(u32))
 #define PRINT_SHINFO_STR_SIZE (PERCPU_BIG_BUFF_SIZE - sizeof(u32))
 
