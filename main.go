@@ -151,7 +151,9 @@ func main() {
 			continue
 		}
 		if err = libpcap.InjectFilters(program,
-			flags.FilterPcap, flags.FilterTunnelPcap); err != nil {
+			flags.FilterPcap,
+			flags.FilterTunnelPcapL2,
+			flags.FilterTunnelPcapL3); err != nil {
 			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
 		}
 	}
