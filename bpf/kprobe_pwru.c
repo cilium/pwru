@@ -52,6 +52,12 @@ struct vxlanhdr {
 	u32 vni;
 };
 
+// Only include the first byte to save stack space.
+struct genevehdr {
+	u8 flags:2;
+	u8 opt_len:6;
+};
+
 struct skb_meta {
 	u32 netns;
 	u32 mark;
@@ -277,6 +283,38 @@ filter_pcap_ebpf_tunnel_l3(void *_skb, void *__skb, void *___skb, void *data, vo
 	return data != data_end && _skb == __skb && __skb == ___skb;
 }
 
+#define VXLAN_PORT1_NET 6177	// 8472 in net byte order.
+#define VXLAN_PORT2_NET 46354	// 4789 in net byte order.
+#define GENEVE_PORT_NET 49431	// 6081 in net byte order.
+
+// Attempts to detect tunnel header length for either vxlan or geneve.
+// This is based on tuple source/dest ports. If no tunnel header is
+// detected then -1 is returned.
+static __always_inline s16
+__tunnel_hdr_len(void *skb_head, u16 sport, u16 dport, u16 l4_data_off) {
+	u16 tunnel_l2_off;
+	if (dport == GENEVE_PORT_NET || sport == GENEVE_PORT_NET) {
+		struct genevehdr gh;
+		if (bpf_probe_read_kernel(&gh, sizeof(struct genevehdr), skb_head + l4_data_off) != 0) {
+			return -1;
+		}
+		tunnel_l2_off = gh.opt_len * 4 + 8;
+	} else if (dport == VXLAN_PORT1_NET || sport == VXLAN_PORT1_NET ||
+		dport == VXLAN_PORT2_NET || sport == VXLAN_PORT2_NET) {
+		struct vxlanhdr vxh = {};
+		if (bpf_probe_read_kernel(&vxh, sizeof(struct vxlanhdr), skb_head + l4_data_off) != 0) {
+			return -1;
+		}
+		tunnel_l2_off = sizeof(struct vxlanhdr);
+		if (vxh.flags != 0x8) {
+			return -1;
+		}
+	} else {
+		return -1;
+	}
+	return tunnel_l2_off;
+}
+
 static __always_inline bool
 filter_pcap_tunnel_l2(struct sk_buff *skb)
 {
@@ -290,17 +328,18 @@ filter_pcap_tunnel_l2(struct sk_buff *skb)
 	if (BPF_CORE_READ(ip4, protocol) != IPPROTO_UDP) {
 		return true;
 	}
-
-	struct vxlanhdr vxh = {};
-	if (bpf_probe_read_kernel(&vxh, sizeof(struct vxlanhdr), data + l4_off + 8) != 0) {
+	
+	struct udphdr *udp = (struct udphdr *) (data + l4_off);
+	s16 tunnel_hdr_len = __tunnel_hdr_len(
+		skb_head,
+		BPF_CORE_READ(udp, source),
+		BPF_CORE_READ(udp, dest),
+		l4_off + sizeof(struct udphdr));
+	
+	if (tunnel_hdr_len == -1)
 		return true;
-	}
 
-	if (vxh.flags != 8) {
-		return true;
-	}
-
-	data = (void*) (data + l4_off + 8 + 8);
+	data = (void*) (data + l4_off + sizeof(struct udphdr) + tunnel_hdr_len);
 	struct ethhdr *eth = (struct ethhdr*) data;
 	if (BPF_CORE_READ(eth, h_proto) != bpf_htons(ETH_P_IP))
 		return false;
@@ -423,15 +462,13 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl, struct tuple *tunnel_tpl) {
 static __always_inline void
 set_tunnel(struct sk_buff *skb, struct tuple *tpl, struct tuple *tunnel_tpl, u16 l4_data_off) {
 	void *skb_head = BPF_CORE_READ(skb, head);
-	struct vxlanhdr vxh = {};
-	if (bpf_probe_read_kernel(&vxh, sizeof(struct vxlanhdr), skb_head + l4_data_off) != 0) {
-		return;
-	}
 
-	if (vxh.flags != 0x8)
+	s16 tunnel_hdr_len = __tunnel_hdr_len(skb_head, tpl->sport, tpl->dport, l4_data_off);
+
+	if (tunnel_hdr_len == -1)
 		return;
 
-	struct ethhdr *inner = (struct ethhdr*) (skb_head + l4_data_off + sizeof(struct vxlanhdr));
+	struct ethhdr *inner = (struct ethhdr*) (skb_head + l4_data_off + tunnel_hdr_len);
 	if (BPF_CORE_READ(inner, h_proto) != bpf_htons(ETH_P_IP))
 		return;
 
