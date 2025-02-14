@@ -17,7 +17,7 @@ func InjectL2Filter(program *ebpf.ProgramSpec, filterExpr string) (err error) {
 	return injectFilter(program, filterExpr, false, false)
 }
 
-func InjectFilters(program *ebpf.ProgramSpec, filterExpr, tunnelFilterExpr string) (err error) {
+func InjectFilters(program *ebpf.ProgramSpec, filterExpr, tunnelFilterExprL2, tunnelFilterExprL3 string) (err error) {
 	if err = injectFilter(program, filterExpr, false, false); err != nil {
 		return
 	}
@@ -28,10 +28,10 @@ func InjectFilters(program *ebpf.ProgramSpec, filterExpr, tunnelFilterExpr strin
 		return injectFilter(program, "__pwru_reject_all__", true, false)
 	}
 	// Attach any tunnel filters.
-	if err := injectFilter(program, tunnelFilterExpr, false, true); err != nil {
+	if err := injectFilter(program, tunnelFilterExprL2, false, true); err != nil {
 		return fmt.Errorf("l2 tunnel filter: %w", err)
 	}
-	if err := injectFilter(program, tunnelFilterExpr, true, true); err != nil {
+	if err := injectFilter(program, tunnelFilterExprL3, true, true); err != nil {
 		return fmt.Errorf("l3 tunnel filter: %w", err)
 	}
 	return nil
