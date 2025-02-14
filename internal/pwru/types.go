@@ -38,7 +38,8 @@ type Flags struct {
 	FilterTrackBpfHelpers   bool
 	FilterIfname            string
 	FilterPcap              string
-	FilterTunnelPcap        string
+	FilterTunnelPcapL2      string
+	FilterTunnelPcapL3      string
 	FilterKprobeBatch       uint
 
 	OutputTS         string
@@ -76,7 +77,8 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.FilterTrackSkb, "filter-track-skb", false, "trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)")
 	flag.BoolVar(&f.FilterTrackSkbByStackid, "filter-track-skb-by-stackid", false, "trace a packet even after it is kfreed (e.g., traffic going through bridge)")
 	flag.BoolVar(&f.FilterTraceTc, "filter-trace-tc", false, "trace TC bpf progs")
-	flag.StringVar(&f.FilterTunnelPcap, "filter-tunnel-pcap", "", "pcap expression for vxlan/geneve tunnel (l3)")
+	flag.StringVar(&f.FilterTunnelPcapL2, "filter-tunnel-pcap-l2", "", "pcap expression for vxlan/geneve tunnel (l2)")
+	flag.StringVar(&f.FilterTunnelPcapL3, "filter-tunnel-pcap-l3", "", "pcap expression for vxlan/geneve tunnel (l3)")
 	flag.BoolVar(&f.FilterTraceXdp, "filter-trace-xdp", false, "trace XDP bpf progs")
 	flag.BoolVar(&f.FilterTrackBpfHelpers, "filter-track-bpf-helpers", false, "trace BPF helper functions")
 	flag.StringVar(&f.FilterIfname, "filter-ifname", "", "filter skb ifname in --filter-netns (if not specified, use current netns)")
