@@ -186,9 +186,9 @@ func HaveBPFLinkTracing() bool {
 	return true
 }
 
-func HaveAvailableFilterFunctions() bool {
-	_, err := getAvailableFilterFunctions()
-	return err == nil
+func AvailableFilterFunctions() (map[string]struct{}, bool) {
+	fns, err := getAvailableFilterFunctions()
+	return fns, err == nil
 }
 
 func HaveSnprintfBtf(kernelBtf *btf.Spec) bool {

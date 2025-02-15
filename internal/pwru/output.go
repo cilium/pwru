@@ -287,6 +287,14 @@ func getAddrByArch(event *Event, o *output) (addr uint64) {
 	return addr
 }
 
+func GetTupleData(event *Event, outputTCPFlags bool) (tupleData string) {
+	return getTupleData(event, outputTCPFlags)
+}
+
+func GetTuple(tpl Tuple, outputTCPFlags bool) (tupleData string) {
+	return getTuple(tpl, outputTCPFlags)
+}
+
 func getTuple(tpl Tuple, outputTCPFlags bool) (tupleData string) {
 	var l4Info string
 	if tpl.L4Proto == syscall.IPPROTO_TCP && tpl.TCPFlag != 0 && outputTCPFlags {

@@ -9,9 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"os/signal"
 	"runtime"
+	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -22,6 +25,7 @@ import (
 
 	"github.com/cilium/pwru/internal/libpcap"
 	"github.com/cilium/pwru/internal/pwru"
+	"github.com/cilium/pwru/tui"
 )
 
 func main() {
@@ -89,11 +93,13 @@ func main() {
 	if flags.Backend != "" && (flags.Backend != pwru.BackendKprobe && flags.Backend != pwru.BackendKprobeMulti) {
 		log.Fatalf("Invalid tracing backend %s", flags.Backend)
 	}
+
+	availFuncs, haveAvailableFuncs := pwru.AvailableFilterFunctions()
 	// Until https://lore.kernel.org/bpf/20221025134148.3300700-1-jolsa@kernel.org/
 	// has been backported to the stable, kprobe-multi cannot be used when attaching
 	// to kmods.
 	if flags.Backend == "" {
-		useKprobeMulti = pwru.HaveBPFLinkKprobeMulti() && pwru.HaveAvailableFilterFunctions()
+		useKprobeMulti = pwru.HaveBPFLinkKprobeMulti() && haveAvailableFuncs
 	} else if flags.Backend == pwru.BackendKprobeMulti {
 		useKprobeMulti = true
 	}
@@ -293,7 +299,7 @@ func main() {
 	}
 	defer output.Close()
 
-	if !flags.OutputJson {
+	if !flags.OutputJson && !flags.OutputExperimentalTUI {
 		output.PrintHeader()
 	}
 
@@ -305,16 +311,37 @@ func main() {
 			log.Printf("Printed %d events, exiting program..\n", flags.OutputLimitLines)
 		}
 	}()
-
-	var event pwru.Event
+	app, err := tui.New(addr2name,
+		strings.Split(flags.TUIFolds, "."), funcs, slices.Collect(maps.Keys(availFuncs)))
+	if err != nil {
+		log.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		app.Run(context.Background())
+	}()
 	events := coll.Maps["events"]
 	runForever := flags.OutputLimitLines == 0
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		fmt.Println("handle ctrl-c")
+		cancel()
+	}()
+
 	for i := flags.OutputLimitLines; i > 0 || runForever; i-- {
+		var event pwru.Event
 		for {
 			if err := events.LookupAndDelete(nil, &event); err == nil {
 				break
 			}
 			select {
+			case <-c:
+				fmt.Println("ctrl-c!")
+				cancel()
+				return
 			case <-ctx.Done():
 				return
 			case <-time.After(time.Microsecond):
@@ -322,7 +349,9 @@ func main() {
 			}
 		}
 
-		if flags.OutputJson {
+		if flags.OutputExperimentalTUI {
+			app.InsertGroup(&event)
+		} else if flags.OutputJson {
 			output.PrintJson(&event)
 		} else {
 			output.Print(&event)
@@ -330,6 +359,10 @@ func main() {
 
 		select {
 		case <-ctx.Done():
+			return
+		case <-c:
+			fmt.Println("ctrl-c!")
+			cancel()
 			return
 		default:
 		}

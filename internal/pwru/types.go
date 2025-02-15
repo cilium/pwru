@@ -62,6 +62,9 @@ type Flags struct {
 	ReadyFile string
 
 	Backend string
+
+	OutputExperimentalTUI bool
+	TUIFolds              string
 }
 
 func (f *Flags) SetFlags() {
@@ -98,6 +101,8 @@ func (f *Flags) SetFlags() {
 	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
 
 	flag.BoolVar(&f.OutputJson, "output-json", false, "output traces in JSON format")
+	flag.BoolVar(&f.OutputExperimentalTUI, "output-experimental-tui", false, "start experimental terminal ui")
+	flag.StringVar(&f.TUIFolds, "tui-folds", "tunnel.tun-dir", "folding")
 
 	flag.StringVar(&f.ReadyFile, "ready-file", "", "create file after all BPF progs are attached")
 	flag.Lookup("ready-file").Hidden = true

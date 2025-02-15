@@ -13,6 +13,10 @@ type ksym struct {
 	name string
 }
 
+func (k *ksym) Name() string {
+	return k.name
+}
+
 type byAddr []*ksym
 
 func (a byAddr) Len() int           { return len(a) }
