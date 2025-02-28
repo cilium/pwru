@@ -42,16 +42,15 @@ func (a *Addr2Name) findNearestSym(ip uint64) string {
 	return strings.Replace(a.Addr2NameSlice[i-1].name, "\t", "", -1)
 }
 
-func ParseKallsyms(funcs Funcs, all bool) (Addr2Name, BpfProgName2Addr, error) {
+func ParseKallsyms(funcs Funcs, all bool) (Addr2Name, error) {
 	a2n := Addr2Name{
 		Addr2NameMap: make(map[uint64]*ksym),
 		Name2AddrMap: make(map[string][]uintptr),
 	}
-	n2a := BpfProgName2Addr{}
 
 	file, err := os.Open("/proc/kallsyms")
 	if err != nil {
-		return a2n, n2a, err
+		return a2n, err
 	}
 	defer file.Close()
 
@@ -62,7 +61,7 @@ func ParseKallsyms(funcs Funcs, all bool) (Addr2Name, BpfProgName2Addr, error) {
 		if all || (funcs[name] > 0) {
 			addr, err := strconv.ParseUint(line[0], 16, 64)
 			if err != nil {
-				return a2n, n2a, err
+				return a2n, err
 			}
 			sym := &ksym{
 				addr: addr,
@@ -73,18 +72,15 @@ func ParseKallsyms(funcs Funcs, all bool) (Addr2Name, BpfProgName2Addr, error) {
 			if all {
 				a2n.Addr2NameSlice = append(a2n.Addr2NameSlice, sym)
 			}
-			if isBpfProg := strings.HasSuffix(name, "[bpf]"); isBpfProg {
-				n2a[name] = addr
-			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return a2n, n2a, err
+		return a2n, err
 	}
 
 	if all {
 		sort.Sort(byAddr(a2n.Addr2NameSlice))
 	}
 
-	return a2n, n2a, nil
+	return a2n, nil
 }
