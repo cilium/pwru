@@ -5,6 +5,7 @@
 package pwru
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
@@ -46,6 +47,7 @@ type Flags struct {
 	OutputSkb        bool
 	OutputShinfo     bool
 	OutputStack      bool
+	OutputBpfmap     bool
 	OutputCaller     bool
 	OutputLimitLines uint64
 	OutputSkbCB      bool
@@ -84,6 +86,7 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 	flag.BoolVar(&f.OutputShinfo, "output-skb-shared-info", false, "print skb shared info")
 	flag.BoolVar(&f.OutputStack, "output-stack", false, "print stack")
+	flag.BoolVar(&f.OutputBpfmap, "output-bpfmap", false, "print function arguments related to bpf maps")
 	flag.BoolVar(&f.OutputCaller, "output-caller", false, "print caller function name")
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
 	flag.BoolVar(&f.OutputSkbCB, "output-skb-cb", false, "print skb->cb")
@@ -176,6 +179,7 @@ type Event struct {
 	Timestamp     uint64
 	PrintSkbId    uint64
 	PrintShinfoId uint64
+	PrintBpfmapId uint64
 	Meta          Meta
 	Tuple         Tuple
 	PrintStackId  int64
@@ -237,4 +241,20 @@ func parseUint32HexOrDecimal(s string) (uint32, error) {
 		return 0, err
 	}
 	return uint32(val), nil
+}
+
+type printBpfmapValue struct {
+	Id        uint32
+	Name      [16]byte
+	KeySize   uint32
+	ValueSize uint32
+	Key       [256]byte
+	Value     [256]byte
+}
+
+func (i *printBpfmapValue) String() string {
+	key := fmt.Sprintf("%s", hex.Dump(i.Key[:i.KeySize]))
+	value := fmt.Sprintf("%s", hex.Dump(i.Value[:i.ValueSize]))
+	return fmt.Sprintf("map_id: %d\nmap_name: %s\nkey(%d):\n%svalue(%d):\n%s",
+		i.Id, i.Name, i.KeySize, key, i.ValueSize, value)
 }
