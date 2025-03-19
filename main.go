@@ -133,6 +133,12 @@ func main() {
 		}
 	}
 
+	// --output-skb-metadata
+	skbMds, err := pwru.ParseSkbMetadataExprs(flags.OutputSkbMetadata, btfSpec)
+	if err != nil {
+		log.Fatalf("Failed to parse skb metadata exprs: %s", err)
+	}
+
 	for name, program := range bpfSpec.Programs {
 		// Skip the skb-tracking ones that should not inject pcap-filter.
 		switch name {
@@ -152,6 +158,9 @@ func main() {
 		}
 		if err = libpcap.InjectFilters(program, flags.FilterPcap); err != nil {
 			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
+		}
+		if err := pwru.InjectSetSkbMetadata(program, skbMds); err != nil {
+			log.Fatalf("Failed to inject skb metadata: %v", err)
 		}
 	}
 
@@ -284,7 +293,7 @@ func main() {
 	printSkbMap := coll.Maps["print_skb_map"]
 	printShinfoMap := coll.Maps["print_shinfo_map"]
 	printStackMap := coll.Maps["print_stack_map"]
-	output, err := pwru.NewOutput(&flags, printSkbMap, printShinfoMap, printStackMap, addr2name, useKprobeMulti, btfSpec)
+	output, err := pwru.NewOutput(&flags, printSkbMap, printShinfoMap, printStackMap, addr2name, skbMds, useKprobeMulti, btfSpec)
 	if err != nil {
 		log.Fatalf("Failed to create outputer: %s", err)
 	}

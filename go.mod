@@ -1,12 +1,16 @@
 module github.com/cilium/pwru
 
-go 1.23.1
+go 1.23.4
+
+toolchain go1.24.0
 
 require (
+	github.com/Asphaltt/mybtf v0.0.0-20250315135407-f9d09086616b
 	github.com/cheggaaa/pb/v3 v3.1.6
 	github.com/cilium/ebpf v0.17.3
 	github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
 	github.com/jsimonetti/rtnetlink v1.4.2
+	github.com/leonhwangprojects/bice v0.1.1
 	github.com/spf13/pflag v1.0.6
 	github.com/tklauser/ps v0.0.3
 	github.com/vishvananda/netns v0.0.5
@@ -28,4 +32,5 @@ require (
 	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	rsc.io/c2go v0.0.0-20170620140410-520c22818a08 // indirect
 )

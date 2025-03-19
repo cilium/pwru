@@ -23,6 +23,7 @@ const (
 	OutputStackMask
 	OutputCallerMask
 	OutputCbMask
+	OutputSkbMetadataMask
 )
 
 const (
@@ -71,6 +72,9 @@ func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	}
 	if flags.OutputCaller {
 		cfg.OutputFlags |= OutputCallerMask
+	}
+	if len(flags.OutputSkbMetadata) > 0 {
+		cfg.OutputFlags |= OutputSkbMetadataMask
 	}
 	if flags.FilterTraceTc || flags.OutputSkbCB {
 		cfg.OutputFlags |= OutputCbMask
