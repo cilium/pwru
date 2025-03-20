@@ -89,6 +89,7 @@ struct event_t {
 	u64 param_second;
 	u64 param_third;
 	u32 cpu_id;
+	u64 skb_metadata[4]; /* output up-to-4 metadata */
 } __attribute__((packed));
 
 #define MAX_QUEUE_ENTRIES 10000
@@ -146,7 +147,7 @@ struct config {
 	u8 output_stack: 1;
 	u8 output_caller: 1;
 	u8 output_cb: 1;
-	u8 output_unused: 1;
+	u8 output_skb_metadata: 1;
 	u8 is_set: 1;
 	u8 track_skb: 1;
 	u8 track_skb_by_stackid: 1;
@@ -269,6 +270,12 @@ filter_pcap(struct sk_buff *skb) {
 static __always_inline bool
 filter(struct sk_buff *skb) {
 	return filter_pcap(skb) && filter_meta(skb);
+}
+
+static __noinline void
+set_skb_metadata(struct sk_buff *skb, u64 *metadata) {
+	/* This func will be rewrote by Go. */
+	metadata[0] = (u64)(void *) skb;
 }
 
 static __always_inline void
@@ -451,6 +458,12 @@ set_output(void *ctx, struct sk_buff *skb, struct event_t *event) {
 	if (cfg->output_cb) {
 		struct qdisc_skb_cb *cb = (struct qdisc_skb_cb *)&skb->cb;
 		bpf_probe_read_kernel(&event->meta.cb, sizeof(event->meta.cb), (void *)&cb->data);
+	}
+
+	if (cfg->output_skb_metadata) {
+		u64 data[4];
+		set_skb_metadata(skb, data);
+		__builtin_memcpy(event->skb_metadata, data, sizeof(data));
 	}
 }
 
