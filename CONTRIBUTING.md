@@ -1,7 +1,7 @@
 # Contributing
 
 `pwru` is an open source project. The userspace code is licensed under [Apache-2.0](LICENSE), while the BPF under [BSD 2-Clause](bpf/LICENSE.BSD-2-Clause) and [GPL-2.0](bpf/LICENSE.GPL-2.0). Everybody is welcome to contribute. Contributors are required to follow the [CNCF Code of
-Conduct](https://github.com/cncf/foundation/blob/main/code-of-conduct.md) and must adhere to the [Developer Certificate of Origin](https://developercertificate.org/) by adding a Signed-off-by line to their commit messages.
+Conduct](https://github.com/cncf/foundation/blob/main/code-of-conduct.md).
 
 ## Getting Started
 
@@ -34,6 +34,10 @@ Alternatively, you can build it within a Docker container:
 ```
 make release
 ```
+
+### Sign-off
+
+Ensure that all commits have [Developer Certificate of Origin](https://developercertificate.org/) by adding a [Signed-off-by line to your commit messages](https://docs.cilium.io/en/stable/contributing/development/contributing_guide/#developer-s-certificate-of-origin).
 
 ## Contributor Ladder  
 
