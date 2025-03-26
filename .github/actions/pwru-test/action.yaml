@@ -24,7 +24,7 @@ runs:
   using: composite
   steps:
     - name: PWRU test
-      uses: cilium/little-vm-helper@9d758b756305e83718a51b792a5aeabd022a39ec # v0.0.16
+      uses: cilium/little-vm-helper@e87948476ca97050b1f149ab2aec379d0de19b84 # v0.0.23
       with:
         provision: 'false'
         cmd: |
@@ -52,7 +52,7 @@ runs:
 
     - name: Fetch artifacts from LVH VM
       if: ${{ !success() }}
-      uses: cilium/little-vm-helper@9d758b756305e83718a51b792a5aeabd022a39ec # v0.0.16
+      uses: cilium/little-vm-helper@e87948476ca97050b1f149ab2aec379d0de19b84 # v0.0.23
       with:
         provision: 'false'
         cmd: |
@@ -61,7 +61,7 @@ runs:
 
     - name: Upload artifacts
       if: ${{ !success() }}
-      uses: actions/upload-artifact@1746f4ab65b179e0ea60a494b83293b640dd5bba # v4.3.2
+      uses: actions/upload-artifact@v4
       with:
         name: logs-${{ inputs.test-name }}
         path: ./logs/${{ inputs.test-name }}/pwru-*
