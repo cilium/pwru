@@ -35,6 +35,7 @@ type Flags struct {
 	FilterTrackSkbByStackid bool
 	FilterTraceTc           bool
 	FilterTraceXdp          bool
+	FilterTraceOnlyBpf      bool
 	FilterTrackBpfHelpers   bool
 	FilterIfname            string
 	FilterPcap              string
@@ -80,6 +81,7 @@ func (f *Flags) SetFlags() {
 	flag.StringVar(&f.FilterTunnelPcapL2, "filter-tunnel-pcap-l2", "", "pcap expression for vxlan/geneve tunnel (l2)")
 	flag.StringVar(&f.FilterTunnelPcapL3, "filter-tunnel-pcap-l3", "", "pcap expression for vxlan/geneve tunnel (l3)")
 	flag.BoolVar(&f.FilterTraceXdp, "filter-trace-xdp", false, "trace XDP bpf progs")
+	flag.BoolVar(&f.FilterTraceOnlyBpf, "filter-trace-only-bpf", false, "trace only TC and XDP bpf progs")
 	flag.BoolVar(&f.FilterTrackBpfHelpers, "filter-track-bpf-helpers", false, "trace BPF helper functions")
 	flag.StringVar(&f.FilterIfname, "filter-ifname", "", "filter skb ifname in --filter-netns (if not specified, use current netns)")
 	flag.UintVar(&f.FilterKprobeBatch, "filter-kprobe-batch", 10, "batch size for kprobe attaching/detaching")
