@@ -48,7 +48,7 @@ jobs:
     #     path: test-app/test-app
 
   test:
-    runs-on: ubuntu-24.04-arm
+    runs-on: oracle-16cpu-64gb-arm64
     name: Test
     needs: build
     strategy:
