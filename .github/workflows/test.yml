@@ -85,7 +85,8 @@ jobs:
           if (( $minor < 10 )); then
             minor="0${minor}"
           fi
-
+          apt-get update -y
+          apt-get install -y docker
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
       - name: Provision LVH VMs
