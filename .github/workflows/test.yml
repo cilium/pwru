@@ -89,7 +89,7 @@ jobs:
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
       - name: Provision LVH VMs
-        uses: cilium/little-vm-helper@e87948476ca97050b1f149ab2aec379d0de19b84 # v0.0.23
+        uses: cilium/little-vm-helper@1dd9b9f8e956ea8f780d0a06864e5d191dc9adc6
         with:
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
