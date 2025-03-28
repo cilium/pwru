@@ -1,8 +1,8 @@
 # github.com/VividCortex/ewma v1.2.0
 ## explicit; go 1.12
 github.com/VividCortex/ewma
-# github.com/cheggaaa/pb/v3 v3.1.6
-## explicit; go 1.17
+# github.com/cheggaaa/pb/v3 v3.1.7
+## explicit; go 1.18
 github.com/cheggaaa/pb/v3
 github.com/cheggaaa/pb/v3/termutil
 # github.com/cilium/ebpf v0.17.3
@@ -63,8 +63,8 @@ github.com/mdlayher/socket
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
-# github.com/rivo/uniseg v0.2.0
-## explicit; go 1.12
+# github.com/rivo/uniseg v0.4.7
+## explicit; go 1.18
 github.com/rivo/uniseg
 # github.com/spf13/pflag v1.0.6
 ## explicit; go 1.12
