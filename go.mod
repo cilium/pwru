@@ -1,6 +1,7 @@
 module github.com/cilium/pwru
 
 go 1.23.1
+toolchain go1.24.1
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.7
@@ -13,7 +14,7 @@ require (
 	golang.org/x/arch v0.14.0
 	golang.org/x/net v0.35.0
 	golang.org/x/sync v0.11.0
-	golang.org/x/sys v0.30.0
+	golang.org/x/sys v0.31.0
 )
 
 require (
