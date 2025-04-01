@@ -24,8 +24,8 @@ github.com/cilium/ebpf/internal/tracefs
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
 github.com/cilium/ebpf/rlimit
-# github.com/cloudflare/cbpfc v0.0.0-20221017140110-11acb56438a2
-## explicit; go 1.16
+# github.com/cloudflare/cbpfc v0.0.0-20240920015331-ff978e94500b
+## explicit; go 1.19
 github.com/cloudflare/cbpfc
 # github.com/fatih/color v1.18.0
 ## explicit; go 1.17
