@@ -98,6 +98,11 @@ func main() {
 		useKprobeMulti = true
 	}
 
+	// If --filter-trace-only-bpf is set, then trace only TC and XDP
+	if flags.FilterTraceOnlyBpf {
+		flags.FilterTraceTc = true
+		flags.FilterTraceXdp = true
+	}
 	funcs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods, useKprobeMulti)
 	if err != nil {
 		log.Fatalf("Failed to get skb-accepting functions: %s", err)
@@ -133,6 +138,13 @@ func main() {
 		}
 	}
 
+	// Skip the skb funcs when --filter-trace-only-bpf is enabled
+	if flags.FilterTraceOnlyBpf {
+		for i := 1; i <= 5; i++ {
+			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_skb_%d", i))
+			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_multi_skb_%d", i))
+		}
+	}
 	for name, program := range bpfSpec.Programs {
 		// Skip the skb-tracking ones that should not inject pcap-filter.
 		switch name {
