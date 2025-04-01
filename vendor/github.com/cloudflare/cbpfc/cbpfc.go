@@ -161,9 +161,9 @@ func (p packetGuardAbsolute) Assemble() (bpf.RawInstruction, error) {
 // adding negative offsets to packet pointers).
 //
 // This requires tracking both the first and last byte read (relative to RegX) to check:
-//  - RegX + start >= 0
-//  - RegX + end < maxPacketOffset
-//  - packet_start + RegX + end < packet_end
+//   - RegX + start >= 0
+//   - RegX + end < maxPacketOffset
+//   - packet_start + RegX + end < packet_end
 //
 // Bounds / range information is propagated in the verifier by copying a packet pointer,
 // adding a constant (which yields a "derived" packet pointer with the same ID), and checking it against the packet_end.
@@ -174,9 +174,10 @@ func (p packetGuardAbsolute) Assemble() (bpf.RawInstruction, error) {
 // would make the read positive: https://elixir.bootlin.com/linux/v5.14.12/source/kernel/bpf/verifier.c#L3287)
 //
 // So instead we check:
-//  - RegX + start >= 0
-//  - RegX + start < maxPacketOffset - length
-//  - packet_start + RegX + start + length < packet_end
+//   - RegX + start >= 0
+//   - RegX + start < maxPacketOffset - length
+//   - packet_start + RegX + start + length < packet_end
+//
 // This lets us reuse packet_start + RegX + start as the packet pointer for LoadIndirect,
 // but means we need to rewrite the offsets of LoadIndirect instructions covered by this guard to subtract length.
 type packetGuardIndirect struct {
@@ -801,13 +802,13 @@ func addBlockGuards(block *block, currentGuard packetGuard, opts packetGuardOpts
 //
 // If the DAG of blocks needs these packet guards:
 //
-//           [4]
-//          /   \
-//      false   [6]
-//             /   \
-//          true   [8]
-//                /   \
-//            false   true
+//	     [4]
+//	    /   \
+//	false   [6]
+//	       /   \
+//	    true   [8]
+//	          /   \
+//	      false   true
 //
 // A packet can only match ("true") by going through guards 4 and 6. It does not have to go through guard 8.
 // guaranteedGuard would return 6.

@@ -12,7 +12,9 @@ import (
 
 const funcTemplate = `
 // True if packet matches, false otherwise
-static inline
+{{- if not .NoInline}}
+__attribute__((__always_inline__)) static inline
+{{- end}}
 uint32_t {{.Name}}(const uint8_t *const data, const uint8_t *const data_end) {
 	__attribute__((unused))
 	uint32_t a, x, m[16];
@@ -29,8 +31,9 @@ __attribute__((unused));
 }`
 
 type cFunction struct {
-	Name   string
-	Blocks []cBlock
+	Name     string
+	NoInline bool
+	Blocks   []cBlock
 }
 
 // cBPF reg to C symbol
@@ -78,11 +81,16 @@ type COpts struct {
 	// FunctionName is the symbol to use as the generated C function. Must match regex:
 	//     [A-Za-z_][0-9A-Za-z_]*
 	FunctionName string
+
+	// NoInline doesn't force the generated function to be inlined, allowing clang to emit
+	// a BPF to BPF call.
+	// Requires at least kernel 5.10 (for x86, later for other architectures) if used with tail-calls.
+	NoInline bool
 }
 
 // ToC compiles a cBPF filter to a C function with a signature of:
 //
-//     uint32_t opts.FunctionName(const uint8_t *const data, const uint8_t *const data_end)
+//	uint32_t opts.FunctionName(const uint8_t *const data, const uint8_t *const data_end)
 //
 // The function returns the filter's return value:
 // 0 if the packet does not match the cBPF filter,
