@@ -3,7 +3,23 @@
   "extends": [
     "config:recommended"
   ],
-  postUpdateOptions: [
+  "postUpdateOptions": [
     "gomodTidy"
-  ]
+  ],
+  "schedule": [
+    "on friday"
+  ],
+  "groupName": "all dependencies",
+  "lockFileMaintenance": {
+    "enabled": false
+   },
+  "packageRules": [
+    {
+      "matchPackagePatterns": [
+        "*"
+      ],
+      "groupName": "all dependencies"
+    }
+  ],
+  "separateMajorMinor": false
 }
