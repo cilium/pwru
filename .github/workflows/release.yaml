@@ -18,7 +18,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@dca8468d37b6d090cde2c7b97b738a37134f5ffb
         with:
-          go-version: 1.23.1
+          go-version: 1.24.2
 
       - name: Generate the artifacts
         run: make release
