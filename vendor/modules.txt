@@ -44,6 +44,8 @@ github.com/josharian/native
 ## explicit; go 1.20
 github.com/jsimonetti/rtnetlink
 github.com/jsimonetti/rtnetlink/internal/unix
+# github.com/jsimonetti/rtnetlink/v2 v2.0.2
+## explicit; go 1.20
 # github.com/mattn/go-colorable v0.1.14
 ## explicit; go 1.18
 github.com/mattn/go-colorable
