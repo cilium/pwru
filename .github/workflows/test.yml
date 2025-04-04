@@ -31,7 +31,7 @@ jobs:
         tar xfv release/pwru-linux-amd64.tar.gz
 
     - name: Store executable
-      uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b
+      uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47
       with:
         name: pwru
         path: pwru
@@ -42,7 +42,7 @@ jobs:
         go build .
 
     - name: Store test-app
-      uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b
+      uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47
       with:
         name: test-app
         path: test-app/test-app

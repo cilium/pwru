@@ -4,15 +4,16 @@ go 1.24.1
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.7
-	github.com/cilium/ebpf v0.17.3
+	github.com/cilium/ebpf v0.18.0
 	github.com/cloudflare/cbpfc v0.0.0-20240920015331-ff978e94500b
 	github.com/jsimonetti/rtnetlink v1.4.2
+	github.com/jsimonetti/rtnetlink/v2 v2.0.2
 	github.com/spf13/pflag v1.0.6
 	github.com/tklauser/ps v0.0.3
 	github.com/vishvananda/netns v0.0.5
-	golang.org/x/arch v0.14.0
-	golang.org/x/net v0.36.0
-	golang.org/x/sync v0.11.0
+	golang.org/x/arch v0.15.0
+	golang.org/x/net v0.38.0
+	golang.org/x/sync v0.12.0
 	golang.org/x/sys v0.31.0
 )
 

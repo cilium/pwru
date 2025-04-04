@@ -38,7 +38,7 @@ jobs:
 
       - name: Upload the artifacts
         id: upload-release-artifacts
-        uses: skx/github-action-publish-binaries@b9ca5643b2f1d7371a6cba7f35333f1461bbc703
+        uses: skx/github-action-publish-binaries@44887b225ceca96efd8a912d39c09ad70312af31
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
