@@ -1,6 +1,6 @@
 module github.com/cilium/pwru
 
-go 1.23.1
+go 1.24.1
 
 require (
 	github.com/cheggaaa/pb/v3 v3.1.7
