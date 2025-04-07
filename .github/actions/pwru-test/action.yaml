@@ -1,24 +1,29 @@
 name: PWRU Test
+description: PWRU tool test action
 
 inputs:
   test-name:
+    description: "Test name"
     required: true
-    type: string
   pwru-flags:
+    description: "PWRU tool flags"
     required: false
-    type: string
   pwru-pcap-filter:
+    description: "PWRU tool PCAP filter"
     required: false
-    type: string
   setup:
+    description: "Setup commands"
     required: false
-    type: string
   gen-traffic:
+    description: "Generate traffic commands"
     required: false
-    type: string
   expected-output-pattern:
+    description: "Expected output pattern"
     required: true
-    type: string
+  ssh-port:
+    description: "SSH port for VM on a host"
+    required: false
+    default: "2222"
 
 runs:
   using: composite
@@ -26,6 +31,7 @@ runs:
     - name: PWRU test
       uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
       with:
+        ssh-port: ${{ inputs.ssh-port }}
         provision: 'false'
         cmd: |
           set -x
@@ -54,6 +60,7 @@ runs:
       if: ${{ !success() }}
       uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
       with:
+        ssh-port: ${{ inputs.ssh-port }}
         provision: 'false'
         cmd: |
           mkdir -p /host/logs/${{ inputs.test-name }}

@@ -1,0 +1,168 @@
+name: Manage ARM64 runners
+description: Manage ARM64 runners
+inputs:
+  state-bucket:
+    required: true
+    description: "AWS S3 bucket name for the Terraform state"
+  state-region:
+    required: true
+    description: "AWS region where state bucket has been created"
+  role-arn:
+    required: true
+    description: "AWS IAM role ARN"
+  region:
+    required: true
+    description: "AWS region"
+  zone:
+    required: true
+    description: "AWS availability zone"
+  infra-dir:
+    required: true
+    description: "Directory with infra config"
+  action:
+    required: true
+    description: "Terraform action: plan, apply, destroy"
+  ec2-type:
+    required: true
+    description: "EC2 instance type"
+  ec2-ami:
+    required: true
+    description: "EC2 AMI type"
+  label:
+    required: true
+    description: "Runners label"
+  gh-org:
+    required: true
+    description: "GitHub organization"
+  gh-app-id:
+    required: true
+    description: "GitHub APP ID"
+  gh-app-install-id:
+    required: true
+    description: "GitHub APP install ID"
+  gh-app-pem:
+    required: true
+    description: "GitHub APP private key"
+  gh-runners-group:
+    required: true
+    description: "GitHub self-hosted runners group"
+  gh-runners-count:
+    required: true
+    description: "GitHub virtual runners count"
+  ssh-private-key:
+    required: true
+    description: "SSH private key for the runner access"
+  ssh-public-key:
+    required: true
+    description: "SSH public key for the runner access"
+
+runs:
+  using: composite
+  steps:
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # 3.1.2
+      with:
+        terraform_version: "1.10.3"
+
+    - name: Set up AWS CLI credentials
+      uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+      with:
+        role-to-assume: ${{ inputs.role-arn }}
+        aws-region: ${{ inputs.region }}
+
+    - name: Lookup EC2 instance FQDN
+      if: ${{ inputs.action == 'destroy' }}
+      id: ec2-destroy
+      shell: bash
+      run: |
+        fqdn="$(aws ec2 describe-instances --region ${{ inputs.region }} | \
+                jq -r '.Reservations[].Instances[] | select(.State.Name == "running") | select(.Tags != null) | select(.Tags[].Value|test("^${{ inputs.label }}$")) | .PublicDnsName')"
+        echo fqdn=$fqdn >> $GITHUB_OUTPUT
+
+    - name: Issue GH token
+      if: ${{ inputs.action == 'destroy' }}
+      id: gh
+      shell: bash
+      working-directory: ${{ inputs.infra-dir }}
+      run: |
+        export GITHUB_ORG="${{ inputs.gh-org }}"
+        export GITHUB_APP_ID="${{ inputs.gh-app-id }}"
+        export GITHUB_APP_INSTALL_ID="${{ inputs.gh-app-install-id }}"
+        export GITHUB_APP_PEM="${{ inputs.gh-app-pem }}"
+        token=$(./token.sh)
+        echo token=$token >> $GITHUB_OUTPUT
+
+    - name: Delete GH runners
+      if: ${{ inputs.action == 'destroy' }}
+      uses: appleboy/ssh-action@8faa84277b88b6cd1455986f459aa66cf72bc8a3 # v1.2.1
+      with:
+        host: ${{ steps.ec2-destroy.outputs.fqdn }}
+        username: ubuntu
+        key: ${{ inputs.ssh-private-key }}
+        script: |
+          echo "GH runners list:"
+          /multi-runners/mr.bash list
+
+          for (( i=1; i<=${{ inputs.gh-runners-count }}; i++ ))
+          do
+            echo "deleting runner-$i ..."
+            /multi-runners/mr.bash del --user runner-$i --token ${{ steps.gh.outputs.token }} || true
+          done
+
+    - name: Set up Terraform variables
+      working-directory: ${{ inputs.infra-dir }}
+      shell: bash
+      run: |
+        cat > terraform.tfvars << EOF
+        ssh_key_pair="${{ github.repository }}/${{ inputs.label }}"
+        ssh_public_key="${{ inputs.ssh-public-key }}"
+        owner="${{ github.repository }}"
+        region="${{ inputs.region }}"
+        zone="${{ inputs.zone }}"
+        gh_app_id="${{ inputs.gh-app-id }}"
+        gh_app_install_id="${{ inputs.gh-app-install-id }}"
+        gh_org="${{ inputs.gh-org }}"
+        gh_group="${{ inputs.gh-runners-group }}"
+        gh_runners_count="${{ inputs.gh-runners-count }}"
+        gh_label="${{ inputs.label }}"
+        ec2_type="${{ inputs.ec2-type }}"
+        ec2_ami="${{ inputs.ec2-ami }}"
+        gh_app_pem=<<EOT
+        ${{ inputs.gh-app-pem }}
+        EOT
+        EOF
+
+    - name: ${{ inputs.action }} runner
+      working-directory: ${{ inputs.infra-dir }}
+      shell: bash
+      run: |
+        make ${{ inputs.action }} STATE_REGION=${{ inputs.state-region }} \
+            STATE_BUCKET=${{ inputs.state-bucket }} \
+            STATE_FILE=${{ inputs.label }} \
+            AUTO_APPROVE=true
+
+    - name: Lookup EC2 instance FQDN
+      if: ${{ inputs.action == 'apply' }}
+      id: ec2-apply
+      shell: bash
+      run: |
+        for (( i=1; i<=60; i++ ))
+        do
+          sleep 10
+          id_fqdn="$(aws ec2 describe-instances --region ${{ inputs.region }} | \
+                     jq -r '.Reservations[].Instances[] | select(.Tags != null) | select(.Tags[].Value|test("^${{ inputs.label }}$")) | .InstanceId + "," + .PublicDnsName')" || true
+          id=$(echo "$id_fqdn" | cut -d "," -f 1)
+          fqdn=$(echo "$id_fqdn" | cut -d "," -f 2)
+          ready_count="$(aws ec2 describe-instance-status --no-cli-pager --instance-ids $id --region ${{ inputs.region }} | \
+                         jq '.InstanceStatuses[] | select(.InstanceStatus.Details[].Status == "passed") | .InstanceId ' | wc -l)" || true
+          if [[ $ready_count -eq 1 ]]
+          then
+            echo "EC2 instance is ready now [id: $id, fqdn: $fqdn]"
+            echo fqdn=$fqdn >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "EC2 instance is not ready yet ..."
+        done
+
+        echo "EC2 instance not ready!"
+        exit 1

@@ -6,10 +6,29 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  # To be able to request the JWT from GitHub's OIDC provider
+  id-token: write
+
+env:
+  arm64-runner-state-bucket: cilium-pwru-runner
+  arm64-runner-state-region: us-east-2
+  arm64-runner-region: us-east-2
+  arm64-runner-zone: us-east-2b
+  arm64-runner-role-arn: arn:aws:iam::478566851380:role/CuTE_CIAccessRole
+  arm64-runner-infra-dir: infra/arm64-runner
+  arm64-runner-ec2-type: c6g.metal # 64 vCPU x 128 GB
+  arm64-runner-ec2-ami: ami-04dd2037804df8ff9
+  arm64-runner-group: cilium-pwru-runners
+  arm64-runner-label: cilium-pwru-runners-arm64-${{ github.run_id }}
+  arm64-runner-count: 7
+
 jobs:
 
   build:
     runs-on: ubuntu-latest
+    name: Build
     steps:
     - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
 
@@ -47,17 +66,84 @@ jobs:
         name: test-app
         path: test-app/test-app
 
-  test:
+  arm64-runner-provision:
+    needs: [build]
     runs-on: ubuntu-latest
+    name: Provision ARM64 runner
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Git Repo
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Provision ARM64 runner
+        uses: ./.github/actions/arm64-runner
+        with:
+          state-bucket: ${{ env.arm64-runner-state-bucket }}
+          state-region: ${{ env.arm64-runner-state-region }}
+          role-arn: ${{ env.arm64-runner-role-arn }}
+          region: ${{ env.arm64-runner-region }}
+          zone: ${{ env.arm64-runner-zone }}
+          infra-dir: ${{ env.arm64-runner-infra-dir }}
+          action: apply
+          ec2-type: ${{ env.arm64-runner-ec2-type }}
+          ec2-ami: ${{ env.arm64-runner-ec2-ami }}
+          label: ${{ env.arm64-runner-label }}
+          gh-org: ${{ github.repository_owner }}
+          gh-app-id: ${{ secrets.ARM64_RUNNER_GH_APP_ID }}
+          gh-app-install-id: ${{ secrets.ARM64_RUNNER_GH_APP_INSTALL_ID }}
+          gh-app-pem: ${{ secrets.ARM64_RUNNER_GH_APP_PRIVATE_KEY }}
+          gh-runners-group: ${{ env.arm64-runner-group }}
+          gh-runners-count: ${{ env.arm64-runner-count }}
+          ssh-private-key: ${{ secrets.ARM64_RUNNER_SSH_PRIVATE_KEY }}
+          ssh-public-key: ${{ secrets.ARM64_RUNNER_SSH_PUBLIC_KEY }}
+
+  test:
     name: Test
-    needs: build
+    needs: [build, arm64-runner-provision]
     strategy:
       fail-fast: false
       matrix:
+        os: ['ubuntu-latest', 'cilium-pwru-runners-arm64-${{ github.run_id }}']
         kernel: [ '5.4-20241218.004849', '5.10-20241218.004849', '5.15-20241218.004849', '6.1-20241218.004849', '6.6-20241218.004849', '6.12-20241218.004849', 'bpf-next-20250105.013256' ]
-    timeout-minutes: 10
+    timeout-minutes: 60
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
+
+      - name: Set up job variables
+        id: vars
+        run: |
+          if [[ "${{ matrix.os }}" == "cilium-pwru-runners-arm64-${{ github.run_id }}" ]]
+          then
+            # this is racy but it should be fine
+            ssh_port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
+            echo metal_arm64=true >> $GITHUB_OUTPUT
+            echo lvh_install_deps=false >> $GITHUB_OUTPUT
+            echo lvh_kernel="/home/runners/vmlinuz-${{ matrix.kernel }}" >> $GITHUB_OUTPUT
+            echo ssh_port=$ssh_port >> $GITHUB_OUTPUT
+            echo shared_folder="/home/runners" >> $GITHUB_OUTPUT
+          else
+            echo metal_arm64=false >> $GITHUB_OUTPUT
+            echo lvh_install_deps=true >> $GITHUB_OUTPUT
+            echo lvh_kernel="" >> $GITHUB_OUTPUT
+            echo ssh_port=2222 >> $GITHUB_OUTPUT
+            echo shared_folder="" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install GO
+        if: steps.vars.outputs.metal_arm64 == 'true'
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        with:
+          go-version: '1.23.2'
+
+      - name: Install LVH CLI
+        if: steps.vars.outputs.metal_arm64 == 'true'
+        run: |
+          go install github.com/cilium/little-vm-helper/cmd/lvh@latest
+          # Move it into /bin folder, so that LVH action can detect it further
+          sudo mv $(which lvh) /bin/lvh
 
       - name: Retrieve stored pwru executable
         uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
@@ -88,20 +174,46 @@ jobs:
 
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
+      - name: Download the kernel
+        if: steps.vars.outputs.metal_arm64 == 'true'
+        run: |
+          if [ ! -e "${{ steps.vars.outputs.shared_folder }}/vmlinuz-${{ matrix.kernel }}" ]; then
+            lvh kernel pull ${{ matrix.kernel }}
+            mkdir -p ${{ steps.vars.outputs.shared_folder }}
+            mv ${{ matrix.kernel }}/boot/vmlinuz* ${{ steps.vars.outputs.shared_folder }}/vmlinuz-${{ matrix.kernel }}
+            rm -rf ${{ matrix.kernel }}
+          fi
+
       - name: Provision LVH VMs
         uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
         with:
+          install-dependencies: ${{ steps.vars.outputs.lvh_install_deps }}
+          images-folder-parent: ${{ steps.vars.outputs.shared_folder }}
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
+          mem: 4G
+          cpu: 2
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
+          kernel: '${{ steps.vars.outputs.lvh_kernel }}'
           host-mount: ./
-          install-dependencies: 'true'
           cmd: |
             chmod +x /host/pwru/pwru
             chmod +x /host/test-app/test-app
 
+            # wait for network to be available
+            while true;
+            do
+              wget --spider -q -T 10 http://google.com && break
+              sleep 10
+            done
+
+            # restart ssh server
+            service ssh restart
+
       - name: Test basic IPv4
         uses: ./.github/actions/pwru-test
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-basic-ipv4
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
           setup: |
@@ -113,6 +225,7 @@ jobs:
       - name: Test basic IPv6
         uses: ./.github/actions/pwru-test
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-basic-ipv6
           pwru-pcap-filter: 'dst host 2606:4700:4700::1001 and port 8080'
           setup: |
@@ -124,6 +237,7 @@ jobs:
       - name: Test advanced IPv4
         uses: ./.github/actions/pwru-test
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-advanced-ipv4
           pwru-pcap-filter: 'tcp[tcpflags] = tcp-syn'
           setup: |
@@ -135,6 +249,7 @@ jobs:
       - name: Test advanced IPv6
         uses: ./.github/actions/pwru-test
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-advanced-ipv6
           pwru-pcap-filter: 'ip6[53] & 0x3f = 0x2'
           setup: |
@@ -146,6 +261,7 @@ jobs:
       - name: Test pcap filter using stack
         uses: ./.github/actions/pwru-test
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-pcap-filter-stack
           pwru-pcap-filter: '(((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)'
           gen-traffic: curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.1.1.1 || true; sleep 5
@@ -154,6 +270,7 @@ jobs:
       - name: Test --filter-track-skb
         uses: ./.github/actions/pwru-test
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-filter-track-skb
           pwru-flags: --filter-track-skb
           pwru-pcap-filter: dst host 10.10.20.99
@@ -166,6 +283,7 @@ jobs:
       - name: Test ARP filter
         uses: ./.github/actions/pwru-test
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-filter-arp
           pwru-pcap-filter: 'arp and arp[7] = 1 and arp[24]= 169 and arp[25] = 254 and arp[26] = 0 and arp[27] = 1'
           setup: |
@@ -185,6 +303,7 @@ jobs:
       - name: Test --filter-ifname
         uses: ./.github/actions/pwru-test
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-filter-ifname
           pwru-flags: --filter-ifname lo
           pwru-pcap-filter: icmp
@@ -196,6 +315,7 @@ jobs:
         if: ${{ steps.kernel.outputs.vsn >= 518 }}
         uses: ./.github/actions/pwru-test
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-kprobe-multi-basic
           pwru-flags: --backend=kprobe-multi
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
@@ -209,6 +329,7 @@ jobs:
         if: ${{ steps.kernel.outputs.vsn >= 606 }}
         uses: ./.github/actions/pwru-test
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-filter-trace-tc-xdp
           pwru-flags: --filter-trace-tc --filter-trace-xdp
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
@@ -227,9 +348,44 @@ jobs:
         if: ${{ !success() }}
         uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
         with:
+          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           provision: 'false'
           cmd: |
             for i in /tmp/pwru-*.status /tmp/pwru-*.ready /tmp/pwru-*.log; do
               echo "--- \$i ---"
               cat \$i || true
             done
+
+  arm64-runner-destroy:
+    needs: [arm64-runner-provision, test]
+    if: always() && needs.arm64-runner-provision.result != 'skipped'
+    runs-on: ubuntu-latest
+    name: Destroy ARM64 runner
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Git Repo
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Destroy ARM64 runner
+        uses: ./.github/actions/arm64-runner
+        with:
+          state-bucket: ${{ env.arm64-runner-state-bucket }}
+          state-region: ${{ env.arm64-runner-state-region }}
+          role-arn: ${{ env.arm64-runner-role-arn }}
+          region: ${{ env.arm64-runner-region }}
+          zone: ${{ env.arm64-runner-zone }}
+          infra-dir: ${{ env.arm64-runner-infra-dir }}
+          action: destroy
+          ec2-type: ${{ env.arm64-runner-ec2-type }}
+          ec2-ami: ${{ env.arm64-runner-ec2-ami }}
+          label: ${{ env.arm64-runner-label }}
+          gh-org: ${{ github.repository_owner }}
+          gh-app-id: ${{ secrets.ARM64_RUNNER_GH_APP_ID }}
+          gh-app-install-id: ${{ secrets.ARM64_RUNNER_GH_APP_INSTALL_ID }}
+          gh-app-pem: ${{ secrets.ARM64_RUNNER_GH_APP_PRIVATE_KEY }}
+          gh-runners-group: ${{ env.arm64-runner-group }}
+          gh-runners-count: ${{ env.arm64-runner-count }}
+          ssh-private-key: ${{ secrets.ARM64_RUNNER_SSH_PRIVATE_KEY }}
+          ssh-public-key: ${{ secrets.ARM64_RUNNER_SSH_PUBLIC_KEY }}
