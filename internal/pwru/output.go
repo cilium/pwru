@@ -44,6 +44,8 @@ type output struct {
 	printShinfoMap *ebpf.Map
 	printStackMap  *ebpf.Map
 	addr2name      Addr2Name
+	skbMetadata    []*SkbMetadata
+	xdpMetadata    []*SkbMetadata
 	writer         *os.File
 	kprobeMulti    bool
 	kfreeReasons   map[uint64]string
@@ -90,7 +92,7 @@ func centerAlignString(s string, width int) string {
 	return fmt.Sprintf("%s%s%s", strings.Repeat(" ", leftPadding), s, strings.Repeat(" ", rightPadding))
 }
 
-func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap *ebpf.Map, addr2Name Addr2Name, kprobeMulti bool, btfSpec *btf.Spec) (*output, error) {
+func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap *ebpf.Map, addr2Name Addr2Name, skbMds, xdpMds []*SkbMetadata, kprobeMulti bool, btfSpec *btf.Spec) (*output, error) {
 	writer := os.Stdout
 
 	if flags.OutputFile != "" {
@@ -121,6 +123,8 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap *ebpf.Ma
 		printShinfoMap: printShinfoMap,
 		printStackMap:  printStackMap,
 		addr2name:      addr2Name,
+		skbMetadata:    skbMds,
+		xdpMetadata:    xdpMds,
 		writer:         writer,
 		kprobeMulti:    kprobeMulti,
 		kfreeReasons:   reasons,
@@ -454,6 +458,12 @@ func (o *output) Print(event *Event) {
 		fmt.Fprintf(o.writer, " %s", o.addr2name.findNearestSym(event.CallerAddr))
 	} else {
 		fmt.Fprintf(o.writer, " %s", outFuncName)
+	}
+
+	if event.Type != eventTypeTracingXdp && len(o.skbMetadata) > 0 {
+		outputSkbMetadata(o.writer, o.skbMetadata, event.SkbMetadata[:])
+	} else if event.Type == eventTypeTracingXdp && len(o.xdpMetadata) > 0 {
+		outputSkbMetadata(o.writer, o.xdpMetadata, event.SkbMetadata[:])
 	}
 
 	if o.flags.OutputStack && event.PrintStackId > 0 {

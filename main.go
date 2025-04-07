@@ -133,6 +133,18 @@ func main() {
 		}
 	}
 
+	// --output-skb-metadata
+	skbMds, err := pwru.ParseSkbMetadataExprs(flags.OutputSkbMetadata, btfSpec)
+	if err != nil {
+		log.Fatalf("Failed to parse skb metadata exprs: %s", err)
+	}
+
+	// --output-xdp-metadata
+	xdpMds, err := pwru.ParseXdpMetadataExprs(flags.OutputXdpMetadata, btfSpec)
+	if err != nil {
+		log.Fatalf("Failed to parse xdp metadata exprs: %s", err)
+	}
+
 	for name, program := range bpfSpec.Programs {
 		// Skip the skb-tracking ones that should not inject pcap-filter.
 		switch name {
@@ -148,6 +160,9 @@ func main() {
 			if err := libpcap.InjectL2Filter(program, flags.FilterPcap); err != nil {
 				log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
 			}
+			if err := pwru.InjectSetXdpMetadata(program, xdpMds); err != nil {
+				log.Fatalf("Failed to inject xdp metadata for %s: %v", name, err)
+			}
 			continue
 		}
 		if err = libpcap.InjectFilters(program,
@@ -155,6 +170,9 @@ func main() {
 			flags.FilterTunnelPcapL2,
 			flags.FilterTunnelPcapL3); err != nil {
 			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
+		}
+		if err := pwru.InjectSetSkbMetadata(program, skbMds); err != nil {
+			log.Fatalf("Failed to inject skb metadata for %s: %v", name, err)
 		}
 	}
 
@@ -287,7 +305,7 @@ func main() {
 	printSkbMap := coll.Maps["print_skb_map"]
 	printShinfoMap := coll.Maps["print_shinfo_map"]
 	printStackMap := coll.Maps["print_stack_map"]
-	output, err := pwru.NewOutput(&flags, printSkbMap, printShinfoMap, printStackMap, addr2name, useKprobeMulti, btfSpec)
+	output, err := pwru.NewOutput(&flags, printSkbMap, printShinfoMap, printStackMap, addr2name, skbMds, xdpMds, useKprobeMulti, btfSpec)
 	if err != nil {
 		log.Fatalf("Failed to create outputer: %s", err)
 	}

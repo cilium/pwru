@@ -1,8 +1,11 @@
 package pwru
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/asm"
 	"github.com/cilium/pwru/internal/asm/x86"
 )
 
@@ -26,4 +29,36 @@ func GetBpfHelpers(addr2name Addr2Name) (helpers []string, err error) {
 		}
 	}
 	return
+}
+
+func injectBpfStub(prog *ebpf.ProgramSpec, stub string, insns asm.Instructions) error {
+	startIdx := -1
+	for i, ins := range prog.Instructions {
+		if ins.Symbol() == stub {
+			startIdx = i
+			break
+		}
+	}
+	if startIdx == -1 {
+		return fmt.Errorf("failed to find stub %s", stub)
+	}
+
+	retIdx := -1
+	retOpCode := asm.Return().OpCode
+	for i := startIdx + 1; i < len(prog.Instructions); i++ {
+		if prog.Instructions[i].OpCode == retOpCode {
+			retIdx = i
+			break
+		}
+	}
+	if retIdx == -1 {
+		return fmt.Errorf("failed to find ret instruction of stub %s", stub)
+	}
+
+	// replace the stub's instructions
+	insns[0] = insns[0].WithMetadata(prog.Instructions[startIdx].Metadata)
+	prog.Instructions = append(prog.Instructions[:startIdx],
+		append(insns, prog.Instructions[retIdx+1:]...)...)
+
+	return nil
 }
