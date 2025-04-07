@@ -56,6 +56,9 @@ type Flags struct {
 	OutputTCPFlags   bool
 	OutputTunnel     bool
 
+	OutputSkbMetadata []string
+	OutputXdpMetadata []string
+
 	KMods    []string
 	AllKMods bool
 
@@ -94,6 +97,8 @@ func (f *Flags) SetFlags() {
 	flag.Uint64Var(&f.OutputLimitLines, "output-limit-lines", 0, "exit the program after the number of events has been received/printed")
 	flag.BoolVar(&f.OutputSkbCB, "output-skb-cb", false, "print skb->cb")
 	flag.BoolVar(&f.OutputTCPFlags, "output-tcp-flags", false, "print TCP flags")
+	flag.StringSliceVar(&f.OutputSkbMetadata, "output-skb-metadata", nil, "print skb metadata (e.g., \"skb->mark\", \"skb->hash\"), 4 at most")
+	flag.StringSliceVar(&f.OutputXdpMetadata, "output-xdp-metadata", nil, "print xdp metadata (e.g., \"xdp->rxq->queue_index\"), 4 at most")
 
 	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
 
@@ -189,6 +194,7 @@ type Event struct {
 	ParamSecond   uint64
 	ParamThird    uint64
 	CPU           uint32
+	SkbMetadata   [4]uint64
 }
 
 type markFlagValue struct {

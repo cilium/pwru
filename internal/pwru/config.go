@@ -27,6 +27,10 @@ const (
 )
 
 const (
+	OutputSkbMetadataMask uint8 = 1 << iota
+)
+
+const (
 	IsSetMask uint8 = 1 << iota
 	TrackSkbMask
 	TrackSkbByStackidMask
@@ -42,8 +46,10 @@ type FilterCfg struct {
 	FilterMarkMask uint32
 	FilterIfindex  uint32
 
-	OutputFlags uint8
-	FilterFlags uint8
+	OutputFlags  uint8
+	OutputFlags2 uint8
+	FilterFlags  uint8
+	FilterFlags2 uint8
 
 	SkbBtfID    uint32
 	ShinfoBtfID uint32
@@ -75,6 +81,9 @@ func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	}
 	if flags.OutputCaller {
 		cfg.OutputFlags |= OutputCallerMask
+	}
+	if len(flags.OutputSkbMetadata)+len(flags.OutputXdpMetadata) > 0 {
+		cfg.OutputFlags2 |= OutputSkbMetadataMask
 	}
 	if flags.FilterTraceTc || flags.OutputSkbCB {
 		cfg.OutputFlags |= OutputCbMask
