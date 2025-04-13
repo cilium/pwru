@@ -41,6 +41,8 @@ type Flags struct {
 	FilterTunnelPcapL2      string
 	FilterTunnelPcapL3      string
 	FilterKprobeBatch       uint
+	FilterSkbExpr           string
+	FilterXdpExpr           string
 
 	OutputTS         string
 	OutputMeta       bool
@@ -88,6 +90,8 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.FilterTrackBpfHelpers, "filter-track-bpf-helpers", false, "trace BPF helper functions")
 	flag.StringVar(&f.FilterIfname, "filter-ifname", "", "filter skb ifname in --filter-netns (if not specified, use current netns)")
 	flag.UintVar(&f.FilterKprobeBatch, "filter-kprobe-batch", 10, "batch size for kprobe attaching/detaching")
+	flag.StringVar(&f.FilterSkbExpr, "filter-skb-expr", "", "filter skb with simple C expression, like 'skb->protocol == 0x0800'")
+	flag.StringVar(&f.FilterXdpExpr, "filter-xdp-expr", "", "filter xdp with simple C expression, like 'xdp->rxq->dev->ifindex == 9'")
 	flag.StringVar(&f.OutputTS, "timestamp", "none", "print timestamp per skb (\"current\", \"relative\", \"absolute\", \"none\")")
 	flag.BoolVar(&f.OutputMeta, "output-meta", true, "print skb metadata")
 	flag.BoolVar(&f.OutputTuple, "output-tuple", true, "print L4 tuple")
