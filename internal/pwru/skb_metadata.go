@@ -21,9 +21,11 @@ import (
 const (
 	labelSetSkbMetadataExit = "__set_skb_metadata_exit"
 	setSkbMetadataStub      = "set_skb_metadata"
+	filterSkbExprStub       = "filter_skb_expr"
 
 	labelSetXdpMetadataExit = "__set_xdp_metadata_exit"
 	setXdpMetadataStub      = "set_xdp_metadata"
+	filterXdpExprStub       = "filter_xdp_expr"
 
 	maxSkbMetadata = 4
 )
@@ -183,4 +185,35 @@ func outputSkbMetadata(w io.Writer, md []*SkbMetadata, data []uint64) {
 			fmt.Fprintf(w, " %s=%s", m.last, s)
 		}
 	}
+}
+
+func injectFilterExprStub(prog *ebpf.ProgramSpec, spec *btf.Spec, expr, stub, meta, buffName string) error {
+	if expr == "" {
+		return nil
+	}
+
+	if !strings.HasPrefix(expr, meta) {
+		return fmt.Errorf("--filter-%s-expr must start with %s", meta, meta)
+	}
+
+	types, err := spec.AnyTypesByName(buffName)
+	if err != nil {
+		return fmt.Errorf("failed to find btf types of %s: %w", buffName, err)
+	}
+
+	ptr := &btf.Pointer{Target: types[0]}
+	insns, err := bice.SimpleCompile(expr, ptr)
+	if err != nil {
+		return fmt.Errorf("failed to compile expr '%s': %w", expr, err)
+	}
+
+	return injectBpfStub(prog, stub, insns)
+}
+
+func InjectFilterSkbExpr(prog *ebpf.ProgramSpec, spec *btf.Spec, expr string) error {
+	return injectFilterExprStub(prog, spec, expr, filterSkbExprStub, "skb", "sk_buff")
+}
+
+func InjectFilterXdpExpr(prog *ebpf.ProgramSpec, spec *btf.Spec, expr string) error {
+	return injectFilterExprStub(prog, spec, expr, filterXdpExprStub, "xdp", "xdp_buff")
 }

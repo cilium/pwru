@@ -160,6 +160,9 @@ func main() {
 			if err := libpcap.InjectL2Filter(program, flags.FilterPcap); err != nil {
 				log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
 			}
+			if err := pwru.InjectFilterXdpExpr(program, btfSpec, flags.FilterXdpExpr); err != nil {
+				log.Fatalf("Failed to inject filter xdp expr for %s: %v", name, err)
+			}
 			if err := pwru.InjectSetXdpMetadata(program, xdpMds); err != nil {
 				log.Fatalf("Failed to inject xdp metadata for %s: %v", name, err)
 			}
@@ -170,6 +173,9 @@ func main() {
 			flags.FilterTunnelPcapL2,
 			flags.FilterTunnelPcapL3); err != nil {
 			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
+		}
+		if err := pwru.InjectFilterSkbExpr(program, btfSpec, flags.FilterSkbExpr); err != nil {
+			log.Fatalf("Failed to inject filter skb expr for %s: %v", name, err)
 		}
 		if err := pwru.InjectSetSkbMetadata(program, skbMds); err != nil {
 			log.Fatalf("Failed to inject skb metadata for %s: %v", name, err)
