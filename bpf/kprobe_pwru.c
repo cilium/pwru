@@ -878,7 +878,7 @@ filter_xdp(struct xdp_buff *xdp) {
 static __noinline void
 set_xdp_metadata(struct xdp_buff *xdp, u64 *metadata) {
 	/* This func will be rewrote by Go. */
-	metadata[0] = (u64)(void *) xdp;
+	metadata[0] = xdp ? 1 : 0;
 }
 
 static __always_inline void
