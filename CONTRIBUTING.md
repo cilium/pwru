@@ -41,9 +41,9 @@ Ensure that all commits have [Developer Certificate of Origin](https://developer
 
 ## Contributor Ladder  
 
-Cilium has a well-defined [contributor ladder](https://github.com/cilium/community/blob/main/CONTRIBUTOR-LADDER.md) to help community members grow both responsibilities and privileges in the ecosystem. This ladder outlines the path from an occasional contributor to a committer, detailing expectations at each stage. Most contributors start at the community level and progress as they become more engaged in the project. We encourage you to take an active role, and the community is here to support you on this journey.  
+The Cilium project has a well-defined [contributor ladder](https://github.com/cilium/community/blob/main/CONTRIBUTOR-LADDER.md) to help community members grow both responsibilities and privileges in the project ecosystem. This ladder outlines the path from an occasional contributor to a committer, detailing expectations at each stage. Most contributors start at the community level in a sub-project and progress as they become more engaged in the project ecosystem. We encourage you to take an active role, and the community is here to support you on this journey.  
 
-Becoming a [Cilium organization member](https://github.com/cilium/community/blob/main/CONTRIBUTOR-LADDER.md#organization-member) grants you additional privileges, such as the ability to trigger CI runs. If you're contributing regularly to `pwru`, consider joining the [pwru team](https://github.com/cilium/community/blob/main/ladder/teams/pwru.yaml) to help review code and accelerate development. Your contributions play a vital role in improving the project, and we'd love to have you more involved!
+Becoming a [Cilium organization member](https://github.com/cilium/community/blob/main/CONTRIBUTOR-LADDER.md#organization-member) grants you additional privileges across the project ecosystem, such as the ability to leave reviews on a PR or trigger CI runs. If you're contributing regularly to `pwru`, consider joining the [pwru team](https://github.com/cilium/community/blob/main/ladder/teams/pwru.yaml) to help review code and accelerate development. Your contributions play a vital role in improving the project, and we'd love to have you more involved!
 
 ## Community
 
