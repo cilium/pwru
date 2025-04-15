@@ -12,6 +12,8 @@ LIBPCAP_ARCH ?= x86_64-unknown-linux-gnu
 # For compiling libpcap and CGO
 CC ?= gcc
 ARCHS ?= amd64 arm64
+CGO_CFLAGS="-I/pwru/libpcap"
+CGO_LDFLAGS="-L/pwru/libpcap -lpcap -static"
 
 TEST_TIMEOUT ?= 5s
 .DEFAULT_GOAL := pwru
@@ -19,7 +21,7 @@ TEST_TIMEOUT ?= 5s
 ## Build the GO binary
 pwru: libpcap/libpcap.a
 	TARGET_GOARCH=$(TARGET_GOARCH) $(GO_GENERATE)
-	CC=$(CC) GOARCH=$(TARGET_GOARCH) $(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) \
+	CGO_CFLAGS=$(CGO_CFLAGS) CGO_LDFLAGS=$(CGO_LDFLAGS) CC=$(CC) GOARCH=$(TARGET_GOARCH) $(GO_BUILD) $(if $(GO_TAGS),-tags $(GO_TAGS)) \
 		-ldflags "-w -s \
 		-X 'github.com/cilium/pwru/internal/pwru.Version=${VERSION}'"
 
