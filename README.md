@@ -148,38 +148,6 @@ kubectl logs -f pwru
 
 See [docs/vagrant.md](docs/vagrant.md)
 
-## Developing
-
-### Dependencies
-
-* Go >= 1.16
-* LLVM/clang >= 12
-* Bison
-* Lex/Flex >= 2.5.31
-
-### Building
-
-```
-make
-```
-
-Alternatively, you can build in the Docker container:
-
-```
-make release
-```
-
-## Contributing
-
-`pwru` is an open source project. The userspace code is licensed under
-[Apache-2.0](LICENSE), while the BPF under [BSD 2-Clause](bpf/LICENSE.BSD-2-Clause)
-and [GPL-2.0](bpf/LICENSE.GPL-2.0). Everybody is welcome to contribute.
-Contributors are required to follow the [Contributor Covenant Code of
-Conduct](https://www.contributor-covenant.org/version/1/4/code-of-conduct/) and
-must adhere to the [Developer Certificate of
-Origin](https://developercertificate.org/) by adding a Signed-off-by line to
-their commit messages.
-
 ## Community
 
 Join the `#pwru` [Slack channel](https://slack.cilium.io) to chat with
