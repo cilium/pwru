@@ -384,6 +384,9 @@ set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 	void *skb_head = BPF_CORE_READ(skb, head);
 	u16 l3_off = BPF_CORE_READ(skb, network_header);
 
+	if (BPF_CORE_READ(skb, protocol) == bpf_ntohs(ETH_P_8021Q))
+		l3_off += sizeof(struct vlan_hdr);
+
 	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + l3_off);
 	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
 
