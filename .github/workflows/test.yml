@@ -19,7 +19,7 @@ env:
   arm64-runner-role-arn: arn:aws:iam::478566851380:role/CuTE_CIAccessRole
   arm64-runner-infra-dir: infra/arm64-runner
   arm64-runner-ec2-type: c6g.metal # 64 vCPU x 128 GB
-  arm64-runner-ec2-ami: ami-0ae6f07ad3a8ef182
+  arm64-runner-ec2-ami: ami-04dd2037804df8ff9
   arm64-runner-group: cilium-pwru-runners
   arm64-runner-label: cilium-pwru-runners-arm64-${{ github.run_id }}
   arm64-runner-count: 7
