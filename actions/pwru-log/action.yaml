@@ -2,8 +2,8 @@ name: pwru-log
 description: 'Collect and upload pwru logs'
 inputs:
   testname:
+    description: "Test name"
     required: true
-    type: string
 
 runs:
   using: composite
