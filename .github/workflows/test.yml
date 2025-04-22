@@ -46,8 +46,8 @@ jobs:
 
     - name: Generate and build
       run: |
-        make release
-        tar xfv release/pwru-linux-amd64.tar.gz
+        ARCHS=arm64 make release
+        tar xfv release/pwru-linux-arm64.tar.gz
 
     - name: Store executable
       uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
