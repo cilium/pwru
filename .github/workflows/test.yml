@@ -121,11 +121,15 @@ jobs:
             ssh_port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
             echo metal_arm64=true >> $GITHUB_OUTPUT
             echo lvh_install_deps=false >> $GITHUB_OUTPUT
+            echo kernel=${{ matrix.kernel }}-arm64 >> $GITHUB_OUTPUT
+            echo lvh_kernel="/home/runners/vmlinuz-${{ matrix.kernel }}" >> $GITHUB_OUTPUT
             echo ssh_port=$ssh_port >> $GITHUB_OUTPUT
             echo shared_folder="/home/runners" >> $GITHUB_OUTPUT
           else
             echo metal_arm64=false >> $GITHUB_OUTPUT
             echo lvh_install_deps=true >> $GITHUB_OUTPUT
+            echo kernel=${{ matrix.kernel }} >> $GITHUB_OUTPUT
+            echo lvh_kernel="" >> $GITHUB_OUTPUT
             echo ssh_port=2222 >> $GITHUB_OUTPUT
             echo shared_folder="" >> $GITHUB_OUTPUT
           fi
@@ -191,7 +195,8 @@ jobs:
           mem: 4G
           cpu: 2
           test-name: pwru-test
-          image-version: ${{ matrix.kernel }}
+          image-version: ${{ steps.vars.outputs.kernel }}
+          kernel: '${{ steps.vars.outputs.lvh_kernel }}'
           host-mount: ./
           cmd: |
             chmod +x /host/pwru/pwru
