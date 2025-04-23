@@ -198,7 +198,7 @@ jobs:
           host-mount: ./
           cmd: |
             chmod +x /host/pwru/pwru
-            chmod +x /host/test-app/test-app
+            # chmod +x /host/test-app/test-app
 
             # wait for network to be available
             while true;
