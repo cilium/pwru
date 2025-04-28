@@ -33,3 +33,5 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	rsc.io/c2go v0.0.0-20170620140410-520c22818a08 // indirect
 )
+
+replace github.com/cilium/ebpf => github.com/lmb/ebpf v0.7.1-0.20250423170500-def29e768675

@@ -4,8 +4,6 @@ github.com/VividCortex/ewma v1.2.0 h1:f58SaIzcDXrSy3kWaHNvuJgJ3Nmz59Zji6XoJR/q1o
 github.com/VividCortex/ewma v1.2.0/go.mod h1:nz4BbCtbLyFDeC9SUHbtcT5644juEuWfUAUnGx7j5l4=
 github.com/cheggaaa/pb/v3 v3.1.7 h1:2FsIW307kt7A/rz/ZI2lvPO+v3wKazzE4K/0LtTWsOI=
 github.com/cheggaaa/pb/v3 v3.1.7/go.mod h1:/Ji89zfVPeC/u5j8ukD0MBPHt2bzTYp74lQ7KlgFWTQ=
-github.com/cilium/ebpf v0.18.0 h1:OsSwqS4y+gQHxaKgg2U/+Fev834kdnsQbtzRnbVC6Gs=
-github.com/cilium/ebpf v0.18.0/go.mod h1:vmsAT73y4lW2b4peE+qcOqw6MxvWQdC+LiU5gd/xyo4=
 github.com/cloudflare/cbpfc v0.0.0-20240920015331-ff978e94500b h1:EgR1t4Lnq6uP6QxJQ+oIFtENOHUY3/7gMOE76vL0KcA=
 github.com/cloudflare/cbpfc v0.0.0-20240920015331-ff978e94500b/go.mod h1:X/9cHz8JVzKlvoZyKBgMgrogKZlLf+pWjmm5gSUm5dI=
 github.com/fatih/color v1.18.0 h1:S8gINlzdQ840/4pfAwic/ZE0djQEH3wM94VfqLTZcOM=
@@ -26,6 +24,8 @@ github.com/kr/text v0.2.0 h1:5Nx0Ya0ZqY2ygV366QzturHI13Jq95ApcVaJBhpS+AY=
 github.com/kr/text v0.2.0/go.mod h1:eLer722TekiGuMkidMxC/pM04lWEeraHUUmBw8l2grE=
 github.com/leonhwangprojects/bice v0.1.2 h1:zqQJtyelzB3R2wS/E1ymQDLHbp6+vskaanLSJ5GFIgY=
 github.com/leonhwangprojects/bice v0.1.2/go.mod h1:6Lsun8A3o0pPfjuCfpUR71WBuOLO64oQhXWdHdlW4SE=
+github.com/lmb/ebpf v0.7.1-0.20250423170500-def29e768675 h1:g7Azz/zeePV7H/0zh7U45G+y2MYEL/TozrrI+uRk9hE=
+github.com/lmb/ebpf v0.7.1-0.20250423170500-def29e768675/go.mod h1:fLCgMo3l8tZmAdM3B2XqdFzXBpwkcSTroaVqN08OWVY=
 github.com/mattn/go-colorable v0.1.14 h1:9A9LHSqF/7dyVVX6g0U9cwm9pG3kP9gSzcuIPHPsaIE=
 github.com/mattn/go-colorable v0.1.14/go.mod h1:6LmQG8QLFO4G5z1gPvYEzlUgJ2wF+stgPZH1UqBm1s8=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
