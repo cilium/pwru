@@ -169,6 +169,10 @@ Alternatively, you can build in the Docker container:
 make release
 ```
 
+### Sign-off
+
+Ensure that all commits have [Developer Certificate of Origin](https://developercertificate.org/) by adding a [Signed-off-by line to your commit messages](https://docs.cilium.io/en/stable/contributing/development/contributing_guide/#developer-s-certificate-of-origin).
+
 ## Community
 
 Join the `#pwru` [Slack channel](https://slack.cilium.io) to chat with
