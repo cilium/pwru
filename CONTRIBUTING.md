@@ -7,37 +7,7 @@ Conduct](https://github.com/cncf/foundation/blob/main/code-of-conduct.md).
 
 - Read the [README](https://github.com/cilium/pwru#readme) to understand how `pwru` works and its use cases.
 - Check out the [issues list](https://github.com/cilium/pwru/issues) for open tasks, especially those labeled `good first issue`.
-
-## Developing  
-
-If you're looking to contribute code to `pwru`, you'll need to set up your development environment with the required dependencies and build the project locally.  
-
-### Dependencies  
-
-Ensure you have the following installed:  
-
-- Go >= 1.16  
-- LLVM/Clang >= 12  
-- Bison  
-- Lex/Flex >= 2.5.31  
-
-### Building  
-
-To build `pwru`, simply run:  
-
-```
-make
-```
-
-Alternatively, you can build it within a Docker container:
-
-```
-make release
-```
-
-### Sign-off
-
-Ensure that all commits have [Developer Certificate of Origin](https://developercertificate.org/) by adding a [Signed-off-by line to your commit messages](https://docs.cilium.io/en/stable/contributing/development/contributing_guide/#developer-s-certificate-of-origin).
+- Set up your [development](https://github.com/cilium/pwru?tab=readme-ov-file#developing) environment with the required dependencies and build the project locally.
 
 ## Contributor Ladder  
 
