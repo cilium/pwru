@@ -148,6 +148,27 @@ kubectl logs -f pwru
 
 See [docs/vagrant.md](docs/vagrant.md)
 
+## Developing
+
+### Dependencies
+
+* Go >= 1.16
+* LLVM/clang >= 12
+* Bison
+* Lex/Flex >= 2.5.31
+
+### Building
+
+```
+make
+```
+
+Alternatively, you can build in the Docker container:
+
+```
+make release
+```
+
 ## Community
 
 Join the `#pwru` [Slack channel](https://slack.cilium.io) to chat with
