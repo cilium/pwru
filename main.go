@@ -195,6 +195,8 @@ func main() {
 		log.Fatalf("Failed to rewrite config: %v", err)
 	}
 
+	bpfSpec.Maps["percpu_big_buff"].ValueSize = flags.SetPerCPUBuf
+	
 	haveFexit := pwru.HaveBPFLinkTracing()
 	if (flags.FilterTraceTc || flags.FilterTraceXdp) && !haveFexit {
 		log.Fatalf("Current kernel does not support fentry/fexit to run with --filter-trace-tc/--filter-trace-xdp")
