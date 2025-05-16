@@ -21,5 +21,19 @@
       "groupName": "all dependencies"
     }
   ],
-  "separateMajorMinor": false
+  "separateMajorMinor": false,
+  {
+    "groupName": "all go dependencies main",
+    "groupSlug": "all-go-deps-main",
+    "matchFiles": [
+      "go.mod",
+      "go.sum"
+    ],
+    "postUpdateOptions": [
+      "gomodUpdateImportPaths"
+    ],
+    matchBaseBranches: [
+      "main"
+    ]
+  }
 }
