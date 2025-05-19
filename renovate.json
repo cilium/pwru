@@ -13,27 +13,27 @@
   "lockFileMaintenance": {
     "enabled": false
    },
+  "separateMajorMinor": false,
   "packageRules": [
     {
       "matchPackagePatterns": [
         "*"
       ],
       "groupName": "all dependencies"
+    },
+    {
+      "groupName": "all go dependencies main",
+      "groupSlug": "all-go-deps-main",
+      "matchFiles": [
+        "go.mod",
+        "go.sum"
+      ],
+      "postUpdateOptions": [
+        "gomodUpdateImportPaths"
+      ],
+      "matchBaseBranches": [
+        "main"
+      ]
     }
-  ],
-  "separateMajorMinor": false,
-  {
-    "groupName": "all go dependencies main",
-    "groupSlug": "all-go-deps-main",
-    "matchFiles": [
-      "go.mod",
-      "go.sum"
-    ],
-    "postUpdateOptions": [
-      "gomodUpdateImportPaths"
-    ],
-    matchBaseBranches: [
-      "main"
-    ]
-  }
+  ]
 }
