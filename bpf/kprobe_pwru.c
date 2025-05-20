@@ -209,7 +209,7 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
 	__type(key, u32);
-	__type(value, u8[PERCPU_BIG_BUFF_SIZE]);
+	__uint(value_size, PERCPU_BIG_BUFF_SIZE);
 	__uint(max_entries, 1);
 } percpu_big_buff SEC(".maps");
 
