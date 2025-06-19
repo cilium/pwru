@@ -1,4 +1,4 @@
-rtnetlink ![Linux Integration](https://github.com/jsimonetti/rtnetlink/workflows/Go/badge.svg) [![GoDoc](https://godoc.org/github.com/jsimonetti/rtnetlink?status.svg)](https://godoc.org/github.com/jsimonetti/rtnetlink) [![Go Report Card](https://goreportcard.com/badge/github.com/jsimonetti/rtnetlink)](https://goreportcard.com/report/github.com/jsimonetti/rtnetlink)
+rtnetlink ![Linux Integration](https://github.com/jsimonetti/rtnetlink/workflows/Go/badge.svg) [![GoDoc](https://godoc.org/github.com/jsimonetti/rtnetlink?status.svg)](https://pkg.go.dev/github.com/jsimonetti/rtnetlink/v2) [![Go Report Card](https://goreportcard.com/badge/github.com/jsimonetti/rtnetlink)](https://goreportcard.com/report/github.com/jsimonetti/rtnetlink)
 =======
 
 Package `rtnetlink` allows the kernel's routing tables to be read and
@@ -22,7 +22,7 @@ look at the message send by iproute2 using `strace -f -esendmsg /bin/ip`
 or similar.
 
 Another (and possibly even more flexible) way would be using `nlmon` and
-`wireshark`. nlmod is a special kernel module which allows you to
+`wireshark`. nlmon is a special kernel module which allows you to
 capture all netlink (not just rtnetlink) traffic inside the kernel. Be
 aware that this might be overwhelming on a system with a lot of netlink
 traffic.
