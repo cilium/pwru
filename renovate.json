@@ -13,7 +13,7 @@
   ],
   "groupName": "all dependencies",
   "lockFileMaintenance": {
-    "enabled": false
+    "enabled": true
    },
   "separateMajorMinor": false,
   "packageRules": [
