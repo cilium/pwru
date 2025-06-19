@@ -6,16 +6,16 @@ require (
 	github.com/Asphaltt/mybtf v0.0.0-20250315135407-f9d09086616b
 	github.com/cheggaaa/pb/v3 v3.1.7
 	github.com/cilium/ebpf v0.18.0
-	github.com/cloudflare/cbpfc v0.0.0-20240920015331-ff978e94500b
+	github.com/cloudflare/cbpfc v0.0.0-20250612131231-1b95965eadb6
 	github.com/jsimonetti/rtnetlink/v2 v2.0.3
 	github.com/leonhwangprojects/bice v0.1.2
 	github.com/spf13/pflag v1.0.6
 	github.com/tklauser/ps v0.0.3
 	github.com/vishvananda/netns v0.0.5
-	golang.org/x/arch v0.16.0
-	golang.org/x/net v0.39.0
-	golang.org/x/sync v0.13.0
-	golang.org/x/sys v0.32.0
+	golang.org/x/arch v0.18.0
+	golang.org/x/net v0.41.0
+	golang.org/x/sync v0.15.0
+	golang.org/x/sys v0.33.0
 )
 
 require (
