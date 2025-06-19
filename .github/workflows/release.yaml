@@ -1,4 +1,5 @@
 on:
+  pull_request: {}
   push:
     # Sequence of patterns matched against refs/tags
     tags:
@@ -8,7 +9,7 @@ name: Create Release
 
 jobs:
   build:
-    name: Create Release
+    name: Create Release ${{ github.event_name == 'pull_request' && '(dry-run)' }}
     if: github.repository == 'cilium/pwru'
     runs-on: ubuntu-latest
     steps:
@@ -24,6 +25,7 @@ jobs:
         run: make release
 
       - name: Create Release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
