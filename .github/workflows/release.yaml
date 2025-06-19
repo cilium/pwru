@@ -24,23 +24,13 @@ jobs:
         run: make release
 
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@4c11c9fe1dcd9636620a16455165783b20fc7ea0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: true # turn this to false once release notes are automatically added
-          prerelease: false
-          body: |
-            Note for maintainers:: Please update the description with the actual release notes (see RELEASE.md for instructions).
-
-      - name: Upload the artifacts
-        id: upload-release-artifacts
-        uses: skx/github-action-publish-binaries@44887b225ceca96efd8a912d39c09ad70312af31
+        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          releaseId: ${{ steps.create_release.outputs.id }}
-          args: 'release/*'
+          tag_name: ${{ github.ref }}
+          name: Release ${{ github.ref_name }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          files: 'release/*'
