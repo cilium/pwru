@@ -7,6 +7,7 @@
     "gomodTidy",
     "gomodVendor"
   ],
+  "baseBranches": ["main"],
   "schedule": [
     "on friday"
   ],
@@ -30,11 +31,11 @@
         "go.sum"
       ],
       "postUpdateOptions": [
+        "gomodTidy",
+        "gomodVendor",
         "gomodUpdateImportPaths"
       ],
-      "matchBaseBranches": [
-        "main"
-      ]
+      "matchBaseBranches": ["main"]
     }
   ]
 }
