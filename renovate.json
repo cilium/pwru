@@ -5,6 +5,7 @@
   ],
   "postUpdateOptions": [
     "gomodTidy"
+    "gomodVendor"
   ],
   "schedule": [
     "on friday"
