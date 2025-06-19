@@ -11,12 +11,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+    - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
 
     - name: Set up Go
-      uses: actions/setup-go@bb65d8857b81c74a671e81f935d3362a5d718e2f
+      uses: actions/setup-go@fa96338abe5531f6e34c5cc0bbe28c1a533d5505
       with:
-        go-version: 1.24.2
+        go-version: 1.24.4
 
     - name: Check module vendoring
       run: |
@@ -31,7 +31,7 @@ jobs:
         tar xfv release/pwru-linux-amd64.tar.gz
 
     - name: Store executable
-      uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47
+      uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
       with:
         name: pwru
         path: pwru
@@ -42,7 +42,7 @@ jobs:
         go build .
 
     - name: Store test-app
-      uses: actions/upload-artifact@6027e3dd177782cd8ab9af838c04fd81a07f1d47
+      uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
       with:
         name: test-app
         path: test-app/test-app
@@ -57,16 +57,16 @@ jobs:
         kernel: [ '5.4-20241218.004849', '5.10-20241218.004849', '5.15-20241218.004849', '6.1-20241218.004849', '6.6-20241218.004849', '6.12-20241218.004849', 'bpf-next-20250105.013256' ]
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
+      - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
 
       - name: Retrieve stored pwru executable
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
         with:
           name: pwru
           path: pwru
 
       - name: Retrieve stored test-app executable
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
         with:
           name: test-app
           path: test-app
