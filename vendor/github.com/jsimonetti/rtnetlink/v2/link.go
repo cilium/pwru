@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/jsimonetti/rtnetlink/internal/unix"
+	"github.com/jsimonetti/rtnetlink/v2/internal/unix"
 
 	"github.com/mdlayher/netlink"
 )
@@ -41,6 +41,9 @@ type LinkMessage struct {
 
 	// Attributes List
 	Attributes *LinkAttributes
+
+	// A response was filtered as requested, see NLM_F_DUMP_FILTERED
+	filtered bool
 }
 
 // MarshalBinary marshals a LinkMessage into a byte slice.
@@ -55,6 +58,14 @@ func (m *LinkMessage) MarshalBinary() ([]byte, error) {
 	nativeEndian.PutUint32(b[12:16], m.Change)
 
 	if m.Attributes != nil {
+		if m.Attributes.Info != nil && m.Attributes.Info.Data != nil {
+			if verifier, ok := m.Attributes.Info.Data.(LinkDriverVerifier); ok {
+				if err := verifier.Verify(m); err != nil {
+					return nil, err
+				}
+			}
+		}
+
 		ae := netlink.NewAttributeEncoder()
 		ae.ByteOrder = nativeEndian
 		err := m.Attributes.encode(ae)
@@ -176,14 +187,26 @@ func (l *LinkService) Set(req *LinkMessage) error {
 
 func (l *LinkService) list(kind string) ([]LinkMessage, error) {
 	req := &LinkMessage{}
-	if kind != "" {
-		req.Attributes = &LinkAttributes{
-			Info: &LinkInfo{Kind: kind},
-		}
+	flags := netlink.Request | netlink.Dump
+
+	if kind == "" {
+		return l.execute(req, unix.RTM_GETLINK, flags)
 	}
 
-	flags := netlink.Request | netlink.Dump
-	return l.execute(req, unix.RTM_GETLINK, flags)
+	req.Attributes = &LinkAttributes{
+		Info: &LinkInfo{Kind: kind},
+	}
+
+	msgs, err := l.execute(req, unix.RTM_GETLINK, flags)
+
+	// All filtered links are marked by a NLM_F_DUMP_FILTERED flag
+	// no other links present in a response, so just check the first one
+	if err == nil && len(msgs) > 0 && !msgs[0].filtered {
+		msgs = []LinkMessage{}
+	}
+
+	return msgs, err
+
 }
 
 // ListByKind retrieves all interfaces of a specific kind.
@@ -200,6 +223,7 @@ func (l *LinkService) List() ([]LinkMessage, error) {
 type LinkAttributes struct {
 	Address          net.HardwareAddr // Interface L2 address
 	Alias            *string          // Interface alias name
+	AltNames         []string         // Alternative interface names
 	Broadcast        net.HardwareAddr // L2 broadcast address
 	Carrier          *uint8           // Current physical link state of the interface.
 	CarrierChanges   *uint32          // Number of times the link has seen a change from UP to DOWN and vice versa
@@ -222,6 +246,7 @@ type LinkAttributes struct {
 	TxQueueLen       *uint32          // Interface transmit queue len in number of packets
 	Type             uint32           // Link type
 	XDP              *LinkXDP         // Express Data Patch Information
+	NetNS            *NetNS           // Interface network namespace
 }
 
 // OperationalState represents an interface's operational state.
@@ -322,6 +347,17 @@ func (a *LinkAttributes) decode(ad *netlink.AttributeDecoder) error {
 		case unix.IFLA_XDP:
 			a.XDP = &LinkXDP{}
 			ad.Nested(a.XDP.decode)
+		case unix.IFLA_PROP_LIST:
+			// read nested encoded property list
+			nad, err := netlink.NewAttributeDecoder(ad.Bytes())
+			if err != nil {
+				return err
+			}
+			for nad.Next() {
+				if nad.Type() == unix.IFLA_ALT_IFNAME {
+					a.AltNames = append(a.AltNames, nad.String())
+				}
+			}
 		}
 	}
 
@@ -330,10 +366,21 @@ func (a *LinkAttributes) decode(ad *netlink.AttributeDecoder) error {
 
 // MarshalBinary marshals a LinkAttributes into a byte slice.
 func (a *LinkAttributes) encode(ae *netlink.AttributeEncoder) error {
-	ae.Uint16(unix.IFLA_UNSPEC, 0)
-	ae.String(unix.IFLA_IFNAME, a.Name)
-	ae.Uint32(unix.IFLA_LINK, a.Type)
-	ae.String(unix.IFLA_QDISC, a.QueueDisc)
+	if a.Name != "" {
+		ae.String(unix.IFLA_IFNAME, a.Name)
+	}
+
+	if a.Alias != nil {
+		ae.String(unix.IFLA_IFALIAS, *a.Alias)
+	}
+
+	if a.Type != 0 {
+		ae.Uint32(unix.IFLA_LINK, a.Type)
+	}
+
+	if a.QueueDisc != "" {
+		ae.String(unix.IFLA_QDISC, a.QueueDisc)
+	}
 
 	if a.MTU != 0 {
 		ae.Uint32(unix.IFLA_MTU, a.MTU)
@@ -384,6 +431,10 @@ func (a *LinkAttributes) encode(ae *netlink.AttributeEncoder) error {
 
 	if a.Master != nil {
 		ae.Uint32(unix.IFLA_MASTER, *a.Master)
+	}
+
+	if a.NetNS != nil {
+		ae.Uint32(a.NetNS.value())
 	}
 
 	return nil
@@ -547,12 +598,122 @@ func (a *LinkStats64) unmarshalBinary(b []byte) error {
 	return nil
 }
 
+var (
+	// registeredDrivers is the global map of registered drivers
+	registeredDrivers = make(map[string]LinkDriver)
+
+	// registeredSlaveDrivers is the global map of registered slave drivers
+	registeredSlaveDrivers = make(map[string]LinkDriver)
+)
+
+// RegisterDriver registers a driver with the link service
+// This allows the driver to be used to encode/decode the link data
+//
+// This function is not threadsafe. This should not be used after Dial
+func RegisterDriver(d LinkDriver) error {
+	if _, ok := d.(LinkSlaveDriver); ok {
+		if _, ok := registeredSlaveDrivers[d.Kind()]; ok {
+			return fmt.Errorf("driver %s already registered", d.Kind())
+		}
+		registeredSlaveDrivers[d.Kind()] = d
+		return nil
+	}
+	if _, ok := registeredDrivers[d.Kind()]; ok {
+		return fmt.Errorf("driver %s already registered", d.Kind())
+	}
+	registeredDrivers[d.Kind()] = d
+	return nil
+}
+
+// getDriver returns the driver instance for the given kind, and true if the driver is registered
+// it returns the default (LinkData) driver, and false if the driver is not registered
+func getDriver(kind string, slave bool) (LinkDriver, bool) {
+	if slave {
+		if t, ok := registeredSlaveDrivers[kind]; ok {
+			return t.New(), true
+		}
+
+		return &LinkData{Name: kind, Slave: true}, false
+	}
+	if t, ok := registeredDrivers[kind]; ok {
+		return t.New(), true
+	}
+
+	return &LinkData{Name: kind}, false
+}
+
+// LinkDriver is the interface that wraps link-specific Encode, Decode, and Kind methods
+type LinkDriver interface {
+	// New returns a new instance of the LinkDriver
+	New() LinkDriver
+
+	// Encode the driver data into the netlink message attribute
+	Encode(*netlink.AttributeEncoder) error
+
+	// Decode the driver data from the netlink message attribute
+	Decode(*netlink.AttributeDecoder) error
+
+	// Return the driver kind as string, this will be matched with the LinkInfo.Kind to find a driver to decode the data
+	Kind() string
+}
+
+// LinkSlaveDriver defines a LinkDriver with Slave method
+type LinkSlaveDriver interface {
+	LinkDriver
+
+	// Slave method specifies driver is a slave link info
+	Slave()
+}
+
+// LinkDriverVerifier defines a LinkDriver with Verify method
+type LinkDriverVerifier interface {
+	LinkDriver
+
+	//  Verify function run before Encode function to check for correctness and
+	//  pass related values that otherwise unavailable to the driver
+	Verify(*LinkMessage) error
+}
+
+// LinkData implements the default LinkDriver interface for not registered drivers
+type LinkData struct {
+	Name  string
+	Data  []byte
+	Slave bool
+}
+
+var _ LinkDriver = &LinkData{}
+
+func (d *LinkData) New() LinkDriver {
+	return &LinkData{}
+}
+
+func (d *LinkData) Decode(ad *netlink.AttributeDecoder) error {
+	d.Data = ad.Bytes()
+	return nil
+}
+
+func (d *LinkData) Encode(ae *netlink.AttributeEncoder) error {
+	if len(d.Data) == 0 {
+		return nil
+	}
+	if d.Slave {
+		ae.Bytes(unix.IFLA_INFO_SLAVE_DATA, d.Data)
+	} else {
+		ae.Bytes(unix.IFLA_INFO_DATA, d.Data)
+	}
+	return nil
+}
+
+func (d *LinkData) Kind() string {
+	return d.Name
+}
+
 // LinkInfo contains data for specific network types
 type LinkInfo struct {
-	Kind      string // Driver name
-	Data      []byte // Driver specific configuration stored as nested Netlink messages
-	SlaveKind string // Slave driver name
-	SlaveData []byte // Slave driver specific configuration
+	Kind      string     // Driver name
+	Data      LinkDriver // Driver specific configuration stored as nested Netlink messages
+	SlaveKind string     // Slave driver name
+	SlaveData LinkDriver // Slave driver specific configuration
 }
 
 func (i *LinkInfo) decode(ad *netlink.AttributeDecoder) error {
@@ -563,22 +724,48 @@ func (i *LinkInfo) decode(ad *netlink.AttributeDecoder) error {
 		case unix.IFLA_INFO_SLAVE_KIND:
 			i.SlaveKind = ad.String()
 		case unix.IFLA_INFO_DATA:
-			i.Data = ad.Bytes()
+			driver, found := getDriver(i.Kind, false)
+			i.Data = driver
+			if found {
+				ad.Nested(i.Data.Decode)
+				continue
+			}
+			_ = i.Data.Decode(ad)
 		case unix.IFLA_INFO_SLAVE_DATA:
-			i.SlaveData = ad.Bytes()
+			driver, found := getDriver(i.SlaveKind, true)
+			i.SlaveData = driver
+			if found {
+				ad.Nested(i.SlaveData.Decode)
+				continue
+			}
+			_ = i.SlaveData.Decode(ad)
 		}
 	}
-
 	return nil
 }
 
 func (i *LinkInfo) encode(ae *netlink.AttributeEncoder) error {
 	ae.String(unix.IFLA_INFO_KIND, i.Kind)
-	ae.Bytes(unix.IFLA_INFO_DATA, i.Data)
-
-	if len(i.SlaveData) > 0 {
+	if i.Data != nil {
+		if i.Kind != i.Data.Kind() {
+			return fmt.Errorf("driver kind %s is not equal to info kind %s", i.Data.Kind(), i.Kind)
+		}
+		if _, ok := i.Data.(*LinkData); ok {
+			_ = i.Data.Encode(ae)
+		} else {
+			ae.Nested(unix.IFLA_INFO_DATA, i.Data.Encode)
+		}
+	}
+	if i.SlaveData != nil {
+		if i.SlaveKind != i.SlaveData.Kind() {
+			return fmt.Errorf("slave driver kind %s is not equal to slave info kind %s", i.SlaveData.Kind(), i.SlaveKind)
+		}
 		ae.String(unix.IFLA_INFO_SLAVE_KIND, i.SlaveKind)
-		ae.Bytes(unix.IFLA_INFO_SLAVE_DATA, i.SlaveData)
+		if _, ok := i.SlaveData.(*LinkData); ok {
+			_ = i.SlaveData.Encode(ae)
+		} else {
+			ae.Nested(unix.IFLA_INFO_SLAVE_DATA, i.SlaveData.Encode)
+		}
 	}
 
 	return nil
@@ -615,8 +802,8 @@ func (xdp *LinkXDP) encode(ae *netlink.AttributeEncoder) error {
 	ae.Int32(unix.IFLA_XDP_FD, xdp.FD)
 	ae.Int32(unix.IFLA_XDP_EXPECTED_FD, xdp.ExpectedFD)
 	ae.Uint32(unix.IFLA_XDP_FLAGS, xdp.Flags)
-	// XDP_ATtACHED and XDP_PROG_ID are things that only can return from the kernel,
-	// not be send, so we don't encode them.
-	// source: https://elixir.bootlin.com/linux/v5.10.15/source/net/core/rtnetlink.c#L2894
+	// XDP_ATTACHED and XDP_PROG_ID are things that can only be returned by the
+	// kernel, so we don't encode them. source:
+	// https://elixir.bootlin.com/linux/v5.10.15/source/net/core/rtnetlink.c#L2894
 	return nil
 }

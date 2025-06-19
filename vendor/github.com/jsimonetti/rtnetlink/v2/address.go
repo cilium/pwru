@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/jsimonetti/rtnetlink/internal/unix"
+	"github.com/jsimonetti/rtnetlink/v2/internal/unix"
 
 	"github.com/mdlayher/netlink"
 )
@@ -158,6 +158,7 @@ type AddressAttributes struct {
 	CacheInfo CacheInfo // Address information
 	Multicast net.IP    // Multicast Ip address
 	Flags     uint32    // Address flags
+	Priority  uint32    // Priority/metric for prefix route
 }
 
 func (a *AddressAttributes) decode(ad *netlink.AttributeDecoder) error {
@@ -181,6 +182,8 @@ func (a *AddressAttributes) decode(ad *netlink.AttributeDecoder) error {
 			ad.Do(decodeIP(&a.Multicast))
 		case unix.IFA_FLAGS:
 			a.Flags = ad.Uint32()
+		case unix.IFA_RT_PRIORITY:
+			a.Priority = ad.Uint32()
 		}
 	}
 
@@ -206,16 +209,19 @@ func (a *AddressAttributes) encode(ae *netlink.AttributeEncoder) error {
 		ae.String(unix.IFA_LABEL, a.Label)
 	}
 	ae.Uint32(unix.IFA_FLAGS, a.Flags)
+	if a.Priority != 0 {
+		ae.Uint32(unix.IFA_RT_PRIORITY, a.Priority)
+	}
 
 	return nil
 }
 
 // CacheInfo contains address information
 type CacheInfo struct {
-	Prefered uint32
-	Valid    uint32
-	Created  uint32
-	Updated  uint32
+	Preferred uint32
+	Valid     uint32
+	Created   uint32
+	Updated   uint32
 }
 
 // decode decodes raw bytes into a CacheInfo's fields.
@@ -224,7 +230,7 @@ func (c *CacheInfo) decode(b []byte) error {
 		return fmt.Errorf("rtnetlink: incorrect CacheInfo size, want: 16, got: %d", len(b))
 	}
 
-	c.Prefered = nativeEndian.Uint32(b[0:4])
+	c.Preferred = nativeEndian.Uint32(b[0:4])
 	c.Valid = nativeEndian.Uint32(b[4:8])
 	c.Created = nativeEndian.Uint32(b[8:12])
 	c.Updated = nativeEndian.Uint32(b[12:16])

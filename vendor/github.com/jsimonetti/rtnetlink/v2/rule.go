@@ -6,7 +6,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/jsimonetti/rtnetlink/internal/unix"
+	"github.com/jsimonetti/rtnetlink/v2/internal/unix"
 	"github.com/mdlayher/netlink"
 )
 
