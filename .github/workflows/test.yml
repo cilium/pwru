@@ -136,14 +136,14 @@ jobs:
             echo lvh_kernel="/home/runners/vmlinuz-${{ matrix.kernel }}" >> $GITHUB_OUTPUT
             echo ssh_port=$ssh_port >> $GITHUB_OUTPUT
             echo shared_folder="/home/runners" >> $GITHUB_OUTPUT
-            echo arch=arm64
+            echo arch=arm64 >> $GITHUB_OUTPUT
           else
             echo metal_arm64=false >> $GITHUB_OUTPUT
             echo lvh_install_deps=true >> $GITHUB_OUTPUT
             echo lvh_kernel="" >> $GITHUB_OUTPUT
             echo ssh_port=2222 >> $GITHUB_OUTPUT
             echo shared_folder="" >> $GITHUB_OUTPUT
-            echo arch=amd64
+            echo arch=amd64 >> $GITHUB_OUTPUT
           fi
 
       # - name: Install GO
@@ -172,8 +172,8 @@ jobs:
       - name: Install stored executables
         shell: bash
         run: |
-          tar xfv pwru-linux-${{ steps.vars.outputs.arch }}.tar.gz
           ls -l
+          tar xfv pwru-linux-${{ steps.vars.outputs.arch }}.tar.gz
 
       - name: Derive kernel version
         id: kernel
@@ -205,9 +205,9 @@ jobs:
       - name: Provision LVH VMs
         uses: cilium/little-vm-helper@e87948476ca97050b1f149ab2aec379d0de19b84 # v0.0.23
         with:
-          install-dependencies: ${{ steps.vars.outputs.lvh_install_deps }}
-          images-folder-parent: ${{ steps.vars.outputs.shared_folder }}
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
+          # install-dependencies: ${{ steps.vars.outputs.lvh_install_deps }}
+          # images-folder-parent: ${{ steps.vars.outputs.shared_folder }}
+          # ssh-port: ${{ steps.vars.outputs.ssh_port }}
           mem: 4G
           cpu: 2
           test-name: pwru-test
@@ -216,9 +216,9 @@ jobs:
           lvh-version: 'v0.0.23'
           host-mount: ./
           cmd: |
-            chmod +x /host/pwru/pwru
-            chmod +x /host/test-app/test-app
-
+            chmod +x /host/pwru/pwru || echo oops
+            chmod +x /host/test-app/test-app || echo o0ops
+ 
             # wait for network to be available
             while true;
             do
