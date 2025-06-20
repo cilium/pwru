@@ -214,7 +214,7 @@ jobs:
           cpu: 2
           test-name: pwru-test
           image-version: ${{ steps.kernel.outputs.kernel }}
-          kernel: '${{ steps.vars.outputs.lvh_kernel }}'
+          # kernel: '${{ steps.vars.outputs.lvh_kernel }}'
           lvh-version: 'v0.0.23'
           host-mount: ./
           cmd: |
