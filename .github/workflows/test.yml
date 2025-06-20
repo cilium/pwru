@@ -179,15 +179,8 @@ jobs:
 
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
-      - name: Download kernel
-        shell: bash
-        id: kkernel
-        run: |
-            lvh kernel pull --platform=linux/${{ steps.vars.outputs.arch }} ${{ matrix.kernel }}
-            echo lvh_kernel_path=$(find ${{ matrix.kernel }}/boot/ -name "vmlinuz-*" -type f | head -1) >> "$GITHUB_OUTPUT"
-
       - name: Provision LVH VMs
-        uses: cilium/little-vm-helper@e87948476ca97050b1f149ab2aec379d0de19b84 # v0.0.23
+        uses: brb/little-vm-helper@2a581060d4120a1727f1a969e894d496ac85110d
         with:
           # install-dependencies: ${{ steps.vars.outputs.lvh_install_deps }}
           # images-folder-parent: ${{ steps.vars.outputs.shared_folder }}
@@ -196,8 +189,9 @@ jobs:
           cpu: 2
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
-          kernel: ${{ steps.kkernel.outputs.lvh_kernel_path }}/boot/
+          fetch-kernel: true
           lvh-version: 'v0.0.23'
+          arch: ${{ steps.vars.outputs.arch }}
           host-mount: ./
           cmd: |
             mkdir /host/pwru-tmp
