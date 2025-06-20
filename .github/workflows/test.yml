@@ -190,6 +190,8 @@ jobs:
             minor="0${minor}"
           fi
 
+          echo "kernel=${{ matrix.kernel}}-${{ steps.vars.outputs.arch }}" >> "$GITHUB_OUTPUT"
+
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
       # - name: Download the kernel
@@ -211,7 +213,7 @@ jobs:
           mem: 4G
           cpu: 2
           test-name: pwru-test
-          image-version: ${{ matrix.kernel }}
+          image-version: ${{ steps.kernel.outputs.kernel }}
           kernel: '${{ steps.vars.outputs.lvh_kernel }}'
           lvh-version: 'v0.0.23'
           host-mount: ./
