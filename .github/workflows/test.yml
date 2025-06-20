@@ -22,7 +22,7 @@ env:
   arm64-runner-ec2-ami: ami-04dd2037804df8ff9
   arm64-runner-group: cilium-pwru-runners
   arm64-runner-label: cilium-pwru-runners-arm64-${{ github.run_id }}
-  arm64-runner-count: 7
+  arm64-runner-count: 1 # TODO(7)
 
 jobs:
 
@@ -52,7 +52,7 @@ jobs:
       uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
       with:
         name: pwru
-        path: pwru-linux-*.tar.gz
+        path: release/pwru-linux-*.tar.gz
 
     - name: Build test-app
       shell: bash
@@ -107,8 +107,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['ubuntu-latest', 'cilium-pwru-runners-arm64-${{ github.run_id }}']
-        kernel: [ '5.4-20241218.004849', '5.10-20241218.004849', '5.15-20241218.004849', '6.1-20241218.004849', '6.6-20241218.004849', '6.12-20241218.004849', 'bpf-next-20250105.013256' ]
+        os:
+        # - 'ubuntu-latest'
+        - 'cilium-pwru-runners-arm64-${{ github.run_id }}'
+        kernel:
+        # - '5.4-20241218.004849'
+        # - '5.10-20241218.004849'
+        # - '5.15-20241218.004849'
+        # - '6.1-20241218.004849'
+        - '6.6-20241218.004849'
+        # - '6.12-20241218.004849'
+        # - 'bpf-next-20250105.013256'
+        # TODO check obsolete kernels
     timeout-minutes: 60
     runs-on: ${{ matrix.os }}
     steps:
@@ -136,18 +146,18 @@ jobs:
             echo arch=amd64
           fi
 
-      - name: Install GO
-        if: steps.vars.outputs.metal_arm64 == 'true'
-        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-        with:
-          go-version: '1.23.2'
+      # - name: Install GO
+        # if: steps.vars.outputs.metal_arm64 == 'true'
+        # uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
+        # with:
+          # go-version: '1.23.2'
 
-      - name: Install LVH CLI
-        if: steps.vars.outputs.metal_arm64 == 'true'
-        run: |
-          go install github.com/cilium/little-vm-helper/cmd/lvh@latest
+      # - name: Install LVH CLI
+        # if: steps.vars.outputs.metal_arm64 == 'true'
+        # run: |
+          # go install github.com/cilium/little-vm-helper/cmd/lvh@latest
           # Move it into /bin folder, so that LVH action can detect it further
-          sudo mv $(which lvh) /bin/lvh
+          # sudo mv $(which lvh) /bin/lvh
 
       - name: Retrieve stored pwru executable
         uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
@@ -163,6 +173,7 @@ jobs:
         shell: bash
         run: |
           tar xfv pwru-linux-${{ steps.vars.outputs.arch }}.tar.gz
+          ls -l
 
       - name: Derive kernel version
         id: kernel
@@ -181,15 +192,15 @@ jobs:
 
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
-      - name: Download the kernel
-        if: steps.vars.outputs.metal_arm64 == 'true'
-        run: |
-          if [ ! -e "${{ steps.vars.outputs.shared_folder }}/vmlinuz-${{ matrix.kernel }}" ]; then
-            lvh kernel pull ${{ matrix.kernel }}
-            mkdir -p ${{ steps.vars.outputs.shared_folder }}
-            mv ${{ matrix.kernel }}/boot/vmlinuz* ${{ steps.vars.outputs.shared_folder }}/vmlinuz-${{ matrix.kernel }}
-            rm -rf ${{ matrix.kernel }}
-          fi
+      # - name: Download the kernel
+      #   if: steps.vars.outputs.metal_arm64 == 'true'
+      #   run: |
+      #     if [ ! -e "${{ steps.vars.outputs.shared_folder }}/vmlinuz-${{ matrix.kernel }}" ]; then
+      #       lvh kernel pull ${{ matrix.kernel }}
+      #       mkdir -p ${{ steps.vars.outputs.shared_folder }}
+      #       mv ${{ matrix.kernel }}/boot/vmlinuz* ${{ steps.vars.outputs.shared_folder }}/vmlinuz-${{ matrix.kernel }}
+      #       rm -rf ${{ matrix.kernel }}
+      #     fi
 
       - name: Provision LVH VMs
         uses: cilium/little-vm-helper@e87948476ca97050b1f149ab2aec379d0de19b84 # v0.0.23
@@ -202,10 +213,11 @@ jobs:
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
           kernel: '${{ steps.vars.outputs.lvh_kernel }}'
+          lvh-version: 'v0.0.23'
           host-mount: ./
           cmd: |
             chmod +x /host/pwru/pwru
-            # chmod +x /host/test-app/test-app
+            chmod +x /host/test-app/test-app
 
             # wait for network to be available
             while true;
@@ -362,6 +374,11 @@ jobs:
               echo "--- \$i ---"
               cat \$i || true
             done
+
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 20
 
   arm64-runner-destroy:
     needs: [arm64-runner-provision, test]
