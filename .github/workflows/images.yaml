@@ -1,7 +1,6 @@
 name: Image Release Build
 
 on:
-  pull_request: {}
   push:
     tags:
       - 'v*'
