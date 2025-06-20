@@ -377,6 +377,12 @@ jobs:
               cat \$i || true
             done
 
+      - name: Tmate deps
+        if: ${{ failure() }}
+        run: |
+          sudo apt update
+          sudo apt-get install -y tmate
+
       - name: Setup tmate session
         if: ${{ failure() }}
         uses: mxschmitt/action-tmate@v3
