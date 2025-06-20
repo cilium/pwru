@@ -381,6 +381,8 @@ jobs:
         if: ${{ failure() }}
         uses: mxschmitt/action-tmate@v3
         timeout-minutes: 20
+        with:
+          install-dependencies: false
 
   arm64-runner-destroy:
     needs: [arm64-runner-provision, test]
