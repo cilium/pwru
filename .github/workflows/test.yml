@@ -146,19 +146,6 @@ jobs:
             echo arch=amd64 >> $GITHUB_OUTPUT
           fi
 
-      # - name: Install GO
-        # if: steps.vars.outputs.metal_arm64 == 'true'
-        # uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-        # with:
-          # go-version: '1.23.2'
-
-      # - name: Install LVH CLI
-        # if: steps.vars.outputs.metal_arm64 == 'true'
-        # run: |
-          # go install github.com/cilium/little-vm-helper/cmd/lvh@latest
-          # Move it into /bin folder, so that LVH action can detect it further
-          # sudo mv $(which lvh) /bin/lvh
-
       - name: Retrieve stored pwru executable
         uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
         with:
@@ -190,19 +177,14 @@ jobs:
             minor="0${minor}"
           fi
 
-          echo "kernel=${{ matrix.kernel}}-${{ steps.vars.outputs.arch }}" >> "$GITHUB_OUTPUT"
-
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
-      # - name: Download the kernel
-      #   if: steps.vars.outputs.metal_arm64 == 'true'
-      #   run: |
-      #     if [ ! -e "${{ steps.vars.outputs.shared_folder }}/vmlinuz-${{ matrix.kernel }}" ]; then
-      #       lvh kernel pull ${{ matrix.kernel }}
-      #       mkdir -p ${{ steps.vars.outputs.shared_folder }}
-      #       mv ${{ matrix.kernel }}/boot/vmlinuz* ${{ steps.vars.outputs.shared_folder }}/vmlinuz-${{ matrix.kernel }}
-      #       rm -rf ${{ matrix.kernel }}
-      #     fi
+      - name: Download kernel
+        shell: bash
+        id: kkernel
+        run: |
+            lvh kernel pull --platform=linux/${{ steps.vars.outputs.arch }} ${{ matrix.kernel }}
+            echo lvh_kernel_path=$(find ${{ matrix.kernel }}/boot/ -name "vmlinuz-*" -type f | head -1) >> "$GITHUB_OUTPUT"
 
       - name: Provision LVH VMs
         uses: cilium/little-vm-helper@e87948476ca97050b1f149ab2aec379d0de19b84 # v0.0.23
@@ -213,14 +195,18 @@ jobs:
           mem: 4G
           cpu: 2
           test-name: pwru-test
-          image-version: ${{ steps.kernel.outputs.kernel }}
-          kernel: asdf
-          # kernel: '${{ steps.vars.outputs.lvh_kernel }}'
+          image-version: ${{ matrix.kernel }}
+          kernel: ${{ steps.kkernel.outputs.lvh_kernel_path }}/boot/
           lvh-version: 'v0.0.23'
           host-mount: ./
           cmd: |
-            chmod +x /host/pwru/pwru || echo oops
-            chmod +x /host/test-app/test-app || echo o0ops
+            mkdir /host/pwru-tmp
+            chmod +x /host/pwru
+            mv /host/pwru /host/pwru-tmp/
+            mv /host/pwru-tmp /host/pwru
+
+            chmod +x /host/test-app-${{ steps.vars.outputs.arch }}
+            mv /host/test-app-${{ steps.vars.outputs.arch }} /host/test-app/test-app
  
             # wait for network to be available
             while true;
