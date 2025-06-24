@@ -1,6 +1,7 @@
 name: Image Release Build
 
 on:
+  pull_request: {}
   push:
     tags:
       - 'v*'
@@ -21,6 +22,7 @@ jobs:
 
       - name: Login to DockerHub
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        if: ${{ github.ref_type == 'tag' }}
         with:
           username: ${{ secrets.DOCKER_HUB_RELEASE_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_RELEASE_PASSWORD }}
@@ -43,5 +45,5 @@ jobs:
           context: .
           file: ./Dockerfile
           platforms: linux/arm64,linux/amd64
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ github.ref_type == 'tag' }}
           tags: ${{ steps.tag.outputs.image_tags }}
