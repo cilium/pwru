@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /* Copyright Authors of Cilium */
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target amd64 -cc clang bpf bpf.c -- -I../bpf/headers
+//go:generate sh -c "echo Generating for $TARGET_GOARCH"
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target $TARGET_GOARCH -cc clang -no-strip bpf bpf.c -- -I../bpf/headers
 package main
 
 import (

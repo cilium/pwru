@@ -31,7 +31,6 @@ runs:
     - name: PWRU test
       uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
       with:
-        ssh-port: ${{ inputs.ssh-port }}
         provision: 'false'
         cmd: |
           set -x
@@ -60,7 +59,6 @@ runs:
       if: ${{ !success() }}
       uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
       with:
-        ssh-port: ${{ inputs.ssh-port }}
         provision: 'false'
         cmd: |
           mkdir -p /host/logs/${{ inputs.test-name }}

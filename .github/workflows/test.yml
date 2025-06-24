@@ -22,7 +22,7 @@ env:
   arm64-runner-ec2-ami: ami-04dd2037804df8ff9
   arm64-runner-group: cilium-pwru-runners
   arm64-runner-label: cilium-pwru-runners-arm64-${{ github.run_id }}
-  arm64-runner-count: 7
+  arm64-runner-count: 1 # TODO(7)
 
 jobs:
 
@@ -47,24 +47,26 @@ jobs:
     - name: Generate and build
       run: |
         make release
-        tar xfv release/pwru-linux-amd64.tar.gz
 
     - name: Store executable
       uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
       with:
         name: pwru
-        path: pwru
+        path: release/pwru-linux-*.tar.gz
 
     - name: Build test-app
+      shell: bash
       run: |
         cd test-app
-        go build .
+        for arch in amd64 arm64; do
+          GOARCH=${arch} go build -o test-app-${arch} .
+        done
 
     - name: Store test-app
       uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
       with:
         name: test-app
-        path: test-app/test-app
+        path: test-app/test-app-*
 
   arm64-runner-provision:
     needs: [build]
@@ -105,59 +107,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ['ubuntu-latest', 'cilium-pwru-runners-arm64-${{ github.run_id }}']
-        kernel: [ '5.4-20241218.004849', '5.10-20241218.004849', '5.15-20241218.004849', '6.1-20241218.004849', '6.6-20241218.004849', '6.12-20241218.004849', 'bpf-next-20250105.013256' ]
+        os:
+        # - 'ubuntu-latest'
+        - 'cilium-pwru-runners-arm64-${{ github.run_id }}'
+        kernel:
+        # - '5.4-20241218.004849'
+        # - '5.10-20241218.004849'
+        # - '5.15-20241218.004849'
+        # - '6.1-20241218.004849'
+        - '6.6-20241218.004849'
+        # - '6.12-20241218.004849'
+        # - 'bpf-next-20250105.013256'
+        # TODO check obsolete kernels
     timeout-minutes: 60
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
 
-      - name: Set up job variables
-        id: vars
-        run: |
-          if [[ "${{ matrix.os }}" == "cilium-pwru-runners-arm64-${{ github.run_id }}" ]]
-          then
-            # this is racy but it should be fine
-            ssh_port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
-            echo metal_arm64=true >> $GITHUB_OUTPUT
-            echo lvh_install_deps=false >> $GITHUB_OUTPUT
-            echo lvh_kernel="/home/runners/vmlinuz-${{ matrix.kernel }}" >> $GITHUB_OUTPUT
-            echo ssh_port=$ssh_port >> $GITHUB_OUTPUT
-            echo shared_folder="/home/runners" >> $GITHUB_OUTPUT
-          else
-            echo metal_arm64=false >> $GITHUB_OUTPUT
-            echo lvh_install_deps=true >> $GITHUB_OUTPUT
-            echo lvh_kernel="" >> $GITHUB_OUTPUT
-            echo ssh_port=2222 >> $GITHUB_OUTPUT
-            echo shared_folder="" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Install GO
-        if: steps.vars.outputs.metal_arm64 == 'true'
-        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5.4.0
-        with:
-          go-version: '1.23.2'
-
-      - name: Install LVH CLI
-        if: steps.vars.outputs.metal_arm64 == 'true'
-        run: |
-          go install github.com/cilium/little-vm-helper/cmd/lvh@latest
-          # Move it into /bin folder, so that LVH action can detect it further
-          sudo mv $(which lvh) /bin/lvh
-
       - name: Retrieve stored pwru executable
         uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
         with:
           name: pwru
-          path: pwru
 
       - name: Retrieve stored test-app executable
         uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
         with:
           name: test-app
-          path: test-app
 
-      - name: Derive kernel version
+      - name: Install stored executables
+        shell: bash
+        run: |
+          tar xfv pwru-linux-${{ steps.vars.outputs.arch }}.tar.gz
+
+      - name: Derive kernel version, arch
         id: kernel
         run: |
           if [[ "${{ matrix.kernel }}" == bpf-next* ]]; then
@@ -174,32 +156,35 @@ jobs:
 
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
-      - name: Download the kernel
-        if: steps.vars.outputs.metal_arm64 == 'true'
-        run: |
-          if [ ! -e "${{ steps.vars.outputs.shared_folder }}/vmlinuz-${{ matrix.kernel }}" ]; then
-            lvh kernel pull ${{ matrix.kernel }}
-            mkdir -p ${{ steps.vars.outputs.shared_folder }}
-            mv ${{ matrix.kernel }}/boot/vmlinuz* ${{ steps.vars.outputs.shared_folder }}/vmlinuz-${{ matrix.kernel }}
-            rm -rf ${{ matrix.kernel }}
+          if [[ "${{ matrix.os }}" == "cilium-pwru-runners-arm64-${{ github.run_id }}" ]]
+          then
+            echo arch=arm64 >> $GITHUB_OUTPUT
+            echo kernel-version=${{ matrix.kernel}} >> $GITHUB_OUTPUT
+          else
+            echo arch=amd64 >> $GITHUB_OUTPUT
+            echo kernel-version="" >> $GITHUB_OUTPUT # for amd64 we can use kernel from lvh image
           fi
 
       - name: Provision LVH VMs
         uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
         with:
-          install-dependencies: ${{ steps.vars.outputs.lvh_install_deps }}
-          images-folder-parent: ${{ steps.vars.outputs.shared_folder }}
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
+          lvh-version: 'v0.0.23'
           mem: 4G
           cpu: 2
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
-          kernel: '${{ steps.vars.outputs.lvh_kernel }}'
+          kernel-version: ${{ steps.kernel.outputs.kernel-version }}
+          arch: ${{ steps.kernel.outputs.arch }}
           host-mount: ./
           cmd: |
-            chmod +x /host/pwru/pwru
-            chmod +x /host/test-app/test-app
+            mkdir /host/pwru-tmp
+            chmod +x /host/pwru
+            mv /host/pwru /host/pwru-tmp/
+            mv /host/pwru-tmp /host/pwru
 
+            chmod +x /host/test-app-${{ steps.vars.outputs.arch }}
+            mv /host/test-app-${{ steps.vars.outputs.arch }} /host/test-app/test-app
+ 
             # wait for network to be available
             while true;
             do
@@ -213,7 +198,6 @@ jobs:
       - name: Test basic IPv4
         uses: ./.github/actions/pwru-test
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-basic-ipv4
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
           setup: |
@@ -225,7 +209,6 @@ jobs:
       - name: Test basic IPv6
         uses: ./.github/actions/pwru-test
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-basic-ipv6
           pwru-pcap-filter: 'dst host 2606:4700:4700::1001 and port 8080'
           setup: |
@@ -237,7 +220,6 @@ jobs:
       - name: Test advanced IPv4
         uses: ./.github/actions/pwru-test
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-advanced-ipv4
           pwru-pcap-filter: 'tcp[tcpflags] = tcp-syn'
           setup: |
@@ -249,7 +231,6 @@ jobs:
       - name: Test advanced IPv6
         uses: ./.github/actions/pwru-test
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-advanced-ipv6
           pwru-pcap-filter: 'ip6[53] & 0x3f = 0x2'
           setup: |
@@ -261,7 +242,6 @@ jobs:
       - name: Test pcap filter using stack
         uses: ./.github/actions/pwru-test
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-pcap-filter-stack
           pwru-pcap-filter: '(((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)'
           gen-traffic: curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.1.1.1 || true; sleep 5
@@ -270,7 +250,6 @@ jobs:
       - name: Test --filter-track-skb
         uses: ./.github/actions/pwru-test
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-filter-track-skb
           pwru-flags: --filter-track-skb
           pwru-pcap-filter: dst host 10.10.20.99
@@ -283,7 +262,6 @@ jobs:
       - name: Test ARP filter
         uses: ./.github/actions/pwru-test
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-filter-arp
           pwru-pcap-filter: 'arp and arp[7] = 1 and arp[24]= 169 and arp[25] = 254 and arp[26] = 0 and arp[27] = 1'
           setup: |
@@ -303,7 +281,6 @@ jobs:
       - name: Test --filter-ifname
         uses: ./.github/actions/pwru-test
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-filter-ifname
           pwru-flags: --filter-ifname lo
           pwru-pcap-filter: icmp
@@ -315,7 +292,6 @@ jobs:
         if: ${{ steps.kernel.outputs.vsn >= 518 }}
         uses: ./.github/actions/pwru-test
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-kprobe-multi-basic
           pwru-flags: --backend=kprobe-multi
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
@@ -329,7 +305,6 @@ jobs:
         if: ${{ steps.kernel.outputs.vsn >= 606 }}
         uses: ./.github/actions/pwru-test
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           test-name: ${{ matrix.kernel }}-filter-trace-tc-xdp
           pwru-flags: --filter-trace-tc --filter-trace-xdp
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
@@ -348,13 +323,25 @@ jobs:
         if: ${{ !success() }}
         uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
         with:
-          ssh-port: ${{ steps.vars.outputs.ssh_port }}
           provision: 'false'
           cmd: |
             for i in /tmp/pwru-*.status /tmp/pwru-*.ready /tmp/pwru-*.log; do
               echo "--- \$i ---"
               cat \$i || true
             done
+
+      - name: Tmate deps
+        if: ${{ failure() }}
+        run: |
+          sudo apt update
+          sudo apt-get install -y tmate
+
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 20
+        with:
+          install-dependencies: false
 
   arm64-runner-destroy:
     needs: [arm64-runner-provision, test]
