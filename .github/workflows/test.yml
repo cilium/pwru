@@ -168,7 +168,7 @@ jobs:
       - name: Provision LVH VMs
         uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
         with:
-          lvh-version: 'v0.0.23'
+          lvh-version: 'v0.0.24'
           mem: 4G
           cpu: 2
           test-name: pwru-test
@@ -290,7 +290,7 @@ jobs:
           expected-output-pattern: 'icmp'
 
       - name: Test --backend=kprobe-multi
-        if: ${{ steps.kernel.outputs.vsn >= 518 }}
+        if: ${{ (steps.kernel.outputs.arch == 'amd64' && steps.kernel.outputs.vsn >= 518) ||  (steps.kernel.outputs.arch == 'arm64' && steps.kernel.outputs.vsn >= 614)}}
         uses: ./.github/actions/pwru-test
         with:
           test-name: ${{ matrix.kernel }}-kprobe-multi-basic
@@ -340,7 +340,7 @@ jobs:
       - name: Setup tmate session
         if: ${{ failure() }}
         uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 20
+        timeout-minutes: 30
         with:
           install-dependencies: false
 
