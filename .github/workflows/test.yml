@@ -124,21 +124,6 @@ jobs:
     steps:
       - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
 
-      - name: Retrieve stored pwru executable
-        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
-        with:
-          name: pwru
-
-      - name: Retrieve stored test-app executable
-        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
-        with:
-          name: test-app
-
-      - name: Install stored executables
-        shell: bash
-        run: |
-          tar xfv pwru-linux-${{ steps.vars.outputs.arch }}.tar.gz
-
       - name: Derive kernel version, arch
         id: kernel
         run: |
@@ -164,6 +149,21 @@ jobs:
             echo arch=amd64 >> $GITHUB_OUTPUT
             echo kernel-version="" >> $GITHUB_OUTPUT # for amd64 we can use kernel from lvh image
           fi
+
+      - name: Retrieve stored pwru executable
+        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
+        with:
+          name: pwru
+
+      - name: Retrieve stored test-app executable
+        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
+        with:
+          name: test-app
+
+      - name: Install stored executables
+        shell: bash
+        run: |
+          tar xfv pwru-linux-${{ steps.kernel.outputs.arch }}.tar.gz
 
       - name: Provision LVH VMs
         uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
@@ -201,6 +201,7 @@ jobs:
           test-name: ${{ matrix.kernel }}-basic-ipv4
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
           setup: |
+            exit 1
             iptables -w 10 -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 --dport 8080 -j DROP
           gen-traffic: |
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.1:8080 || true
