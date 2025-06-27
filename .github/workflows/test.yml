@@ -89,7 +89,7 @@ jobs:
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
       - name: Provision LVH VMs
-        uses: cilium/little-vm-helper@e87948476ca97050b1f149ab2aec379d0de19b84 # v0.0.23
+        uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
         with:
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
@@ -225,7 +225,7 @@ jobs:
 
       - name: Fetch artifacts
         if: ${{ !success() }}
-        uses: cilium/little-vm-helper@e87948476ca97050b1f149ab2aec379d0de19b84 # v0.0.23
+        uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
         with:
           provision: 'false'
           cmd: |

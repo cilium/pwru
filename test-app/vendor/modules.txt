@@ -1,0 +1,21 @@
+# github.com/cilium/ebpf v0.19.0
+## explicit; go 1.23.0
+github.com/cilium/ebpf
+github.com/cilium/ebpf/asm
+github.com/cilium/ebpf/btf
+github.com/cilium/ebpf/internal
+github.com/cilium/ebpf/internal/efw
+github.com/cilium/ebpf/internal/kallsyms
+github.com/cilium/ebpf/internal/kconfig
+github.com/cilium/ebpf/internal/linux
+github.com/cilium/ebpf/internal/platform
+github.com/cilium/ebpf/internal/sys
+github.com/cilium/ebpf/internal/sysenc
+github.com/cilium/ebpf/internal/testutils/testmain
+github.com/cilium/ebpf/internal/tracefs
+github.com/cilium/ebpf/internal/unix
+github.com/cilium/ebpf/link
+# golang.org/x/sys v0.31.0
+## explicit; go 1.23.0
+golang.org/x/sys/unix
+golang.org/x/sys/windows
