@@ -7,6 +7,7 @@ package pwru
 import (
 	"bufio"
 	"fmt"
+	"iter"
 	"log"
 	"os"
 	"path/filepath"
@@ -47,7 +48,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 
 	type iterator struct {
 		kmod string
-		iter *btf.TypesIterator
+		iter iter.Seq2[btf.Type, error]
 	}
 
 	reg, err := regexp.Compile(pattern)
@@ -61,7 +62,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 		log.Printf("Failed to retrieve available ftrace functions (is /sys/kernel/debug/tracing mounted?): %s", err)
 	}
 
-	iters := []iterator{{"", spec.Iterate()}}
+	iters := []iterator{{"", spec.All()}}
 	for _, module := range kmods {
 		path := filepath.Join("/sys/kernel/btf", module)
 		f, err := os.Open(path)
@@ -74,12 +75,15 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 		if err != nil {
 			return nil, fmt.Errorf("failed to load %s btf: %v", module, err)
 		}
-		iters = append(iters, iterator{module, modSpec.Iterate()})
+		iters = append(iters, iterator{module, modSpec.All()})
 	}
 
 	for _, it := range iters {
-		for it.iter.Next() {
-			typ := it.iter.Type
+		for typ, err := range it.iter {
+			if err != nil {
+				return nil, fmt.Errorf("failed to iterate through btf types: %v", err)
+			}
+
 			fn, ok := typ.(*btf.Func)
 			if !ok {
 				continue
