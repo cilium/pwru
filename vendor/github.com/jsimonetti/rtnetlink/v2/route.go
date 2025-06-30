@@ -142,16 +142,22 @@ func (r *RouteService) Delete(req *RouteMessage) error {
 	return err
 }
 
-// Get Route(s)
+// Get Route(s).
 func (r *RouteService) Get(req *RouteMessage) ([]RouteMessage, error) {
-	flags := netlink.Request | netlink.DumpFiltered
+	flags := netlink.Request
 	return r.execute(req, unix.RTM_GETROUTE, flags)
 }
 
 // List all routes
 func (r *RouteService) List() ([]RouteMessage, error) {
+	return r.ListMatch(&RouteMessage{})
+}
+
+// List matching Route(s). For attributes to be included as part of the match filter the
+// netlink connection must be in strict mode.
+func (r *RouteService) ListMatch(req *RouteMessage) ([]RouteMessage, error) {
 	flags := netlink.Request | netlink.Dump
-	return r.execute(&RouteMessage{}, unix.RTM_GETROUTE, flags)
+	return r.execute(req, unix.RTM_GETROUTE, flags)
 }
 
 type RouteAttributes struct {
