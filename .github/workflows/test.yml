@@ -28,48 +28,50 @@ jobs:
     - name: Generate and build
       run: |
         make release
-        tar xfv release/pwru-linux-amd64.tar.gz
 
     - name: Store executable
       uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
       with:
         name: pwru
-        path: pwru
+        path: release/pwru-linux-*.tar.gz
 
     - name: Build test-app
+      shell: bash
       run: |
         cd test-app
-        go build .
+        for arch in amd64 arm64; do
+          GOARCH=${arch} go build -o test-app-${arch} .
+        done
 
     - name: Store test-app
       uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
       with:
         name: test-app
-        path: test-app/test-app
+        path: test-app/test-app-*
 
   test:
-    runs-on: ubuntu-latest
     name: Test
-    needs: build
+    needs: [build]
     strategy:
       fail-fast: false
       matrix:
-        kernel: [ '5.4-20241218.004849', '5.10-20241218.004849', '5.15-20241218.004849', '6.1-20241218.004849', '6.6-20241218.004849', '6.12-20241218.004849', 'bpf-next-20250105.013256' ]
-    timeout-minutes: 10
+        arch:
+        - amd64
+        kernel:
+        - 5.4-20250616.013250
+        - 5.10-20250616.013250
+        - 5.15-20250616.013250
+        - 6.1-20250616.013250
+        - 6.6-20250616.013250
+        - 6.12-20250616.013250
+        - bpf-next-20250623.155211
+        include:
+          - arch: arm64
+            kernel: 6.12-20250616.013250
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
-
-      - name: Retrieve stored pwru executable
-        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
-        with:
-          name: pwru
-          path: pwru
-
-      - name: Retrieve stored test-app executable
-        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
-        with:
-          name: test-app
-          path: test-app
 
       - name: Derive kernel version
         id: kernel
@@ -88,16 +90,49 @@ jobs:
 
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
+          if [[ "${{ matrix.arch }}" == "arm64" ]]
+          then
+            echo kernel-version=${{ matrix.kernel}} >> $GITHUB_OUTPUT
+          else
+            echo kernel-version=""  >> $GITHUB_OUTPUT
+          fi
+
+      - name: Retrieve stored pwru executable
+        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
+        with:
+          name: pwru
+
+      - name: Retrieve stored test-app executable
+        uses: actions/download-artifact@448e3f862ab3ef47aa50ff917776823c9946035b
+        with:
+          name: test-app
+
+      - name: Install stored executables
+        shell: bash
+        run: |
+          tar xfv pwru-linux-${{ matrix.arch }}.tar.gz
+
       - name: Provision LVH VMs
         uses: cilium/little-vm-helper@9c1f3a549af06e213863d034c13ba1c5d1e3c667 # v0.0.26
         with:
+          lvh-version: 'v0.0.24'
+          mem: 4G
+          cpu: 2
+          cpu-kind: ''
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
+          kernel-version: ${{ steps.kernel.outputs.kernel-version }}
+          arch: ${{ matrix.arch }}
+          install-dependencies: true
           host-mount: ./
-          install-dependencies: 'true'
           cmd: |
-            chmod +x /host/pwru/pwru
-            chmod +x /host/test-app/test-app
+            mkdir /host/pwru-tmp
+            chmod +x /host/pwru
+            mv /host/pwru /host/pwru-tmp/
+            mv /host/pwru-tmp /host/pwru
+
+            chmod +x /host/test-app-${{ matrix.arch }}
+            mv /host/test-app-${{ matrix.arch }} /host/test-app/test-app
 
       - name: Test basic IPv4
         uses: ./.github/actions/pwru-test
@@ -148,7 +183,7 @@ jobs:
         with:
           test-name: ${{ matrix.kernel }}-pcap-filter-stack
           pwru-pcap-filter: '(((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)'
-          gen-traffic: curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.1.1.1 || true; sleep 5
+          gen-traffic: curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.1.1.1 || true; sleep 10
           expected-output-pattern: '1.1.1.1:80'
 
       - name: Test --filter-track-skb
@@ -193,7 +228,7 @@ jobs:
           expected-output-pattern: 'icmp'
 
       - name: Test --backend=kprobe-multi
-        if: ${{ steps.kernel.outputs.vsn >= 518 }}
+        if: ${{ (matrix.arch == 'amd64' && steps.kernel.outputs.vsn >= 518) ||  (matrix.arch == 'arm64' && steps.kernel.outputs.vsn >= 614)}}
         uses: ./.github/actions/pwru-test
         with:
           test-name: ${{ matrix.kernel }}-kprobe-multi-basic
