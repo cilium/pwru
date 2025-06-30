@@ -68,48 +68,50 @@ jobs:
         name: test-app
         path: test-app/test-app-*
 
-  arm64-runner-provision:
-    needs: [build]
-    runs-on: ubuntu-latest
-    name: Provision ARM64 runner
-    timeout-minutes: 30
-    steps:
-      - name: Checkout Git Repo
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
+  # arm64-runner-provision:
+  #   needs: [build]
+  #   runs-on: ubuntu-latest
+  #   name: Provision ARM64 runner
+  #   timeout-minutes: 30
+  #   steps:
+  #     - name: Checkout Git Repo
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+  #       with:
+  #         persist-credentials: false
 
-      - name: Provision ARM64 runner
-        uses: ./.github/actions/arm64-runner
-        with:
-          state-bucket: ${{ env.arm64-runner-state-bucket }}
-          state-region: ${{ env.arm64-runner-state-region }}
-          role-arn: ${{ env.arm64-runner-role-arn }}
-          region: ${{ env.arm64-runner-region }}
-          zone: ${{ env.arm64-runner-zone }}
-          infra-dir: ${{ env.arm64-runner-infra-dir }}
-          action: apply
-          ec2-type: ${{ env.arm64-runner-ec2-type }}
-          ec2-ami: ${{ env.arm64-runner-ec2-ami }}
-          label: ${{ env.arm64-runner-label }}
-          gh-org: ${{ github.repository_owner }}
-          gh-app-id: ${{ secrets.ARM64_RUNNER_GH_APP_ID }}
-          gh-app-install-id: ${{ secrets.ARM64_RUNNER_GH_APP_INSTALL_ID }}
-          gh-app-pem: ${{ secrets.ARM64_RUNNER_GH_APP_PRIVATE_KEY }}
-          gh-runners-group: ${{ env.arm64-runner-group }}
-          gh-runners-count: ${{ env.arm64-runner-count }}
-          ssh-private-key: ${{ secrets.ARM64_RUNNER_SSH_PRIVATE_KEY }}
-          ssh-public-key: ${{ secrets.ARM64_RUNNER_SSH_PUBLIC_KEY }}
+  #     - name: Provision ARM64 runner
+  #       uses: ./.github/actions/arm64-runner
+  #       with:
+  #         state-bucket: ${{ env.arm64-runner-state-bucket }}
+  #         state-region: ${{ env.arm64-runner-state-region }}
+  #         role-arn: ${{ env.arm64-runner-role-arn }}
+  #         region: ${{ env.arm64-runner-region }}
+  #         zone: ${{ env.arm64-runner-zone }}
+  #         infra-dir: ${{ env.arm64-runner-infra-dir }}
+  #         action: apply
+  #         ec2-type: ${{ env.arm64-runner-ec2-type }}
+  #         ec2-ami: ${{ env.arm64-runner-ec2-ami }}
+  #         label: ${{ env.arm64-runner-label }}
+  #         gh-org: ${{ github.repository_owner }}
+  #         gh-app-id: ${{ secrets.ARM64_RUNNER_GH_APP_ID }}
+  #         gh-app-install-id: ${{ secrets.ARM64_RUNNER_GH_APP_INSTALL_ID }}
+  #         gh-app-pem: ${{ secrets.ARM64_RUNNER_GH_APP_PRIVATE_KEY }}
+  #         gh-runners-group: ${{ env.arm64-runner-group }}
+  #         gh-runners-count: ${{ env.arm64-runner-count }}
+  #         ssh-private-key: ${{ secrets.ARM64_RUNNER_SSH_PRIVATE_KEY }}
+  #         ssh-public-key: ${{ secrets.ARM64_RUNNER_SSH_PUBLIC_KEY }}
 
   test:
     name: Test
-    needs: [build, arm64-runner-provision]
+    needs: [build]
+    # needs: [build, arm64-runner-provision]
     strategy:
       fail-fast: false
       matrix:
         os:
         # - 'ubuntu-latest'
-        - 'cilium-pwru-runners-arm64-${{ github.run_id }}'
+        # - 'cilium-pwru-runners-arm64-${{ github.run_id }}'
+        - 'ubuntu-latest'
         kernel:
         # - '5.4-20241218.004849'
         # - '5.10-20241218.004849'
@@ -146,8 +148,10 @@ jobs:
             echo arch=arm64 >> $GITHUB_OUTPUT
             echo kernel-version=${{ matrix.kernel}} >> $GITHUB_OUTPUT
           else
-            echo arch=amd64 >> $GITHUB_OUTPUT
-            echo kernel-version="" >> $GITHUB_OUTPUT # for amd64 we can use kernel from lvh image
+            echo arch=arm64 >> $GITHUB_OUTPUT
+            echo kernel-version=${{ matrix.kernel}} >> $GITHUB_OUTPUT
+            # echo arch=amd64 >> $GITHUB_OUTPUT
+            # echo kernel-version="" >> $GITHUB_OUTPUT # for amd64 we can use kernel from lvh image
           fi
 
       - name: Retrieve stored pwru executable
@@ -165,16 +169,25 @@ jobs:
         run: |
           tar xfv pwru-linux-${{ steps.kernel.outputs.arch }}.tar.gz
 
+      - name: TODO install deps
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-arm
+
       - name: Provision LVH VMs
-        uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
+        #uses: cilium/little-vm-helper@e5b2424f49a2055186b7ac33e6a83b7c992b8f3a # v0.0.24
+        uses: brb/little-vm-helper@1971542fe7500c7a9238d64e2f915668ac4da815
         with:
           lvh-version: 'v0.0.24'
           mem: 4G
           cpu: 2
+          cpu-kind: ''
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
           kernel-version: ${{ steps.kernel.outputs.kernel-version }}
           arch: ${{ steps.kernel.outputs.arch }}
+          qemu-arch: ${{ steps.kernel.outputs.arch }}
           host-mount: ./
           cmd: |
             mkdir /host/pwru-tmp
@@ -182,8 +195,8 @@ jobs:
             mv /host/pwru /host/pwru-tmp/
             mv /host/pwru-tmp /host/pwru
 
-            chmod +x /host/test-app-${{ steps.vars.outputs.arch }}
-            mv /host/test-app-${{ steps.vars.outputs.arch }} /host/test-app/test-app
+            chmod +x /host/test-app-${{ steps.kernel.outputs.arch }}
+            mv /host/test-app-${{ steps.kernel.outputs.arch }} /host/test-app/test-app
  
             # wait for network to be available
             while true;
@@ -201,7 +214,6 @@ jobs:
           test-name: ${{ matrix.kernel }}-basic-ipv4
           pwru-pcap-filter: 'dst host 1.0.0.1 and port 8080'
           setup: |
-            exit 1
             iptables -w 10 -I OUTPUT 1 -m tcp --proto tcp --dst 1.0.0.1/32 --dport 8080 -j DROP
           gen-traffic: |
             curl -vvv -sS --fail --connect-timeout "1" -o /dev/null http://1.0.0.1:8080 || true
@@ -344,36 +356,36 @@ jobs:
         with:
           install-dependencies: false
 
-  arm64-runner-destroy:
-    needs: [arm64-runner-provision, test]
-    if: always() && needs.arm64-runner-provision.result != 'skipped'
-    runs-on: ubuntu-latest
-    name: Destroy ARM64 runner
-    timeout-minutes: 60
-    steps:
-      - name: Checkout Git Repo
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          persist-credentials: false
+  # arm64-runner-destroy:
+  #   needs: [arm64-runner-provision, test]
+  #   if: always() && needs.arm64-runner-provision.result != 'skipped'
+  #   runs-on: ubuntu-latest
+  #   name: Destroy ARM64 runner
+  #   timeout-minutes: 60
+  #   steps:
+  #     - name: Checkout Git Repo
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+  #       with:
+  #         persist-credentials: false
 
-      - name: Destroy ARM64 runner
-        uses: ./.github/actions/arm64-runner
-        with:
-          state-bucket: ${{ env.arm64-runner-state-bucket }}
-          state-region: ${{ env.arm64-runner-state-region }}
-          role-arn: ${{ env.arm64-runner-role-arn }}
-          region: ${{ env.arm64-runner-region }}
-          zone: ${{ env.arm64-runner-zone }}
-          infra-dir: ${{ env.arm64-runner-infra-dir }}
-          action: destroy
-          ec2-type: ${{ env.arm64-runner-ec2-type }}
-          ec2-ami: ${{ env.arm64-runner-ec2-ami }}
-          label: ${{ env.arm64-runner-label }}
-          gh-org: ${{ github.repository_owner }}
-          gh-app-id: ${{ secrets.ARM64_RUNNER_GH_APP_ID }}
-          gh-app-install-id: ${{ secrets.ARM64_RUNNER_GH_APP_INSTALL_ID }}
-          gh-app-pem: ${{ secrets.ARM64_RUNNER_GH_APP_PRIVATE_KEY }}
-          gh-runners-group: ${{ env.arm64-runner-group }}
-          gh-runners-count: ${{ env.arm64-runner-count }}
-          ssh-private-key: ${{ secrets.ARM64_RUNNER_SSH_PRIVATE_KEY }}
-          ssh-public-key: ${{ secrets.ARM64_RUNNER_SSH_PUBLIC_KEY }}
+  #     - name: Destroy ARM64 runner
+  #       uses: ./.github/actions/arm64-runner
+  #       with:
+  #         state-bucket: ${{ env.arm64-runner-state-bucket }}
+  #         state-region: ${{ env.arm64-runner-state-region }}
+  #         role-arn: ${{ env.arm64-runner-role-arn }}
+  #         region: ${{ env.arm64-runner-region }}
+  #         zone: ${{ env.arm64-runner-zone }}
+  #         infra-dir: ${{ env.arm64-runner-infra-dir }}
+  #         action: destroy
+  #         ec2-type: ${{ env.arm64-runner-ec2-type }}
+  #         ec2-ami: ${{ env.arm64-runner-ec2-ami }}
+  #         label: ${{ env.arm64-runner-label }}
+  #         gh-org: ${{ github.repository_owner }}
+  #         gh-app-id: ${{ secrets.ARM64_RUNNER_GH_APP_ID }}
+  #         gh-app-install-id: ${{ secrets.ARM64_RUNNER_GH_APP_INSTALL_ID }}
+  #         gh-app-pem: ${{ secrets.ARM64_RUNNER_GH_APP_PRIVATE_KEY }}
+  #         gh-runners-group: ${{ env.arm64-runner-group }}
+  #         gh-runners-count: ${{ env.arm64-runner-count }}
+  #         ssh-private-key: ${{ secrets.ARM64_RUNNER_SSH_PRIVATE_KEY }}
+  #         ssh-public-key: ${{ secrets.ARM64_RUNNER_SSH_PUBLIC_KEY }}
