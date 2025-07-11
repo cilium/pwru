@@ -17,9 +17,9 @@ jobs:
         uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
 
       - name: Set up Go
-        uses: actions/setup-go@fa96338abe5531f6e34c5cc0bbe28c1a533d5505
+        uses: actions/setup-go@7c0b336c9aab5e8ed4f0ad8b81225b125f9883e4
         with:
-          go-version: 1.24.4
+          go-version: 1.24.5
 
       - name: Generate the artifacts
         run: make release
