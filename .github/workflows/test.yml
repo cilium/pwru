@@ -14,9 +14,9 @@ jobs:
     - uses: actions/checkout@09d2acae674a48949e3602304ab46fd20ae0c42f
 
     - name: Set up Go
-      uses: actions/setup-go@fa96338abe5531f6e34c5cc0bbe28c1a533d5505
+      uses: actions/setup-go@7c0b336c9aab5e8ed4f0ad8b81225b125f9883e4
       with:
-        go-version: 1.24.4
+        go-version: 1.24.5
 
     - name: Check module vendoring
       run: |
@@ -89,7 +89,7 @@ jobs:
           echo "vsn=${major}${minor}" >> "$GITHUB_OUTPUT"
 
       - name: Provision LVH VMs
-        uses: cilium/little-vm-helper@3b6f374a9b62e6987efee7e3ab226f968d857c7c # v0.0.25
+        uses: cilium/little-vm-helper@9c1f3a549af06e213863d034c13ba1c5d1e3c667 # v0.0.26
         with:
           test-name: pwru-test
           image-version: ${{ matrix.kernel }}
@@ -225,7 +225,7 @@ jobs:
 
       - name: Fetch artifacts
         if: ${{ !success() }}
-        uses: cilium/little-vm-helper@3b6f374a9b62e6987efee7e3ab226f968d857c7c # v0.0.25
+        uses: cilium/little-vm-helper@9c1f3a549af06e213863d034c13ba1c5d1e3c667 # v0.0.26
         with:
           provision: 'false'
           cmd: |
