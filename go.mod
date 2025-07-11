@@ -3,7 +3,7 @@ module github.com/cilium/pwru
 go 1.24.1
 
 require (
-	github.com/Asphaltt/mybtf v0.0.0-20250315135407-f9d09086616b
+	github.com/Asphaltt/mybtf v0.0.0-20250708022622-be6f548674b2
 	github.com/cheggaaa/pb/v3 v3.1.7
 	github.com/cilium/ebpf v0.19.0
 	github.com/cloudflare/cbpfc v0.0.0-20250612131231-1b95965eadb6
@@ -12,10 +12,10 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/tklauser/ps v0.0.3
 	github.com/vishvananda/netns v0.0.5
-	golang.org/x/arch v0.18.0
-	golang.org/x/net v0.41.0
-	golang.org/x/sync v0.15.0
-	golang.org/x/sys v0.33.0
+	golang.org/x/arch v0.19.0
+	golang.org/x/net v0.42.0
+	golang.org/x/sync v0.16.0
+	golang.org/x/sys v0.34.0
 )
 
 require (

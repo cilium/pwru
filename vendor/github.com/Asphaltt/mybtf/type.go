@@ -86,8 +86,14 @@ func IsBigEndian(t btf.Type) bool {
 // UnderlyingType returns the underlying type of the given btf.Type if it is
 // typedef, volatile, const, restrict or type tag.
 func UnderlyingType(t btf.Type) btf.Type {
+	var ptrs []*btf.Pointer
+
+loop:
 	for {
 		switch v := t.(type) {
+		case *btf.Pointer:
+			ptrs = append(ptrs, v)
+			t = v.Target
 		case *btf.Typedef:
 			t = v.Type
 		case *btf.Volatile:
@@ -99,9 +105,19 @@ func UnderlyingType(t btf.Type) btf.Type {
 		case *btf.TypeTag:
 			t = v.Type
 		default:
-			return t
+			break loop
 		}
 	}
+
+	if len(ptrs) == 0 {
+		return t
+	}
+
+	for i := len(ptrs) - 1; i >= 0; i-- {
+		t = &btf.Pointer{Target: t}
+	}
+
+	return t
 }
 
 func HaveEnumValue(spec *btf.Spec, enumName, enumValue string) bool {
