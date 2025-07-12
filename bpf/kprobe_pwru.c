@@ -773,6 +773,9 @@ get_func_ip(void) {
 #elif defined(bpf_target_arm64)
 	/* Ref: commit b2ad54e1533e ("bpf, arm64: Implement bpf_arch_text_poke() for arm64") */
 	static const int ip_offset = 12/* sizeof 3 insns */;
+#elif defined(bpf_target_loongarch)
+	/* LoongArch does not support trampoline, get_func_ip does not apply to LoongArch */
+	static const int ip_offset = 0;
 #else
 #error Unsupported architecture
 #endif
