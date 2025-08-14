@@ -85,6 +85,7 @@ Usage: ./pwru [options] [pcap-filter]
       --output-tunnel                  print encapsulated tunnel header data
       --output-tuple                   print L4 tuple (default true)
       --output-xdp-metadata strings    print xdp metadata (e.g., "xdp->rxq->queue_index"), 4 at most
+      --set-percpu-buf uint32          set the size of buffers to print skb data (used by --output-skb and --output-skb-shared-info) (default 4096)
       --timestamp string               print timestamp per skb ("current", "relative", "absolute", "none") (default "none")
       --version                        show pwru version and exit
 ```
