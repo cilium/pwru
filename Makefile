@@ -35,8 +35,8 @@ release:
 		--rm \
 		--workdir /pwru \
 		--volume `pwd`:/pwru docker.io/library/golang:1.24.1 \
-		sh -c "apt update && apt install -y make git clang-15 llvm curl gcc flex bison gcc-aarch64* libc6-dev-arm64-cross && \
-			ln -s /usr/bin/clang-15 /usr/bin/clang && \
+		sh -c "apt update && apt install -y make git clang-19 llvm curl gcc flex bison gcc-aarch64* libc6-dev-arm64-cross && \
+			ln -s /usr/bin/clang-19 /usr/bin/clang && \
 			git config --global --add safe.directory /pwru && \
 			make local-release"
 
