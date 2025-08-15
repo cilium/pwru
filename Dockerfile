@@ -1,5 +1,5 @@
 ARG BUILDPLATFORM
-FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.24.6 AS build
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.25.0 AS build
 
 ARG TARGETARCH    
 RUN gcc_pkg=$(if [ "${TARGETARCH}" = "arm64" ]; then echo "aarch64"; else echo "x86-64"; fi)  && \
