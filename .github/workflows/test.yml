@@ -217,6 +217,27 @@ jobs:
             ping -W1 -c1 10.0.0.1 || true
           expected-output-pattern: 'arp_rcv'
 
+      - name: Derive ifindex for next test [1/2]
+        uses: cilium/little-vm-helper@9c1f3a549af06e213863d034c13ba1c5d1e3c667 # v0.0.26
+        with:
+          provision: 'false'
+          cmd: cat /sys/class/net/lo/ifindex >> /host/ifindex
+
+      - name: Derive ifindex for next test [2/2]
+        id: ifindex
+        shell: bash
+        run: echo "ifindex=$(cat ifindex)" >> $GITHUB_OUTPUT
+
+      - name: Test --filter-skb-expr
+        uses: ./.github/actions/pwru-test
+        with:
+          test-name: ${{ matrix.kernel }}-filter-skb-expr
+          pwru-flags: --filter-skb-expr 'skb->dev->ifindex == ${{ steps.ifindex.outputs.ifindex }}'
+          pwru-pcap-filter: icmp
+          gen-traffic: |
+            ping -W1 -c1 127.0.0.1 || true
+          expected-output-pattern: 'icmp'
+
       - name: Test --filter-ifname
         uses: ./.github/actions/pwru-test
         with:
