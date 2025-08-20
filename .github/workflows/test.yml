@@ -58,15 +58,22 @@ jobs:
         arch:
         - amd64
         kernel:
+        # renovate: datasource=docker depName=quay.io/lvh-images/kind
         - 5.4-20250616.013250
+        # renovate: datasource=docker depName=quay.io/lvh-images/kind
         - 5.10-20250616.013250
+        # renovate: datasource=docker depName=quay.io/lvh-images/kind
         - 5.15-20250616.013250
+        # renovate: datasource=docker depName=quay.io/lvh-images/kind
         - 6.1-20250616.013250
+        # renovate: datasource=docker depName=quay.io/lvh-images/kind
         - 6.6-20250616.013250
+        # renovate: datasource=docker depName=quay.io/lvh-images/kind
         - 6.12-20250616.013250
         - bpf-next-20250623.155211
         include:
           - arch: arm64
+            # renovate: datasource=docker depName=quay.io/lvh-images/kind
             kernel: 6.12-20250616.013250
     timeout-minutes: 60
     runs-on: ubuntu-latest
