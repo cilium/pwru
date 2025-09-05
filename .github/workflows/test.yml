@@ -14,9 +14,9 @@ jobs:
     - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
     - name: Set up Go
-      uses: actions/setup-go@e75c3e80bcde46e322cd5845ae46582947c9becd
+      uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00
       with:
-        go-version: 1.25.0
+        go-version: 1.25.1
 
     - name: Check module vendoring
       run: |
@@ -105,12 +105,12 @@ jobs:
           fi
 
       - name: Retrieve stored pwru executable
-        uses: actions/download-artifact@de96f4613b77ec03b5cf633e7c350c32bd3c5660
+        uses: actions/download-artifact@abefc31eafcfbdf6c5336127c1346fdae79ff41c
         with:
           name: pwru
 
       - name: Retrieve stored test-app executable
-        uses: actions/download-artifact@de96f4613b77ec03b5cf633e7c350c32bd3c5660
+        uses: actions/download-artifact@abefc31eafcfbdf6c5336127c1346fdae79ff41c
         with:
           name: test-app
 
