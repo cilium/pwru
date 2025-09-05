@@ -9,7 +9,7 @@ require (
 	github.com/cloudflare/cbpfc v0.0.0-20250612131231-1b95965eadb6
 	github.com/jsimonetti/rtnetlink/v2 v2.0.5
 	github.com/leonhwangprojects/bice v0.1.3
-	github.com/spf13/pflag v1.0.7
+	github.com/spf13/pflag v1.0.10
 	github.com/tklauser/ps v0.0.3
 	github.com/vishvananda/netns v0.0.5
 	golang.org/x/arch v0.20.0
