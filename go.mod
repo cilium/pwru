@@ -12,10 +12,10 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/tklauser/ps v0.0.3
 	github.com/vishvananda/netns v0.0.5
-	golang.org/x/arch v0.20.0
-	golang.org/x/net v0.43.0
-	golang.org/x/sync v0.16.0
-	golang.org/x/sys v0.35.0
+	golang.org/x/arch v0.21.0
+	golang.org/x/net v0.44.0
+	golang.org/x/sync v0.17.0
+	golang.org/x/sys v0.36.0
 )
 
 require (
