@@ -114,15 +114,12 @@ func main() {
 		log.Fatalf("Failed to get function addrs: %s", err)
 	}
 
-	var opts ebpf.CollectionOptions
-	opts.Programs.KernelTypes = btfSpec
-	opts.Programs.LogLevel = ebpf.LogLevelInstruction
-
 	bpfSpec, err := LoadKProbePWRU()
 	if err != nil {
 		log.Fatalf("Failed to load bpf spec: %v", err)
 	}
 
+	// we delete the program specs that are not needed according to the chosen mode: kprobe vs kprobe-multi
 	if useKprobeMulti {
 		for i := 1; i <= 5; i++ {
 			delete(bpfSpec.Programs, fmt.Sprintf("kprobe_skb_%d", i))
@@ -155,8 +152,7 @@ func main() {
 			"kretprobe_veth_convert_skb_to_xdp_buff",
 			"fexit_xdp":
 			continue
-		}
-		if name == "fentry_xdp" {
+		case "fentry_xdp":
 			if err := libpcap.InjectL2Filter(program, flags.FilterPcap); err != nil {
 				log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
 			}
@@ -245,6 +241,9 @@ func main() {
 		delete(bpfSpec.Programs, "fexit_skb_copy")
 	}
 
+	var opts ebpf.CollectionOptions
+	opts.Programs.KernelTypes = btfSpec
+	opts.Programs.LogLevel = ebpf.LogLevelInstruction
 	coll, err := ebpf.NewCollectionWithOptions(bpfSpec, opts)
 	if err != nil {
 		var (
