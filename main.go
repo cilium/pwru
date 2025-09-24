@@ -47,10 +47,10 @@ func main() {
 		Cur: 8192,
 		Max: 8192,
 	}); err != nil {
-		log.Fatalf("failed to set temporary rlimit: %s", err)
+		log.Fatalf("failed to set temporary RLIMIT_NOFILE: %s", err)
 	}
 	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Fatalf("Failed to set temporary rlimit: %s", err)
+		log.Fatalf("failed to set temporary RLIMIT_MEMLOCK: %s", err)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -202,7 +202,7 @@ func main() {
 	}
 
 	bpfSpec.Maps["percpu_big_buff"].ValueSize = flags.SetPerCPUBuf
-	
+
 	haveFexit := pwru.HaveBPFLinkTracing()
 	if (flags.FilterTraceTc || flags.FilterTraceXdp) && !haveFexit {
 		log.Fatalf("Current kernel does not support fentry/fexit to run with --filter-trace-tc/--filter-trace-xdp")
