@@ -21,7 +21,6 @@ func genEndbrPoison() uint32 {
 
 func isEndbrInsn(val uint32) bool {
 	const endbr64 uint32 = 0xfa1e0ff3
-	const endbr32 uint32 = 0xfb1e0ff3
 
 	if val == genEndbrPoison() {
 		return true
