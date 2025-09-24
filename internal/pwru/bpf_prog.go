@@ -6,6 +6,7 @@ package pwru
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/cilium/ebpf"
 	"golang.org/x/sys/unix"
@@ -27,6 +28,7 @@ func listBpfProgs(typ ebpf.ProgramType) ([]*ebpf.Program, error) {
 		}
 
 		if prog.Type() == typ {
+			log.Printf("Found bpf prog: %s\n", prog.String())
 			progs = append(progs, prog)
 		} else {
 			_ = prog.Close()
@@ -35,6 +37,10 @@ func listBpfProgs(typ ebpf.ProgramType) ([]*ebpf.Program, error) {
 
 	if !errors.Is(err, unix.ENOENT) { // Surely err != nil
 		return nil, err
+	}
+
+	if len(progs) == 0 {
+		log.Printf("No bpf progs found with type '%s'\n", typ.String())
 	}
 
 	return progs, nil
