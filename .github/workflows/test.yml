@@ -30,7 +30,7 @@ jobs:
         make release
 
     - name: Store executable
-      uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
+      uses: actions/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
       with:
         name: pwru
         path: release/pwru-linux-*.tar.gz
@@ -44,7 +44,7 @@ jobs:
         done
 
     - name: Store test-app
-      uses: actions/upload-artifact@de65e23aa2b7e23d713bb51fbfcb6d502f8667d8
+      uses: actions/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
       with:
         name: test-app
         path: test-app/test-app-*
@@ -105,12 +105,12 @@ jobs:
           fi
 
       - name: Retrieve stored pwru executable
-        uses: actions/download-artifact@abefc31eafcfbdf6c5336127c1346fdae79ff41c
+        uses: actions/download-artifact@4a24838f3d5601fd639834081e118c2995d51e1c
         with:
           name: pwru
 
       - name: Retrieve stored test-app executable
-        uses: actions/download-artifact@abefc31eafcfbdf6c5336127c1346fdae79ff41c
+        uses: actions/download-artifact@4a24838f3d5601fd639834081e118c2995d51e1c
         with:
           name: test-app
 
