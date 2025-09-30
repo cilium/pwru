@@ -8,6 +8,9 @@ for ARCH in ${ARCHS}; do
     if [ "$ARCH" = "arm64" ]; then
         LIBPCAP_ARCH=aarch64-unknown-linux-gnu
         CC=aarch64-linux-gnu-gcc
+    elif [ "$ARCH" = "riscv64" ]; then
+        LIBPCAP_ARCH=riscv64-unknown-linux-gnu
+        CC=riscv64-linux-gnu-gcc
     else
         LIBPCAP_ARCH=x86_64-unknown-linux-gnu
         CC=x86_64-linux-gnu-gcc
