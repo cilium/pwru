@@ -16,6 +16,10 @@ ARCHS ?= amd64 arm64
 TEST_TIMEOUT ?= 5s
 .DEFAULT_GOAL := pwru
 
+# renovate: datasource=docker depName=golang
+GO_IMAGE_VERSION = 1.25.1
+GO_IMAGE_SHA = sha256:ab1f5c47de0f2693ed97c46a646bde2e4f380e40c173454d00352940a379af60
+
 ## Build the GO binary
 pwru: libpcap/libpcap.a
 	TARGET_GOARCH=$(TARGET_GOARCH) $(GO_GENERATE)
@@ -34,7 +38,7 @@ release:
 	docker run \
 		--rm \
 		--workdir /pwru \
-		--volume `pwd`:/pwru docker.io/library/golang:1.24.1 \
+		--volume `pwd`:/pwru docker.io/library/golang:$(GO_IMAGE_VERSION)@$(GO_IMAGE_SHA) \
 		sh -c "apt update && apt install -y make git clang-19 llvm curl gcc flex bison gcc-aarch64* libc6-dev-arm64-cross && \
 			ln -s /usr/bin/clang-19 /usr/bin/clang && \
 			git config --global --add safe.directory /pwru && \
