@@ -826,7 +826,7 @@ get_func_ip(void *ctx) {
 #if defined(bpf_target_x86)
 	fp_tramp = (u64) ctx + 8; /* FP of trampoline */
 #elif defined(bpf_target_arm64)
-	fp_tramp = detect_tramp_fp(); /* FP of trampoline */
+	return bpf_get_func_ip(ctx); /* always supported on arm64 */
 #endif
 	bpf_probe_read_kernel(&ip, sizeof(ip), (void *)(fp_tramp + 8)); /* IP of tracee */
 	return ip - ip_offset;
