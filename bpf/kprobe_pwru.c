@@ -491,7 +491,7 @@ get_tracing_fp(void)
 }
 
 #ifdef bpf_target_arm64
-static __always_inline u64 detect_tramp_fp(void);
+static __always_inline u64 detect_tramp_fp(void *ctx);
 #endif
 
 static __always_inline u64
@@ -501,7 +501,7 @@ get_tramp_fp(void *ctx) {
 #ifdef bpf_target_x86
 	fp_tramp = (u64) ctx + 8;
 #elif defined(bpf_target_arm64)
-	fp_tramp = detect_tramp_fp();
+	fp_tramp = detect_tramp_fp(ctx);
 #endif
 
 	return fp_tramp;
@@ -753,18 +753,24 @@ int BPF_PROG(fexit_skb_copy, struct sk_buff *old, gfp_t mask, struct sk_buff *ne
  * dynamic, not fixed anymore.
  */
 static __always_inline u64
-detect_tramp_fp(void) {
-	static const int range_of_detection = 256;
-	u64 fp, r10;
+detect_tramp_fp(void *ctx) {
+	u64 fp, ip, ptr;
 
-	r10 = get_tracing_fp(); /* R10 of current bpf prog */
-	for (int i = 6; i >= 0; i--) {
-		bpf_probe_read_kernel(&fp, sizeof(fp), (void *) (r10 + i * 16));
-		if (r10 < fp && fp < r10 + range_of_detection)
-			return fp;
+	ip = bpf_get_func_ip(ctx);
+	ip += 8; /* The IP of tracee stored on stack has 8B far from its original entry. */
+	ptr = (u64) ctx + 8 /* skb/xdp */ + 16 /* x19 and x20 */ + 8 /* fp */;
+
+	/*
+	 * As we are not sure about the size of `padding`, detect the FP of
+	 * the trampoline by checking the IP of tracee.
+	 */
+	for (int i = 0; i < 6; i++) {
+		bpf_probe_read_kernel(&fp, sizeof(fp), (void *) (ptr + i * 8));
+		if (fp == ip)
+			return fp - 8;
 	}
 
-	return r10;
+	return fp;
 }
 #endif
 
@@ -803,21 +809,23 @@ get_func_ip(void *ctx) {
 	 * Stack layout on arm64:
 	 * |  r9  |
 	 * |  fp  | FP of tracee's caller
+	 * +------+ FP of tracee
 	 * |  lr  | IP of tracee
 	 * |  fp  | FP of tracee
-	 * +------+ FP of trampoline  <-------+
-	 * |  ..  | padding                   |
-	 * |  ..  | callee saved regs         |
-	 * | retv | retval of tracee          |
-	 * | regs | regs of tracee            |
-	 * | nreg | number of regs            |
-	 * |  ip  | IP of tracee if needed    | possible range of
-	 * | rctx | bpf_tramp_run_ctx         | detection
-	 * |  lr  | IP of trampoline          |
-	 * |  fp  | FP of trampoline  <--------- detect it
-	 * +------+ FP of current prog        |
-	 * | regs | callee saved regs         |
-	 * +------+ R10 of bpf prog   <-------+
+	 * +------+ FP of trampoline  <--------- detect it
+	 * |  ..  | padding
+	 * |  x20 | always
+	 * |  x19 | always
+	 * |  arg | skb/xdp always for our case
+	 * +------+ ctx of current prog
+	 * | nreg | number of regs
+	 * |  ip  | IP of tracee
+	 * | rctx | bpf_tramp_run_ctx
+	 * |  lr  | IP of trampoline
+	 * |  fp  | FP of trampoline
+	 * +------+ FP of current prog
+	 * | regs | callee saved regs
+	 * +------+ R10 of bpf prog
 	 * |  ..  |
 	 * +------+ SP of current prog
 	 */
