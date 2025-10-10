@@ -491,18 +491,18 @@ get_tracing_fp(void)
 }
 
 #ifdef bpf_target_arm64
-static __always_inline u64 detect_tramp_fp(void);
+static __always_inline u64 detect_tramp_fp(void *ctx);
 #endif
 
 static __always_inline u64
-get_tramp_fp(void) {
+get_tramp_fp(void *ctx) {
 	u64 fp_tramp = 0;
 
 #ifdef bpf_target_x86
 	u64 fp = get_tracing_fp();
 	bpf_probe_read_kernel(&fp_tramp, sizeof(fp_tramp), (void *) fp);
 #elif defined(bpf_target_arm64)
-	fp_tramp = detect_tramp_fp();
+	fp_tramp = detect_tramp_fp(ctx);
 #endif
 
 	return fp_tramp;
@@ -517,7 +517,7 @@ get_kprobe_fp(struct pt_regs *ctx)
 static __always_inline u64
 get_stackid(void *ctx, const bool is_kprobe) {
 	u64 caller_fp;
-	u64 fp = is_kprobe ? get_kprobe_fp(ctx) : get_tramp_fp();
+	u64 fp = is_kprobe ? get_kprobe_fp(ctx) : get_tramp_fp(ctx);
 	for (int depth = 0; depth < MAX_STACK_DEPTH; depth++) {
 		if (bpf_probe_read_kernel(&caller_fp, sizeof(caller_fp), (void *)fp) < 0)
 			break;
@@ -630,7 +630,7 @@ cont:
 	return true;
 }
 
-static __always_inline u64 get_func_ip(void);
+static __always_inline u64 get_func_ip(void *ctx);
 
 static __always_inline u64
 get_addr(void *ctx, const bool is_kprobe, const bool has_get_func_ip) {
@@ -639,7 +639,7 @@ get_addr(void *ctx, const bool is_kprobe, const bool has_get_func_ip) {
 	if (has_get_func_ip) {
 		ip = bpf_get_func_ip(ctx); /* endbr has been handled in helper. */
 	} else {
-		ip = is_kprobe ? PT_REGS_IP((struct pt_regs *) ctx) : get_func_ip();
+		ip = is_kprobe ? PT_REGS_IP((struct pt_regs *) ctx) : get_func_ip(ctx);
 #ifdef bpf_target_x86
 		ip -= ENDBR_INSN_SIZE;
 		ip -= is_kprobe; /* -1 always on x86 if kprobe. */
@@ -754,28 +754,33 @@ int BPF_PROG(fexit_skb_copy, struct sk_buff *old, gfp_t mask, struct sk_buff *ne
  * dynamic, not fixed anymore.
  */
 static __always_inline u64
-detect_tramp_fp(void) {
-	static const int range_of_detection = 256;
-	u64 fp, r10;
+detect_tramp_fp(void *ctx) {
+	u64 fp, ip, ptr;
 
-	r10 = get_tracing_fp(); /* R10 of current bpf prog */
-	for (int i = 6; i >= 0; i--) {
-		bpf_probe_read_kernel(&fp, sizeof(fp), (void *) (r10 + i * 16));
-		if (r10 < fp && fp < r10 + range_of_detection)
-			return fp;
+	ip = bpf_get_func_ip(ctx);
+	ip += 8; /* The IP of tracee stored on stack has 8B far from its original entry. */
+	ptr = (u64) ctx + 8 /* skb/xdp */ + 16 /* x19 and x20 */ + 8 /* fp */;
+
+	/*
+	 * As we are not sure about the size of `padding`, detect the FP of
+	 * the trampoline by checking the IP of tracee.
+	 */
+	for (int i = 0; i < 6; i++) {
+		bpf_probe_read_kernel(&fp, sizeof(fp), (void *) (ptr + i * 8));
+		if (fp == ip)
+			return fp - 8;
 	}
 
-	return r10;
+	return fp;
 }
 #endif
 
 static __always_inline u64
-get_func_ip(void) {
+get_func_ip(void *ctx) {
 	u64 fp_tramp, ip;
 
 #if defined(bpf_target_x86)
 	static const int ip_offset = 5/* sizeof callq insn */;
-	u64 fp;
 #elif defined(bpf_target_arm64)
 	/* Ref: commit b2ad54e1533e ("bpf, arm64: Implement bpf_arch_text_poke() for arm64") */
 	static const int ip_offset = 12/* sizeof 3 insns */;
@@ -793,6 +798,8 @@ get_func_ip(void) {
 	 * | rip | IP of tracee
 	 * | rbp | FP of tracee's caller
 	 * +-----+ FP of trampoline
+	 * | skb |
+	 * +-----+ ctx of fentry
 	 * | ... |
 	 * | rip | IP of trampoline
 	 * | rbp | FP of trampoline
@@ -803,30 +810,31 @@ get_func_ip(void) {
 	 * Stack layout on arm64:
 	 * |  r9  |
 	 * |  fp  | FP of tracee's caller
+	 * +------+ FP of tracee
 	 * |  lr  | IP of tracee
 	 * |  fp  | FP of tracee
-	 * +------+ FP of trampoline  <-------+
-	 * |  ..  | padding                   |
-	 * |  ..  | callee saved regs         |
-	 * | retv | retval of tracee          |
-	 * | regs | regs of tracee            |
-	 * | nreg | number of regs            |
-	 * |  ip  | IP of tracee if needed    | possible range of
-	 * | rctx | bpf_tramp_run_ctx         | detection
-	 * |  lr  | IP of trampoline          |
-	 * |  fp  | FP of trampoline  <--------- detect it
-	 * +------+ FP of current prog        |
-	 * | regs | callee saved regs         |
-	 * +------+ R10 of bpf prog   <-------+
+	 * +------+ FP of trampoline  <--------- detect it
+	 * |  ..  | padding
+	 * |  x20 | always
+	 * |  x19 | always
+	 * |  arg | skb/xdp always for our case
+	 * +------+ ctx of current prog
+	 * | nreg | number of regs
+	 * |  ip  | IP of tracee
+	 * | rctx | bpf_tramp_run_ctx
+	 * |  lr  | IP of trampoline
+	 * |  fp  | FP of trampoline
+	 * +------+ FP of current prog
+	 * | regs | callee saved regs
+	 * +------+ R10 of bpf prog
 	 * |  ..  |
 	 * +------+ SP of current prog
 	 */
 
 #if defined(bpf_target_x86)
-	fp = get_tracing_fp(); /* FP of current prog */
-	bpf_probe_read_kernel(&fp_tramp, sizeof(fp_tramp), (void *)fp); /* FP of trampoline */
+	fp_tramp = (u64) ctx + 8; /* FP of trampoline */
 #elif defined(bpf_target_arm64)
-	fp_tramp = detect_tramp_fp(); /* FP of trampoline */
+	return bpf_get_func_ip(ctx); /* always supported on arm64 */
 #endif
 	bpf_probe_read_kernel(&ip, sizeof(ip), (void *)(fp_tramp + 8)); /* IP of tracee */
 	return ip - ip_offset;
