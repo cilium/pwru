@@ -19,14 +19,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@c0137caad775660c0844396c52da96e560aba63d
         with:
-          go-version: 1.25.2
+          go-version: 1.25.3
 
       - name: Generate the artifacts
         run: make release
 
       - name: Create Release
         if: github.event_name == 'push'
-        uses: softprops/action-gh-release@aec2ec56f94eb8180ceec724245f64ef008b89f5 # v2.4.0
+        uses: softprops/action-gh-release@6da8fa9354ddfdc4aeace5fc48d7f679b5214090 # v2.4.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:

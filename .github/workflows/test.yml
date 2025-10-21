@@ -16,7 +16,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@c0137caad775660c0844396c52da96e560aba63d
       with:
-        go-version: 1.25.2
+        go-version: 1.25.3
 
     - name: Check module vendoring
       run: |
@@ -120,7 +120,7 @@ jobs:
           tar xfv pwru-linux-${{ matrix.arch }}.tar.gz
 
       - name: Provision LVH VMs
-        uses: cilium/little-vm-helper@9c1f3a549af06e213863d034c13ba1c5d1e3c667 # v0.0.26
+        uses: cilium/little-vm-helper@01debd6cb7e5514cfdb4a33e776bdc647bc5306e # v0.0.27
         with:
           lvh-version: 'v0.0.24'
           mem: 4G
@@ -225,7 +225,7 @@ jobs:
           expected-output-pattern: 'arp_rcv'
 
       - name: Derive ifindex for next test [1/2]
-        uses: cilium/little-vm-helper@9c1f3a549af06e213863d034c13ba1c5d1e3c667 # v0.0.26
+        uses: cilium/little-vm-helper@01debd6cb7e5514cfdb4a33e776bdc647bc5306e # v0.0.27
         with:
           provision: 'false'
           cmd: cat /sys/class/net/lo/ifindex >> /host/ifindex
@@ -288,7 +288,7 @@ jobs:
 
       - name: Fetch artifacts
         if: ${{ !success() }}
-        uses: cilium/little-vm-helper@9c1f3a549af06e213863d034c13ba1c5d1e3c667 # v0.0.26
+        uses: cilium/little-vm-helper@01debd6cb7e5514cfdb4a33e776bdc647bc5306e # v0.0.27
         with:
           provision: 'false'
           cmd: |
