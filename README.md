@@ -145,6 +145,12 @@ kubectl wait pod pwru --for condition=Ready --timeout=90s
 kubectl logs -f pwru
 ```
 
+## Distro packages
+
+`pwru` is available in some distro packages. [GH#89](https://github.com/cilium/pwru/issues/89) tracks any packaging work and progress.
+
+[![pwru distro status](https://repology.org/badge/vertical-allrepos/pwru.svg)](https://repology.org/project/pwru/versions)
+
 ### Running on Vagrant
 
 See [docs/vagrant.md](docs/vagrant.md)
