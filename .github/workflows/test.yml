@@ -122,7 +122,8 @@ jobs:
       - name: Provision LVH VMs
         uses: cilium/little-vm-helper@01debd6cb7e5514cfdb4a33e776bdc647bc5306e # v0.0.27
         with:
-          lvh-version: 'v0.0.24'
+          # renovate: datasource=github-tags depName=cilium/little-vm-helper
+          lvh-version: 'v0.0.27'
           mem: 4G
           cpu: 2
           cpu-kind: ''
