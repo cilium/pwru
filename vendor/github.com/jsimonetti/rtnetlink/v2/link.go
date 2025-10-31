@@ -185,6 +185,66 @@ func (l *LinkService) Set(req *LinkMessage) error {
 	return err
 }
 
+// SetMaster enslaves an interface to a master device (such as a bridge or bond).
+// The optional slaveConfig parameter allows configuring slave-specific settings
+// (such as BridgePort configuration when enslaving to a bridge).
+//
+// Example usage with a bridge:
+//
+//	bridgePort := &driver.BridgePort{
+//	    Learning:     &driver.BridgeEnableEnabled,
+//	    UnicastFlood: &driver.BridgeEnableEnabled,
+//	}
+//	err := conn.Link.SetMaster(ifaceIndex, bridgeIndex, bridgePort)
+//
+// To remove an interface from its master, use RemoveMaster instead.
+func (l *LinkService) SetMaster(ifaceIndex, masterIndex uint32, slaveConfig LinkSlaveDriver) error {
+	// Get current interface state
+	rx, err := l.Get(ifaceIndex)
+	if err != nil {
+		return err
+	}
+
+	// Prepare link attributes with master set
+	master := masterIndex
+	attrs := &LinkAttributes{
+		Master:    &master,
+		Name:      rx.Attributes.Name,
+		MTU:       rx.Attributes.MTU,
+		Type:      rx.Attributes.Type,
+		QueueDisc: rx.Attributes.QueueDisc,
+	}
+
+	// If slave configuration is provided, set the slave info
+	if slaveConfig != nil {
+		attrs.Info = &LinkInfo{
+			SlaveKind: slaveConfig.Kind(),
+			SlaveData: slaveConfig,
+		}
+	}
+
+	// Apply the changes
+	tx := &LinkMessage{
+		Family:     unix.AF_UNSPEC,
+		Type:       rx.Type,
+		Index:      ifaceIndex,
+		Flags:      rx.Flags,
+		Change:     0,
+		Attributes: attrs,
+	}
+	return l.Set(tx)
+}
+
+// RemoveMaster un-enslaves an interface from its master device.
+// This sets the Master field to 0, removing the interface from any bridge, bond, or other master.
+//
+// Example usage:
+//
+//	err := conn.Link.RemoveMaster(ifaceIndex)
+func (l *LinkService) RemoveMaster(ifaceIndex uint32) error {
+	return l.SetMaster(ifaceIndex, 0, nil)
+}
+
 func (l *LinkService) list(kind string) ([]LinkMessage, error) {
 	req := &LinkMessage{}
 	flags := netlink.Request | netlink.Dump
