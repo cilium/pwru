@@ -11,7 +11,7 @@ VERSION=$(shell git describe --tags --always)
 LIBPCAP_ARCH ?= x86_64-unknown-linux-gnu
 # For compiling libpcap and CGO
 CC ?= gcc
-ARCHS ?= amd64 arm64
+ARCHS ?= amd64 arm64 riscv64
 
 TEST_TIMEOUT ?= 5s
 .DEFAULT_GOAL := pwru
@@ -39,7 +39,7 @@ release:
 		--rm \
 		--workdir /pwru \
 		--volume `pwd`:/pwru docker.io/library/golang:$(GO_IMAGE_VERSION)@$(GO_IMAGE_SHA) \
-		sh -c "apt update && apt install -y make git clang-19 llvm curl gcc flex bison gcc-aarch64* libc6-dev-arm64-cross && \
+		sh -c "apt update && apt install -y make git clang-19 llvm curl gcc flex bison gcc-aarch64* libc6-dev-arm64-cross gcc-riscv64* libc6-dev-riscv64-cross && \
 			ln -s /usr/bin/clang-19 /usr/bin/clang && \
 			git config --global --add safe.directory /pwru && \
 			make local-release"

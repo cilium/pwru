@@ -490,7 +490,7 @@ get_tracing_fp(void)
 	return fp;
 }
 
-#ifdef bpf_target_arm64
+#if defined(bpf_target_arm64) || defined(bpf_target_riscv)
 static __always_inline u64 detect_tramp_fp(void *ctx);
 #endif
 
@@ -500,7 +500,7 @@ get_tramp_fp(void *ctx) {
 
 #ifdef bpf_target_x86
 	fp_tramp = (u64) ctx + 8;
-#elif defined(bpf_target_arm64)
+#elif defined(bpf_target_arm64) || defined(bpf_target_riscv)
 	fp_tramp = detect_tramp_fp(ctx);
 #endif
 
@@ -742,11 +742,11 @@ int BPF_PROG(fexit_skb_copy, struct sk_buff *old, gfp_t mask, struct sk_buff *ne
 	return BPF_OK;
 }
 
-#ifdef bpf_target_arm64
-/* As R10 of bpf is not A64_FP, we need to detect the FP of trampoline
- * by scanning the stacks of current bpf prog and the trampoline.
+#if defined(bpf_target_arm64) || defined(bpf_target_riscv)
+/* As R10 of bpf is not A64_FP nor RISC-V fp, we need to detect the FP of
+ * trampoline by scanning the stacks of current bpf prog and the trampoline.
  *
- * Since commit 5d4fa9ec5643 ("bpf, arm64: Avoid blindly saving/restoring all callee-saved registers"),
+ * On arm64, since commit 5d4fa9ec5643 ("bpf, arm64: Avoid blindly saving/restoring all callee-saved registers"),
  * the number of callee-saved registers saved in the bpf prog prologue is
  * dynamic, not fixed anymore.
  */
@@ -784,6 +784,9 @@ get_func_ip(void *ctx) {
 #elif defined(bpf_target_loongarch)
 	/* LoongArch does not support trampoline, get_func_ip does not apply to LoongArch */
 	static const int ip_offset = 0;
+#elif defined(bpf_target_riscv)
+	/* Ref: commit 25ad10658dc1 ("riscv, bpf: Adapt bpf trampoline to optimized riscv ftrace framework") */
+	static const int ip_offset = 8/* sizeof 2 insns */;
 #else
 #error Unsupported architecture
 #endif
@@ -830,7 +833,7 @@ get_func_ip(void *ctx) {
 
 #if defined(bpf_target_x86)
 	fp_tramp = get_tramp_fp(ctx);
-#elif defined(bpf_target_arm64)
+#elif defined(bpf_target_arm64) || defined(bpf_target_riscv)
 	return bpf_get_func_ip(ctx); /* always supported on arm64 */
 #endif
 	bpf_probe_read_kernel(&ip, sizeof(ip), (void *)(fp_tramp + 8)); /* IP of tracee */
