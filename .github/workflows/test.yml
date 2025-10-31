@@ -14,7 +14,7 @@ jobs:
     - uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
     - name: Set up Go
-      uses: actions/setup-go@c0137caad775660c0844396c52da96e560aba63d
+      uses: actions/setup-go@faf52423ec0d44c58f68e83b614bfcd99dded66f
       with:
         go-version: 1.25.3
 
@@ -30,7 +30,7 @@ jobs:
         make release
 
     - name: Store executable
-      uses: actions/upload-artifact@2d9f9cdfa99fedaddba68e9b5b5c281eca26cc63
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
       with:
         name: pwru
         path: release/pwru-linux-*.tar.gz
@@ -44,7 +44,7 @@ jobs:
         done
 
     - name: Store test-app
-      uses: actions/upload-artifact@2d9f9cdfa99fedaddba68e9b5b5c281eca26cc63
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4
       with:
         name: test-app
         path: test-app/test-app-*
@@ -105,12 +105,12 @@ jobs:
           fi
 
       - name: Retrieve stored pwru executable
-        uses: actions/download-artifact@4a24838f3d5601fd639834081e118c2995d51e1c
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
         with:
           name: pwru
 
       - name: Retrieve stored test-app executable
-        uses: actions/download-artifact@4a24838f3d5601fd639834081e118c2995d51e1c
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
         with:
           name: test-app
 
