@@ -25,9 +25,15 @@ type Funcs map[string]int
 // to attach kprobes.
 func getAvailableFilterFunctions() (map[string]struct{}, error) {
 	availableFuncs := make(map[string]struct{})
-	f, err := os.Open("/sys/kernel/debug/tracing/available_filter_functions")
+	var f *os.File
+    var err error
+	// Linux v6.17+ enforce this new path for the tracing functionality
+	f, err = os.Open("/sys/kernel/tracing/available_filter_functions")
 	if err != nil {
-		return nil, fmt.Errorf("failed to open: %v", err)
+		f, err = os.Open("/sys/kernel/debug/tracing/available_filter_functions")
+		if err != nil {
+			return nil, fmt.Errorf("failed to open: %v", err)
+		}
 	}
 	defer f.Close()
 
@@ -59,7 +65,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti bool) 
 	var availableFuncs map[string]struct{}
 	availableFuncs, err = getAvailableFilterFunctions()
 	if err != nil {
-		log.Printf("Failed to retrieve available ftrace functions (is /sys/kernel/debug/tracing mounted?): %s", err)
+		log.Printf("Failed to retrieve available ftrace functions (is /sys/kernel/tracing or /sys/kernel/debug/tracing mounted?): %s", err)
 	}
 
 	iters := []iterator{{"", spec.All()}}
