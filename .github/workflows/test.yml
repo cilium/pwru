@@ -11,10 +11,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@71cf2267d89c5cb81562390fa70a37fa40b1305e
+    - uses: actions/checkout@c2d88d3ecc89a9ef08eebf45d9637801dcee7eb5
 
     - name: Set up Go
-      uses: actions/setup-go@3a0c2c82458cbb45a3cbfeeb2b91ce8f85420560
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
       with:
         go-version: 1.25.4
 
@@ -78,7 +78,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@71cf2267d89c5cb81562390fa70a37fa40b1305e
+      - uses: actions/checkout@c2d88d3ecc89a9ef08eebf45d9637801dcee7eb5
 
       - name: Derive kernel version
         id: kernel
