@@ -59,8 +59,6 @@ jobs:
         - amd64
         kernel:
         # renovate: datasource=docker depName=quay.io/lvh-images/kind
-        - 5.4-20250616.013250
-        # renovate: datasource=docker depName=quay.io/lvh-images/kind
         - 5.10-20250616.013250
         # renovate: datasource=docker depName=quay.io/lvh-images/kind
         - 5.15-20250616.013250
