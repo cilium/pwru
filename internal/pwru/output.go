@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -108,14 +108,14 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap, printBp
 
 	reasons, err := getKFreeSKBReasons(btfSpec)
 	if err != nil {
-		log.Printf("Unable to load packet drop reasons: %v", err)
+		slog.Warn("Unable to load packet drop reasons", "error", err)
 	}
 
 	var ifs map[uint64]map[uint32]string
 	if flags.OutputMeta {
 		ifs, err = getIfaces()
 		if err != nil {
-			log.Printf("Failed to retrieve all ifaces from all network namespaces: %v. Some iface names might be not shown.", err)
+			slog.Warn("Failed to retrieve all ifaces from all network namespaces. Some iface names might be not shown.", "error", err)
 		}
 	}
 

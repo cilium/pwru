@@ -6,7 +6,7 @@ package pwru
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
 	"github.com/cilium/ebpf"
@@ -32,7 +32,7 @@ func TrackSkb(coll *ebpf.Collection, haveFexit, trackSkbClone bool) (*skbTracker
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("opening kprobe kfree_skbmem: %s", err)
 		} else {
-			log.Printf("Warn: kfree_skbmem not found, pwru is likely to mismatch skb due to lack of skb lifetime management\n")
+			slog.Warn("kfree_skbmem not found, pwru is likely to mismatch skb due to lack of skb lifetime management")
 			return &t, nil
 		}
 	} else {

@@ -3,7 +3,7 @@ package x86
 import (
 	"debug/elf"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -19,10 +19,12 @@ var (
 func parseKCore() {
 	var err error
 	if kcore, err = os.Open("/proc/kcore"); err != nil {
-		log.Fatalf("failed to open /proc/kcore: %s", err)
+		slog.Error("failed to open /proc/kcore", "error", err)
+		os.Exit(1)
 	}
 	if kcoreElf, err = elf.NewFile(kcore); err != nil {
-		log.Fatalf("failed to new kcore elf: %s", err)
+		slog.Error("failed to new kcore elf", "error", err)
+		os.Exit(1)
 	}
 
 }

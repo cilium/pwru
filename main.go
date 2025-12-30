@@ -8,7 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"runtime"
@@ -39,7 +39,8 @@ func main() {
 	}
 	if flags.FilterTrackBpfHelpers {
 		if runtime.GOARCH != "amd64" {
-			log.Fatalf("BPF helpers tracking is only supported on amd64")
+			slog.Error("BPF helpers tracking is only supported on amd64")
+			os.Exit(1)
 		}
 	}
 
@@ -47,10 +48,12 @@ func main() {
 		Cur: 8192,
 		Max: 8192,
 	}); err != nil {
-		log.Fatalf("failed to set temporary RLIMIT_NOFILE: %s", err)
+		slog.Error("failed to set temporary RLIMIT_NOFILE", "error", err)
+		os.Exit(1)
 	}
 	if err := rlimit.RemoveMemlock(); err != nil {
-		log.Fatalf("failed to set temporary RLIMIT_MEMLOCK: %s", err)
+		slog.Error("failed to set temporary RLIMIT_MEMLOCK", "error", err)
+		os.Exit(1)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -64,17 +67,20 @@ func main() {
 		btfSpec, err = btf.LoadKernelSpec()
 	}
 	if err != nil {
-		log.Fatalf("Failed to load BTF spec: %s", err)
+		slog.Error("Failed to load BTF spec", "error", err)
+		os.Exit(1)
 	}
 
 	if (flags.OutputSkb || flags.OutputShinfo) && !pwru.HaveSnprintfBtf(btfSpec) {
-		log.Fatal("Unsupported to output skb or shinfo because bpf_snprintf_btf() is unavailable")
+		slog.Error("Unsupported to output skb or shinfo because bpf_snprintf_btf() is unavailable")
+		os.Exit(1)
 	}
 
 	if flags.AllKMods {
 		files, err := os.ReadDir("/sys/kernel/btf")
 		if err != nil {
-			log.Fatalf("Failed to read directory: %s", err)
+			slog.Error("Failed to read directory", "error", err)
+			os.Exit(1)
 		}
 
 		flags.KMods = nil
@@ -87,7 +93,8 @@ func main() {
 
 	var useKprobeMulti bool
 	if flags.Backend != "" && (flags.Backend != pwru.BackendKprobe && flags.Backend != pwru.BackendKprobeMulti) {
-		log.Fatalf("Invalid tracing backend %s", flags.Backend)
+		slog.Error("Invalid tracing backend", "backend", flags.Backend)
+		os.Exit(1)
 	}
 	// Until https://lore.kernel.org/bpf/20221025134148.3300700-1-jolsa@kernel.org/
 	// has been backported to the stable, kprobe-multi cannot be used when attaching
@@ -100,10 +107,12 @@ func main() {
 
 	funcs, bpfmapFuncs, err := pwru.GetFuncs(flags.FilterFunc, btfSpec, flags.KMods, useKprobeMulti, flags.OutputBpfmap)
 	if err != nil {
-		log.Fatalf("Failed to get skb-accepting functions: %s", err)
+		slog.Error("Failed to get skb-accepting functions", "error", err)
+		os.Exit(1)
 	}
 	if len(funcs) == 0 && !flags.FilterTraceTc && !flags.FilterTraceXdp {
-		log.Fatalf("Cannot find a matching kernel function")
+		slog.Error("Cannot find a matching kernel function")
+		os.Exit(1)
 	}
 	// If --filter-trace-tc/--filter-trace-xdp, it's to retrieve and print bpf
 	// prog's name.
@@ -111,12 +120,14 @@ func main() {
 		len(flags.KMods) != 0 || flags.FilterTraceTc || flags.FilterTraceXdp ||
 		len(flags.FilterNonSkbFuncs) > 0 || flags.OutputCaller || flags.FilterTrackBpfHelpers)
 	if err != nil {
-		log.Fatalf("Failed to get function addrs: %s", err)
+		slog.Error("Failed to get function addrs", "error", err)
+		os.Exit(1)
 	}
 
 	bpfSpec, err := LoadKProbePWRU()
 	if err != nil {
-		log.Fatalf("Failed to load bpf spec: %v", err)
+		slog.Error("Failed to load bpf spec", "error", err)
+		os.Exit(1)
 	}
 
 	// we delete the program specs that are not needed according to the chosen mode: kprobe vs kprobe-multi
@@ -133,13 +144,15 @@ func main() {
 	// --output-skb-metadata
 	skbMds, err := pwru.ParseSkbMetadataExprs(flags.OutputSkbMetadata, btfSpec)
 	if err != nil {
-		log.Fatalf("Failed to parse skb metadata exprs: %s", err)
+		slog.Error("Failed to parse skb metadata exprs", "error", err)
+		os.Exit(1)
 	}
 
 	// --output-xdp-metadata
 	xdpMds, err := pwru.ParseXdpMetadataExprs(flags.OutputXdpMetadata, btfSpec)
 	if err != nil {
-		log.Fatalf("Failed to parse xdp metadata exprs: %s", err)
+		slog.Error("Failed to parse xdp metadata exprs", "error", err)
+		os.Exit(1)
 	}
 
 	for name, program := range bpfSpec.Programs {
@@ -155,13 +168,16 @@ func main() {
 			continue
 		case "fentry_xdp":
 			if err := libpcap.InjectL2Filter(program, flags.FilterPcap); err != nil {
-				log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
+				slog.Error("Failed to inject filter ebpf", "program", name, "error", err)
+				os.Exit(1)
 			}
 			if err := pwru.InjectFilterXdpExpr(program, btfSpec, flags.FilterXdpExpr); err != nil {
-				log.Fatalf("Failed to inject filter xdp expr for %s: %v", name, err)
+				slog.Error("Failed to inject filter xdp expr", "program", name, "error", err)
+				os.Exit(1)
 			}
 			if err := pwru.InjectSetXdpMetadata(program, xdpMds); err != nil {
-				log.Fatalf("Failed to inject xdp metadata for %s: %v", name, err)
+				slog.Error("Failed to inject xdp metadata", "program", name, "error", err)
+				os.Exit(1)
 			}
 			continue
 		}
@@ -169,40 +185,48 @@ func main() {
 			flags.FilterPcap,
 			flags.FilterTunnelPcapL2,
 			flags.FilterTunnelPcapL3); err != nil {
-			log.Fatalf("Failed to inject filter ebpf for %s: %v", name, err)
+			slog.Error("Failed to inject filter ebpf", "name", name, "error", err)
+			os.Exit(1)
 		}
 		if err := pwru.InjectFilterSkbExpr(program, btfSpec, flags.FilterSkbExpr); err != nil {
-			log.Fatalf("Failed to inject filter skb expr for %s: %v", name, err)
+			slog.Error("Failed to inject filter skb expr", "name", name, "error", err)
+			os.Exit(1)
 		}
 		if err := pwru.InjectSetSkbMetadata(program, skbMds); err != nil {
-			log.Fatalf("Failed to inject skb metadata for %s: %v", name, err)
+			slog.Error("Failed to inject skb metadata", "name", name, "error", err)
+			os.Exit(1)
 		}
 	}
 
 	skbBtfID, err := pwru.GetStructBtfID(btfSpec, "sk_buff")
 	if err != nil {
-		log.Fatalf("Failed to get BTF ID for sk_buff: %v", err)
+		slog.Error("Failed to get BTF ID for sk_buff", "error", err)
+		os.Exit(1)
 	}
 	shinfoBtfID, err := pwru.GetStructBtfID(btfSpec, "skb_shared_info")
 	if err != nil {
-		log.Fatalf("Failed to get BTF ID for skb_shared_info: %v", err)
+		slog.Error("Failed to get BTF ID for skb_shared_info", "error", err)
+		os.Exit(1)
 	}
 
 	pwruConfig, err := pwru.GetConfig(&flags)
 	pwruConfig.SkbBtfID = uint32(skbBtfID)
 	pwruConfig.ShinfoBtfID = uint32(shinfoBtfID)
 	if err != nil {
-		log.Fatalf("Failed to get pwru config: %v", err)
+		slog.Error("Failed to get pwru config", "error", err)
+		os.Exit(1)
 	}
 	if err := bpfSpec.Variables["CFG"].Set(pwruConfig); err != nil {
-		log.Fatalf("Failed to rewrite config: %v", err)
+		slog.Error("Failed to rewrite config", "error", err)
+		os.Exit(1)
 	}
 
 	bpfSpec.Maps["percpu_big_buff"].ValueSize = flags.SetPerCPUBuf
 
 	haveFexit := pwru.HaveBPFLinkTracing()
 	if (flags.FilterTraceTc || flags.FilterTraceXdp) && !haveFexit {
-		log.Fatalf("Current kernel does not support fentry/fexit to run with --filter-trace-tc/--filter-trace-xdp")
+		slog.Error("Current kernel does not support fentry/fexit to run with --filter-trace-tc/--filter-trace-xdp")
+		os.Exit(1)
 	}
 
 	// As we know, for every fentry tracing program, there is a corresponding
@@ -262,7 +286,8 @@ func main() {
 			verifierLog = fmt.Sprintf("Verifier error: %+v\n", ve)
 		}
 
-		log.Fatalf("Failed to load objects: %s\n%+v", verifierLog, err)
+		slog.Error("Failed to load objects", "verifierLog", verifierLog, "error", err)
+		os.Exit(1)
 	}
 	defer coll.Close()
 
@@ -270,7 +295,8 @@ func main() {
 	if flags.FilterTraceTc {
 		t, err := pwru.TraceTC(coll, bpfSpecFentryTc, &opts)
 		if err != nil {
-			log.Fatalf("failed to trace TC progs: %v", err)
+			slog.Error("failed to trace TC progs", "error", err)
+			os.Exit(1)
 		}
 		defer t.Detach()
 		traceTc = t.HaveTracing()
@@ -280,20 +306,23 @@ func main() {
 	if flags.FilterTraceXdp {
 		t, err := pwru.TraceXDP(coll, bpfSpecFentryXdp, &opts)
 		if err != nil {
-			log.Fatalf("failed to trace XDP progs: %v", err)
+			slog.Error("failed to trace XDP progs", "error", err)
+			os.Exit(1)
 		}
 		defer t.Detach()
 		traceXdp = t.HaveTracing()
 	}
 
 	if !traceTc && !traceXdp && len(funcs) == 0 {
-		log.Fatalf("No kprobe/tc-bpf/xdp to trace!")
+		slog.Error("No kprobe/tc-bpf/xdp to trace!")
+		os.Exit(1)
 	}
 
 	if flags.FilterTrackSkb || flags.FilterTrackSkbByStackid {
 		t, err := pwru.TrackSkb(coll, haveFexit, flags.FilterTrackSkb)
 		if err != nil {
-			log.Fatalf("Failed to track skb: %s", err)
+			slog.Error("Failed to track skb", "error", err)
+			os.Exit(1)
 		}
 		defer t.Detach()
 	}
@@ -301,7 +330,8 @@ func main() {
 	if flags.FilterTrackBpfHelpers {
 		bpfHelpers, err := pwru.GetBpfHelpers(addr2name)
 		if err != nil {
-			log.Fatalf("Failed to get bpf helpers: %s\n", err)
+			slog.Error("Failed to get bpf helpers", "error", err)
+			os.Exit(1)
 		}
 		flags.FilterNonSkbFuncs = append(flags.FilterNonSkbFuncs, bpfHelpers...)
 	}
@@ -314,17 +344,19 @@ func main() {
 	if len(funcs) != 0 {
 		k, err := pwru.NewKprober(ctx, funcs, coll, addr2name, useKprobeMulti, flags.FilterKprobeBatch)
 		if err != nil {
-			log.Fatalf("Failed to attach kprobes: %v", err)
+			slog.Error("Failed to attach kprobes", "error", err)
+			os.Exit(1)
 		}
 		defer k.DetachKprobes()
 	}
 
-	log.Println("Listening for events..")
+	slog.Info("Listening for events..")
 
 	if flags.ReadyFile != "" {
 		file, err := os.Create(flags.ReadyFile)
 		if err != nil {
-			log.Fatalf("Failed to create ready file: %s", err)
+			slog.Error("Failed to create ready file", "error", err)
+			os.Exit(1)
 		}
 		file.Close()
 	}
@@ -335,7 +367,8 @@ func main() {
 	printBpfmapMap := coll.Maps["print_bpfmap_map"]
 	output, err := pwru.NewOutput(&flags, printSkbMap, printShinfoMap, printStackMap, printBpfmapMap, addr2name, skbMds, xdpMds, useKprobeMulti, btfSpec)
 	if err != nil {
-		log.Fatalf("Failed to create outputer: %s", err)
+		slog.Error("Failed to create outputer", "error", err)
+		os.Exit(1)
 	}
 	defer output.Close()
 
@@ -346,9 +379,9 @@ func main() {
 	defer func() {
 		select {
 		case <-ctx.Done():
-			log.Println("Received signal, exiting program..")
+			slog.Info("Received signal, exiting program..")
 		default:
-			log.Printf("Printed %d events, exiting program..\n", flags.OutputLimitLines)
+			slog.Info("Printed events, exiting program..", "count", flags.OutputLimitLines)
 		}
 	}()
 
@@ -370,7 +403,8 @@ func main() {
 
 		if flags.OutputJson {
 			if err := output.PrintJson(&event); err != nil {
-				log.Fatalf("Error encoding JSON: %s", err)
+				slog.Error("Error encoding JSON", "error", err)
+				os.Exit(1)
 			}
 		} else {
 			output.Print(&event)

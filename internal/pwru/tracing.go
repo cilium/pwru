@@ -6,7 +6,7 @@ package pwru
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"maps"
 	"runtime"
 	"sync"
@@ -68,7 +68,7 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 	entryFn, err := getBpfProgInfo(prog)
 	if err != nil {
 		if errors.Is(err, errNotFound) {
-			log.Printf("Skip tracing bpf prog %s because cannot find its entry function name", prog)
+			slog.Info("Skip tracing bpf prog because cannot find its entry function name", "prog", prog)
 			return nil
 		}
 		return fmt.Errorf("failed to get entry function name: %w", err)
@@ -149,7 +149,7 @@ func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 }
 
 func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec, opts *ebpf.CollectionOptions) (*tracing, error) {
-	log.Printf("Attaching tc-bpf progs...\n")
+	slog.Info("Attaching tc-bpf progs...")
 
 	progs, err := listBpfProgs(ebpf.SchedCLS)
 	if err != nil {
@@ -168,7 +168,7 @@ func TraceTC(coll *ebpf.Collection, spec *ebpf.CollectionSpec, opts *ebpf.Collec
 }
 
 func TraceXDP(coll *ebpf.Collection, spec *ebpf.CollectionSpec, opts *ebpf.CollectionOptions) (*tracing, error) {
-	log.Printf("Attaching xdp progs...\n")
+	slog.Info("Attaching xdp progs...")
 
 	progs, err := listBpfProgs(ebpf.XDP)
 	if err != nil {
