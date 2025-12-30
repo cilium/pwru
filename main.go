@@ -268,14 +268,20 @@ func main() {
 
 	traceTc := false
 	if flags.FilterTraceTc {
-		t := pwru.TraceTC(coll, bpfSpecFentryTc, &opts)
+		t, err := pwru.TraceTC(coll, bpfSpecFentryTc, &opts)
+		if err != nil {
+			log.Fatalf("failed to trace TC progs: %v", err)
+		}
 		defer t.Detach()
 		traceTc = t.HaveTracing()
 	}
 
 	traceXdp := false
 	if flags.FilterTraceXdp {
-		t := pwru.TraceXDP(coll, bpfSpecFentryXdp, &opts)
+		t, err := pwru.TraceXDP(coll, bpfSpecFentryXdp, &opts)
+		if err != nil {
+			log.Fatalf("failed to trace XDP progs: %v", err)
+		}
 		defer t.Detach()
 		traceXdp = t.HaveTracing()
 	}
@@ -285,7 +291,10 @@ func main() {
 	}
 
 	if flags.FilterTrackSkb || flags.FilterTrackSkbByStackid {
-		t := pwru.TrackSkb(coll, haveFexit, flags.FilterTrackSkb)
+		t, err := pwru.TrackSkb(coll, haveFexit, flags.FilterTrackSkb)
+		if err != nil {
+			log.Fatalf("Failed to track skb: %s", err)
+		}
 		defer t.Detach()
 	}
 
@@ -303,7 +312,10 @@ func main() {
 	}
 
 	if len(funcs) != 0 {
-		k := pwru.NewKprober(ctx, funcs, coll, addr2name, useKprobeMulti, flags.FilterKprobeBatch)
+		k, err := pwru.NewKprober(ctx, funcs, coll, addr2name, useKprobeMulti, flags.FilterKprobeBatch)
+		if err != nil {
+			log.Fatalf("Failed to attach kprobes: %v", err)
+		}
 		defer k.DetachKprobes()
 	}
 
@@ -357,7 +369,9 @@ func main() {
 		}
 
 		if flags.OutputJson {
-			output.PrintJson(&event)
+			if err := output.PrintJson(&event); err != nil {
+				log.Fatalf("Error encoding JSON: %s", err)
+			}
 		} else {
 			output.Print(&event)
 		}
