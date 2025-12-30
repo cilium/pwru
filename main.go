@@ -242,6 +242,13 @@ func main() {
 		delete(bpfSpec.Programs, "fexit_skb_copy")
 	}
 
+	if !flags.OutputBpfmap {
+		delete(bpfSpec.Programs, "kprobe_bpf_map_update_elem")
+		delete(bpfSpec.Programs, "kprobe_bpf_map_delete_elem")
+		delete(bpfSpec.Programs, "kprobe_bpf_map_lookup_elem")
+		delete(bpfSpec.Programs, "kretprobe_bpf_map_lookup_elem")
+	}
+
 	var opts ebpf.CollectionOptions
 	opts.Programs.KernelTypes = btfSpec
 	opts.Programs.LogLevel = ebpf.LogLevelInstruction
