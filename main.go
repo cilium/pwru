@@ -29,6 +29,10 @@ func main() {
 	flags.SetFlags()
 	flags.Parse()
 
+	if flags.Debug {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
+
 	if flags.ShowHelp {
 		flags.PrintHelp()
 		os.Exit(0)

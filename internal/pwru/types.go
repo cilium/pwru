@@ -71,6 +71,8 @@ type Flags struct {
 	Backend string
 
 	SetPerCPUBuf uint32
+
+	Debug bool
 }
 
 func (f *Flags) SetFlags() {
@@ -119,6 +121,9 @@ func (f *Flags) SetFlags() {
 		fmt.Sprintf("Tracing backend('%s', '%s'). Will auto-detect if not specified.", BackendKprobe, BackendKprobeMulti))
 
 	flag.Uint32Var(&f.SetPerCPUBuf, "set-percpu-buf", 4096, "set the size of buffers to print skb data (used by --output-skb and --output-skb-shared-info)")
+
+	flag.BoolVar(&f.Debug, "debug", false, "enable debug logging")
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] [pcap-filter]\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "    Available pcap-filter: see \"man 7 pcap-filter\"\n")
