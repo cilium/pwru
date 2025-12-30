@@ -21,6 +21,7 @@ func listBpfProgs(typ ebpf.ProgramType) ([]*ebpf.Program, error) {
 	)
 
 	var progs []*ebpf.Program
+	var progNames []string
 	for id, err = ebpf.ProgramGetNextID(id); err == nil; id, err = ebpf.ProgramGetNextID(id) {
 		prog, err := ebpf.NewProgramFromID(id)
 		if err != nil {
@@ -28,12 +29,13 @@ func listBpfProgs(typ ebpf.ProgramType) ([]*ebpf.Program, error) {
 		}
 
 		if prog.Type() == typ {
-			slog.Info("Found bpf prog", "prog", prog.String())
 			progs = append(progs, prog)
+			progNames = append(progNames, prog.String())
 		} else {
 			_ = prog.Close()
 		}
 	}
+	slog.Debug("Found bpf progs", "names", progNames)
 
 	if !errors.Is(err, unix.ENOENT) { // Surely err != nil
 		return nil, err
