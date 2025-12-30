@@ -1064,7 +1064,7 @@ int kprobe_bpf_map_update_elem(struct pt_regs *ctx) {
 	if (skb && *skb) {
 		struct event_t event = {};
 
-		event.addr = PT_REGS_IP(ctx);
+		event.addr = get_addr(ctx, true);
 		if (!handle_everything(*skb, ctx, &event, &stackid, true))
 			return BPF_OK;
 
@@ -1090,7 +1090,7 @@ int kprobe_bpf_map_delete_elem(struct pt_regs *ctx) {
 	if (skb && *skb) {
 		struct event_t event = {};
 
-		event.addr = PT_REGS_IP(ctx);
+		event.addr = get_addr(ctx, true);
 		if (!handle_everything(*skb, ctx, &event, &stackid, true))
 			return BPF_OK;
 
@@ -1112,7 +1112,7 @@ int kprobe_bpf_map_lookup_elem(struct pt_regs *ctx) {
 	if (skb && *skb) {
 		struct event_t event = {};
 
-		event.addr = PT_REGS_IP(ctx);
+		event.addr = get_addr(ctx, true);
 		if (!handle_everything(*skb, ctx, &event, &stackid, true))
 			return BPF_OK;
 
