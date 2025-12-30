@@ -8,7 +8,7 @@ import (
 	"bufio"
 	"fmt"
 	"iter"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -67,7 +67,7 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti, bpfma
 	var availableFuncs map[string]struct{}
 	availableFuncs, err = getAvailableFilterFunctions()
 	if err != nil {
-		log.Printf("Failed to retrieve available ftrace functions (is /sys/kernel/tracing or /sys/kernel/debug/tracing mounted?): %s", err)
+		slog.Warn("Failed to retrieve available ftrace functions (is /sys/kernel/tracing or /sys/kernel/debug/tracing mounted?)", "error", err)
 	}
 
 	iters := []iterator{{"", spec.All()}}

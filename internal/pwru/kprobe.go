@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -126,7 +126,7 @@ func AttachKprobes(ctx context.Context, bar *pb.ProgressBar, kps []Kprobe, batch
 
 // DetachKprobes detaches kprobes concurrently.
 func (k *kprober) DetachKprobes() {
-	log.Println("Detaching kprobes...")
+	slog.Info("Detaching kprobes...")
 
 	links := k.links
 	bar := pb.StartNew(len(links))
@@ -207,7 +207,7 @@ func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Add
 		msg = "kprobe-multi"
 		probeMethod = "kprobe_multi"
 	}
-	log.Printf("Attaching kprobes (via %s)...\n", msg)
+	slog.Info("Attaching kprobes", "via", msg)
 
 	ignored := 0
 	bar := pb.StartNew(len(funcs))
@@ -249,7 +249,7 @@ func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Add
 		return &k, nil
 	default:
 	}
-	log.Printf("Attached (ignored %d)\n", ignored)
+	slog.Info("Attached", "ignored", ignored)
 
 	return &k, nil
 }
@@ -276,7 +276,7 @@ func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, bpfmapFuncs map[st
 				kp, err := link.Kprobe(fn, coll.Programs["kprobe_bpf_map_lookup_elem"], nil)
 				if err != nil {
 					if !errors.Is(err, os.ErrNotExist) {
-						log.Printf("Failed to attach bpf_map_lookup_elem kprobe %s: %s\n", fn, err)
+						slog.Warn("Failed to attach bpf_map_lookup_elem kprobe", "func", fn, "error", err)
 					}
 					continue
 				}
@@ -285,7 +285,7 @@ func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, bpfmapFuncs map[st
 				krp, err := link.Kretprobe(fn, coll.Programs["kretprobe_bpf_map_lookup_elem"], nil)
 				if err != nil {
 					if errors.Is(err, os.ErrNotExist) {
-						log.Printf("Failed to open bpf_map_lookup_elem kretprobe %s: %s\n", fn, err)
+						slog.Warn("Failed to open bpf_map_lookup_elem kretprobe", "func", fn, "error", err)
 					}
 					continue
 				}
@@ -295,7 +295,7 @@ func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, bpfmapFuncs map[st
 				kp, err := link.Kprobe(fn, coll.Programs["kprobe_bpf_map_update_elem"], nil)
 				if err != nil {
 					if errors.Is(err, os.ErrNotExist) {
-						log.Printf("Failed to open bpf_map_update_elem kprobe %s: %s\n", fn, err)
+						slog.Warn("Failed to open bpf_map_update_elem kprobe", "func", fn, "error", err)
 					}
 					continue
 				}
@@ -305,7 +305,7 @@ func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, bpfmapFuncs map[st
 				kp, err := link.Kprobe(fn, coll.Programs["kprobe_bpf_map_delete_elem"], nil)
 				if err != nil {
 					if errors.Is(err, os.ErrNotExist) {
-						log.Printf("Failed to open bpf_map_delete_elem kprobe %s: %s\n", fn, err)
+						slog.Warn("Failed to open bpf_map_delete_elem kprobe", "func", fn, "error", err)
 					}
 					continue
 				}
@@ -320,7 +320,7 @@ func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, bpfmapFuncs map[st
 			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
-			log.Printf("Opening non-skb-kprobe %s: %s\n", fn, err)
+			slog.Warn("Opening non-skb-kprobe", "func", fn, "error", err)
 		} else {
 			k.links = append(k.links, kp)
 		}
