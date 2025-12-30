@@ -65,9 +65,9 @@ func attachKprobes(ctx context.Context, bar *pb.ProgressBar, kprobes []Kprobe) (
 }
 
 // AttachKprobes attaches kprobes concurrently.
-func AttachKprobes(ctx context.Context, bar *pb.ProgressBar, kps []Kprobe, batch uint) (links []link.Link, ignored int) {
+func AttachKprobes(ctx context.Context, bar *pb.ProgressBar, kps []Kprobe, batch uint) (links []link.Link, ignored int, err error) {
 	if batch == 0 {
-		log.Fatal("--filter-kprobe-batch must be greater than 0")
+		return nil, 0, fmt.Errorf("--filter-kprobe-batch must be greater than 0")
 	}
 
 	var kprobes []Kprobe
@@ -118,7 +118,7 @@ func AttachKprobes(ctx context.Context, bar *pb.ProgressBar, kps []Kprobe, batch
 	}
 
 	if err := errg.Wait(); err != nil {
-		log.Fatalf("Attaching kprobes: %v\n", err)
+		return nil, 0, fmt.Errorf("attaching kprobes: %v", err)
 	}
 
 	return
@@ -163,7 +163,7 @@ func (k *kprober) DetachKprobes() {
 }
 
 // AttachKprobeMulti attaches kprobe-multi serially.
-func AttachKprobeMulti(ctx context.Context, bar *pb.ProgressBar, kprobes []Kprobe, a2n Addr2Name) (links []link.Link, ignored int) {
+func AttachKprobeMulti(ctx context.Context, bar *pb.ProgressBar, kprobes []Kprobe, a2n Addr2Name) (links []link.Link, ignored int, err error) {
 	links = make([]link.Link, 0, len(kprobes))
 
 	for _, kp := range kprobes {
@@ -189,10 +189,10 @@ func AttachKprobeMulti(ctx context.Context, bar *pb.ProgressBar, kprobes []Kprob
 		}
 
 		opts := link.KprobeMultiOptions{Addresses: addrs}
-		l, err := link.KprobeMulti(kp.Prog, opts)
+		l, err0 := link.KprobeMulti(kp.Prog, opts)
 		bar.Add(len(kp.HookFuncs))
-		if err != nil {
-			log.Fatalf("Opening kprobe-multi: %s\n", err)
+		if err0 != nil {
+			return nil, 0, fmt.Errorf("opening kprobe-multi: %s", err0)
 		}
 
 		links = append(links, l)
@@ -201,7 +201,7 @@ func AttachKprobeMulti(ctx context.Context, bar *pb.ProgressBar, kprobes []Kprob
 	return
 }
 
-func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Addr2Name, useKprobeMulti bool, batch uint) *kprober {
+func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Addr2Name, useKprobeMulti bool, batch uint) (*kprober, error) {
 	msg, probeMethod := "kprobe", "kprobe"
 	if useKprobeMulti {
 		msg = "kprobe-multi"
@@ -229,23 +229,29 @@ func NewKprober(ctx context.Context, funcs Funcs, coll *ebpf.Collection, a2n Add
 	k.kprobeBatch = batch
 
 	if !useKprobeMulti {
-		l, i := AttachKprobes(ctx, bar, pwruKprobes, batch)
+		l, i, err := AttachKprobes(ctx, bar, pwruKprobes, batch)
+		if err != nil {
+			return nil, err
+		}
 		k.links = l
 		ignored += i
 	} else {
-		l, i := AttachKprobeMulti(ctx, bar, pwruKprobes, a2n)
+		l, i, err := AttachKprobeMulti(ctx, bar, pwruKprobes, a2n)
+		if err != nil {
+			return nil, err
+		}
 		k.links = l
 		ignored += i
 	}
 	bar.Finish()
 	select {
 	case <-ctx.Done():
-		return &k
+		return &k, nil
 	default:
 	}
 	log.Printf("Attached (ignored %d)\n", ignored)
 
-	return &k
+	return &k, nil
 }
 
 func NewNonSkbFuncsKprober(nonSkbFuncs []string, funcs Funcs, bpfmapFuncs map[string]*btf.FuncProto, coll *ebpf.Collection) *kprober {

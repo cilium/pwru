@@ -171,7 +171,7 @@ func (o *output) PrintHeader() {
 }
 
 // PrintJson prints the event in JSON format
-func (o *output) PrintJson(event *Event) {
+func (o *output) PrintJson(event *Event) error {
 	// crate an instance of the outputStructured struct to hold the data
 	d := &jsonPrinter{}
 
@@ -249,8 +249,9 @@ func (o *output) PrintJson(event *Event) {
 
 	err := encoder.Encode(d)
 	if err != nil {
-		log.Fatalf("Error encoding JSON: %s", err)
+		return fmt.Errorf("error encoding JSON: %s", err)
 	}
+	return nil
 }
 
 func getAbsoluteTs() string {
