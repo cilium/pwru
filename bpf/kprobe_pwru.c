@@ -138,6 +138,17 @@ struct {
 	__uint(max_entries, MAX_TRACK_SIZE);
 } xdp_dhs_skb_heads SEC(".maps");
 
+/* fexit/xdp runs unconditionally for all XDP packets, but we only want to
+ * track (for later SKB tracing) those that passed the filter in fentry/xdp.
+ * This per-CPU map indicates whether the current XDP packet matched the filter.
+ */
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__type(key, u32);
+	__type(value, bool);
+	__uint(max_entries, 1);
+} xdp_filter_matched SEC(".maps");
+
 struct config {
 	u32 netns;
 	u32 mark;
@@ -981,14 +992,17 @@ SEC("fentry/xdp")
 int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
 	struct event_t event = {};
 	u64 xdp_dhs = (u64) BPF_CORE_READ(xdp, data_hard_start);
+	bool matched = false;
 
 	if (cfg->is_set) {
 		if (cfg->track_skb && bpf_map_lookup_elem(&xdp_dhs_skb_heads, &xdp_dhs)) {
 			bpf_map_delete_elem(&xdp_dhs_skb_heads, &xdp_dhs);
+			matched = true;
 			goto cont;
 		}
 
 		if (filter_xdp(xdp)) {
+			matched = true;
 			goto cont;
 		}
 
@@ -996,6 +1010,10 @@ int BPF_PROG(fentry_xdp, struct xdp_buff *xdp) {
 
 cont:
 		set_xdp_output(ctx, xdp, &event);
+	}
+
+	if (cfg->track_skb && matched) {
+		bpf_map_update_elem(&xdp_filter_matched, &ZERO, &TRUE, BPF_ANY);
 	}
 
 	event.pid = bpf_get_current_pid_tgid() >> 32;
@@ -1011,8 +1029,12 @@ cont:
 
 SEC("fexit/xdp")
 int BPF_PROG(fexit_xdp, struct xdp_buff *xdp) {
-	u64 xdp_dhs = (u64) BPF_CORE_READ(xdp, data_hard_start);
-	bpf_map_update_elem(&xdp_dhs_skb_heads, &xdp_dhs, &xdp, BPF_ANY);
+	bool *matched = bpf_map_lookup_elem(&xdp_filter_matched, &ZERO);
+	if (matched && *matched) {
+		u64 xdp_dhs = (u64) BPF_CORE_READ(xdp, data_hard_start);
+		bpf_map_update_elem(&xdp_dhs_skb_heads, &xdp_dhs, &xdp, BPF_ANY);
+		*matched = false;
+	}
 	return BPF_OK;
 }
 
