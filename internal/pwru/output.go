@@ -53,6 +53,7 @@ type output struct {
 	kprobeMulti    bool
 	kfreeReasons   map[uint64]string
 	ifaceCache     map[uint64]map[uint32]string
+	procCache      map[int]string
 }
 
 // outputStructured is a struct to hold the data for the json output
@@ -133,6 +134,7 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap, printBp
 		kprobeMulti:    kprobeMulti,
 		kfreeReasons:   reasons,
 		ifaceCache:     ifs,
+		procCache:      map[int]string{},
 	}, nil
 }
 
@@ -178,7 +180,7 @@ func (o *output) PrintJson(event *Event) error {
 	// add the data to the struct
 	d.Skb = fmt.Sprintf("%#x", event.SkbAddr)
 	d.Cpu = event.CPU
-	d.Process = getExecName(int(event.PID))
+	d.Process = o.getExecName(int(event.PID))
 	d.Func = getOutFuncName(o, event, event.Addr)
 	if o.flags.OutputCaller {
 		d.CallerFunc = o.addr2name.findNearestSym(event.CallerAddr)
@@ -268,7 +270,11 @@ func getRelativeTs(event *Event, o *output) uint64 {
 	return ts
 }
 
-func getExecName(pid int) string {
+func (o *output) getExecName(pid int) string {
+	if name, ok := o.procCache[pid]; ok {
+		return name
+	}
+
 	p, err := ps.FindProcess(pid)
 	execName := fmt.Sprintf("<empty>:%d", pid)
 	if err == nil && p != nil {
@@ -280,6 +286,8 @@ func getExecName(pid int) string {
 			execName = string(bexecName)
 		}
 	}
+
+	o.procCache[pid] = execName
 	return execName
 }
 
@@ -431,7 +439,7 @@ func (o *output) Print(event *Event) {
 		fmt.Fprintf(o.writer, "%-12s ", getAbsoluteTs())
 	}
 
-	execName := getExecName(int(event.PID))
+	execName := o.getExecName(int(event.PID))
 
 	ts := event.Timestamp
 	if o.flags.OutputTS == "relative" {
