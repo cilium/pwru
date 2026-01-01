@@ -261,6 +261,12 @@ func run(flags pwru.Flags) error {
 		delete(bpfSpec.Programs, "kretprobe_bpf_map_lookup_elem")
 	}
 
+	if !flags.FilterTrackSkb {
+		delete(bpfSpec.Programs, "kprobe_veth_convert_skb_to_xdp_buff")
+		delete(bpfSpec.Programs, "kretprobe_veth_convert_skb_to_xdp_buff")
+		delete(bpfSpec.Programs, "kprobe_skb_by_stackid")
+	}
+
 	var opts ebpf.CollectionOptions
 	opts.Programs.KernelTypes = btfSpec
 	opts.Programs.LogLevel = ebpf.LogLevelInstruction

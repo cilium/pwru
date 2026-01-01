@@ -53,6 +53,7 @@ type output struct {
 	kprobeMulti    bool
 	kfreeReasons   map[uint64]string
 	ifaceCache     map[uint64]map[uint32]string
+	procCache      map[int]string
 }
 
 // outputStructured is a struct to hold the data for the json output
@@ -133,6 +134,7 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap, printBp
 		kprobeMulti:    kprobeMulti,
 		kfreeReasons:   reasons,
 		ifaceCache:     ifs,
+		procCache:      map[int]string{},
 	}, nil
 }
 
@@ -178,7 +180,7 @@ func (o *output) PrintJson(event *Event) error {
 	// add the data to the struct
 	d.Skb = fmt.Sprintf("%#x", event.SkbAddr)
 	d.Cpu = event.CPU
-	d.Process = getExecName(int(event.PID))
+	d.Process = o.getExecName(int(event.PID))
 	d.Func = getOutFuncName(o, event, event.Addr)
 	if o.flags.OutputCaller {
 		d.CallerFunc = o.addr2name.findNearestSym(event.CallerAddr)
@@ -268,7 +270,11 @@ func getRelativeTs(event *Event, o *output) uint64 {
 	return ts
 }
 
-func getExecName(pid int) string {
+func (o *output) getExecName(pid int) string {
+	if name, ok := o.procCache[pid]; ok {
+		return name
+	}
+
 	p, err := ps.FindProcess(pid)
 	execName := fmt.Sprintf("<empty>:%d", pid)
 	if err == nil && p != nil {
@@ -280,6 +286,8 @@ func getExecName(pid int) string {
 			execName = string(bexecName)
 		}
 	}
+
+	o.procCache[pid] = execName
 	return execName
 }
 
@@ -427,11 +435,14 @@ func fprintWithPadding(writer *os.File, data string, maxLenSeen *int) {
 }
 
 func (o *output) Print(event *Event) {
+	var sb strings.Builder
+	sb.Grow(256)
+
 	if o.flags.OutputTS == "absolute" {
-		fmt.Fprintf(o.writer, "%-12s ", getAbsoluteTs())
+		sb.WriteString(fmt.Sprintf("%-12s ", getAbsoluteTs()))
 	}
 
-	execName := getExecName(int(event.PID))
+	execName := o.getExecName(int(event.PID))
 
 	ts := event.Timestamp
 	if o.flags.OutputTS == "relative" {
@@ -440,58 +451,75 @@ func (o *output) Print(event *Event) {
 
 	outFuncName := getOutFuncName(o, event, event.Addr)
 
-	fmt.Fprintf(o.writer, "%-18s %-3s %-16s", fmt.Sprintf("%#x", event.SkbAddr),
-		fmt.Sprintf("%d", event.CPU), fmt.Sprintf("%s", execName))
+	sb.WriteString(fmt.Sprintf("%-18s %-3s %-16s", fmt.Sprintf("%#x", event.SkbAddr),
+		fmt.Sprintf("%d", event.CPU), execName))
 	if o.flags.OutputTS != "none" {
-		fmt.Fprintf(o.writer, " %-16d", ts)
+		sb.WriteString(fmt.Sprintf(" %-16d", ts))
 	}
 	o.lastSeenSkb[event.SkbAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
-		fmt.Fprintf(o.writer, " %s", getMetaData(event, o))
+		sb.WriteString(" ")
+		sb.WriteString(getMetaData(event, o))
 		if o.flags.FilterTraceTc || o.flags.OutputSkbCB {
-			fmt.Fprintf(o.writer, " %s", getCb(event))
+			sb.WriteString(" ")
+			sb.WriteString(getCb(event))
 		}
 	}
 
 	if o.flags.OutputTuple {
-		fprintWithPadding(o.writer, getTupleData(event, o.flags.OutputTCPFlags), &maxTupleLengthSeen)
+		tupleData := getTupleData(event, o.flags.OutputTCPFlags)
+		if len(tupleData) > maxTupleLengthSeen {
+			maxTupleLengthSeen = len(tupleData)
+		}
+		sb.WriteString(fmt.Sprintf(" %-*s", maxTupleLengthSeen, tupleData))
 	}
 
 	if o.flags.OutputCaller {
-		fprintWithPadding(o.writer, outFuncName, &maxFuncLengthSeen)
-		fmt.Fprintf(o.writer, " %s", o.addr2name.findNearestSym(event.CallerAddr))
+		if len(outFuncName) > maxFuncLengthSeen {
+			maxFuncLengthSeen = len(outFuncName)
+		}
+		sb.WriteString(fmt.Sprintf(" %-*s", maxFuncLengthSeen, outFuncName))
+		sb.WriteString(" ")
+		sb.WriteString(o.addr2name.findNearestSym(event.CallerAddr))
 	} else {
-		fmt.Fprintf(o.writer, " %s", outFuncName)
+		sb.WriteString(" ")
+		sb.WriteString(outFuncName)
 	}
 
 	if event.Type != eventTypeTracingXdp && len(o.skbMetadata) > 0 {
-		outputSkbMetadata(o.writer, o.skbMetadata, event.SkbMetadata[:])
+		var metaBuf strings.Builder
+		outputSkbMetadata(&metaBuf, o.skbMetadata, event.SkbMetadata[:])
+		sb.WriteString(metaBuf.String())
 	} else if event.Type == eventTypeTracingXdp && len(o.xdpMetadata) > 0 {
-		outputSkbMetadata(o.writer, o.xdpMetadata, event.SkbMetadata[:])
+		var metaBuf strings.Builder
+		outputSkbMetadata(&metaBuf, o.xdpMetadata, event.SkbMetadata[:])
+		sb.WriteString(metaBuf.String())
 	}
 
 	if o.flags.OutputStack && event.PrintStackId > 0 {
-		fmt.Fprintf(o.writer, "%s", getStackData(event, o))
+		sb.WriteString(getStackData(event, o))
 	}
 
 	if o.flags.OutputSkb {
-		fmt.Fprintf(o.writer, "%s", getSkbData(event, o))
+		sb.WriteString(getSkbData(event, o))
 	}
 
 	if o.flags.OutputShinfo {
-		fmt.Fprintf(o.writer, "%s", getShinfoData(event, o))
+		sb.WriteString(getShinfoData(event, o))
 	}
 
 	if o.flags.OutputTunnel {
-		fmt.Fprintf(o.writer, " %s", getTuple(event.TunnelTuple, o.flags.OutputTCPFlags))
+		sb.WriteString(" ")
+		sb.WriteString(getTuple(event.TunnelTuple, o.flags.OutputTCPFlags))
 	}
 
 	if o.flags.OutputBpfmap && event.PrintBpfmapId > 0 {
-		fmt.Fprintf(o.writer, "%s", getBpfMapData(event, o))
+		sb.WriteString(getBpfMapData(event, o))
 	}
 
-	fmt.Fprintln(o.writer)
+	sb.WriteString("\n")
+	o.writer.Write([]byte(sb.String()))
 }
 
 func (o *output) getIfaceName(netnsInode, ifindex uint32) string {
