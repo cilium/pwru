@@ -45,7 +45,6 @@ func (t *tracing) detach() {
 	var errg errgroup.Group
 
 	for _, l := range t.links {
-		l := l
 		errg.Go(func() error {
 			_ = l.Close()
 			return nil
@@ -134,7 +133,6 @@ func (t *tracing) trace(coll *ebpf.Collection, spec *ebpf.CollectionSpec,
 	var errg errgroup.Group
 
 	for _, prog := range progs {
-		prog := prog
 		errg.Go(func() error {
 			return t.traceProg(spec, opts, prog, tracingName)
 		})
