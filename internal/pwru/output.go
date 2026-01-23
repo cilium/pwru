@@ -58,24 +58,24 @@ type output struct {
 
 // outputStructured is a struct to hold the data for the json output
 type jsonPrinter struct {
-	Skb         string      `json:"skb,omitempty"`
-	Shinfo      string      `json:"skb_shared_info,omitempty"`
-	Cpu         uint32      `json:"cpu,omitempty"`
-	Process     string      `json:"process,omitempty"`
-	Func        string      `json:"func,omitempty"`
-	CallerFunc  string      `json:"caller_func,omitempty"`
-	Time        interface{} `json:"time,omitempty"`
-	Netns       uint32      `json:"netns,omitempty"`
-	Mark        uint32      `json:"mark,omitempty"`
-	Iface       string      `json:"iface,omitempty"`
-	Proto       uint16      `json:"proto,omitempty"`
-	Mtu         uint32      `json:"mtu,omitempty"`
-	Len         uint32      `json:"len,omitempty"`
-	Cb          [5]uint32   `json:"cb,omitempty"`
-	Tuple       *jsonTuple  `json:"tuple,omitempty"`
-	TunnelTuple *jsonTuple  `json:"tunnel_tuple,omitempty"`
-	Stack       interface{} `json:"stack,omitempty"`
-	SkbMetadata interface{} `json:"skb_metadata,omitempty"`
+	Skb         string     `json:"skb,omitempty"`
+	Shinfo      string     `json:"skb_shared_info,omitempty"`
+	Cpu         uint32     `json:"cpu,omitempty"`
+	Process     string     `json:"process,omitempty"`
+	Func        string     `json:"func,omitempty"`
+	CallerFunc  string     `json:"caller_func,omitempty"`
+	Time        any        `json:"time,omitempty"`
+	Netns       uint32     `json:"netns,omitempty"`
+	Mark        uint32     `json:"mark,omitempty"`
+	Iface       string     `json:"iface,omitempty"`
+	Proto       uint16     `json:"proto,omitempty"`
+	Mtu         uint32     `json:"mtu,omitempty"`
+	Len         uint32     `json:"len,omitempty"`
+	Cb          [5]uint32  `json:"cb,omitempty"`
+	Tuple       *jsonTuple `json:"tuple,omitempty"`
+	TunnelTuple *jsonTuple `json:"tunnel_tuple,omitempty"`
+	Stack       any        `json:"stack,omitempty"`
+	SkbMetadata any        `json:"skb_metadata,omitempty"`
 }
 
 type jsonTuple struct {
