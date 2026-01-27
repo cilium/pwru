@@ -358,7 +358,11 @@ func run(flags pwru.Flags) error {
 	if err != nil {
 		return fmt.Errorf("Failed to create outputer: %w", err)
 	}
-	defer output.Close()
+	defer func() {
+		if err := output.Close(); err != nil {
+			slog.Warn("Failed to close output", "error", err)
+		}
+	}()
 
 	if !flags.OutputJson {
 		output.PrintHeader()
