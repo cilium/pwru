@@ -72,7 +72,11 @@ Usage: ./pwru [options] [pcap-filter]
       --kernel-btf string              specify kernel BTF file
       --kmods strings                  list of kernel modules names to attach to
       --output-caller                  print caller function name
-      --output-file string             write traces to file
+      --output-file string             write traces to file (rotates at 100MB by default)
+      --output-file-max-size int       max size in MB per file before rotation (default 100)
+      --output-file-max-age int        max age in days to keep rotated files (default 0, no limit)
+      --output-file-max-backups int    max number of rotated files to keep (default 0, no limit)
+      --output-file-compress           compress rotated files with gzip (default false)
       --output-json                    output traces in JSON format
       --output-limit-lines uint        exit the program after the number of events has been received/printed
       --output-meta                    print skb metadata (default true)

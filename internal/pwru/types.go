@@ -45,20 +45,24 @@ type Flags struct {
 	FilterSkbExpr           string
 	FilterXdpExpr           string
 
-	OutputTS         string
-	OutputMeta       bool
-	OutputTuple      bool
-	OutputSkb        bool
-	OutputShinfo     bool
-	OutputStack      bool
-	OutputBpfmap     bool
-	OutputCaller     bool
-	OutputLimitLines uint64
-	OutputSkbCB      bool
-	OutputFile       string
-	OutputJson       bool
-	OutputTCPFlags   bool
-	OutputTunnel     bool
+	OutputTS             string
+	OutputMeta           bool
+	OutputTuple          bool
+	OutputSkb            bool
+	OutputShinfo         bool
+	OutputStack          bool
+	OutputBpfmap         bool
+	OutputCaller         bool
+	OutputLimitLines     uint64
+	OutputSkbCB          bool
+	OutputFile           string
+	OutputFileMaxSize    int
+	OutputFileMaxBackups int
+	OutputFileMaxAge     int
+	OutputFileCompress   bool
+	OutputJson           bool
+	OutputTCPFlags       bool
+	OutputTunnel         bool
 
 	OutputSkbMetadata []string
 	OutputXdpMetadata []string
@@ -110,7 +114,11 @@ func (f *Flags) SetFlags() {
 	flag.BoolVar(&f.OutputTCPFlags, "output-tcp-flags", false, "print TCP flags")
 	flag.StringSliceVar(&f.OutputSkbMetadata, "output-skb-metadata", nil, fmt.Sprintf("print skb metadata (e.g., \"skb->mark\", \"skb->hash\"), %d at most", maxSkbMetadata))
 	flag.StringSliceVar(&f.OutputXdpMetadata, "output-xdp-metadata", nil, fmt.Sprintf("print xdp metadata (e.g., \"xdp->rxq->queue_index\"), %d at most", maxSkbMetadata))
-	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file")
+	flag.StringVar(&f.OutputFile, "output-file", "", "write traces to file (rotates at 100MB by default)")
+	flag.IntVar(&f.OutputFileMaxSize, "output-file-max-size", 100, "max size in MB per file before rotation")
+	flag.IntVar(&f.OutputFileMaxBackups, "output-file-max-backups", 0, "max number of rotated files to keep (0, no limit)")
+	flag.IntVar(&f.OutputFileMaxAge, "output-file-max-age", 0, "max age in days to keep rotated files (0, no limit)")
+	flag.BoolVar(&f.OutputFileCompress, "output-file-compress", false, "compress rotated files with gzip")
 
 	flag.BoolVar(&f.OutputJson, "output-json", false, "output traces in JSON format")
 
