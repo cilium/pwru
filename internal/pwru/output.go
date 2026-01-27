@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -26,11 +27,17 @@ import (
 	"github.com/tklauser/ps"
 	"github.com/vishvananda/netns"
 	"golang.org/x/sys/unix"
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/cilium/pwru/internal/byteorder"
 )
 
 const absoluteTS string = "15:04:05.000"
+
+type WriteSyncer interface {
+	io.Writer
+	Sync() error
+}
 
 const (
 	eventTypeKprobe = iota
@@ -49,7 +56,8 @@ type output struct {
 	addr2name      Addr2Name
 	skbMetadata    []*SkbMetadata
 	xdpMetadata    []*SkbMetadata
-	writer         *os.File
+	writer         io.Writer
+	closer         io.Closer
 	kprobeMulti    bool
 	kfreeReasons   map[uint64]string
 	ifaceCache     map[uint64]map[uint32]string
@@ -97,14 +105,20 @@ func centerAlignString(s string, width int) string {
 }
 
 func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap, printBpfmapMap *ebpf.Map, addr2Name Addr2Name, skbMds, xdpMds []*SkbMetadata, kprobeMulti bool, btfSpec *btf.Spec) (*output, error) {
-	writer := os.Stdout
+	var writer io.Writer = os.Stdout
+	var closer io.Closer
 
 	if flags.OutputFile != "" {
-		file, err := os.Create(flags.OutputFile)
-		if err != nil {
-			return nil, err
+		lj := &lumberjack.Logger{
+			Filename:   flags.OutputFile,
+			MaxSize:    flags.OutputFileMaxSize,
+			MaxAge:     flags.OutputFileMaxAge,
+			MaxBackups: flags.OutputFileMaxBackups,
+			Compress:   flags.OutputFileCompress,
+			LocalTime:  true,
 		}
-		writer = file
+		writer = lj
+		closer = lj
 	}
 
 	reasons, err := getKFreeSKBReasons(btfSpec)
@@ -131,6 +145,7 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap, printBp
 		skbMetadata:    skbMds,
 		xdpMetadata:    xdpMds,
 		writer:         writer,
+		closer:         closer,
 		kprobeMulti:    kprobeMulti,
 		kfreeReasons:   reasons,
 		ifaceCache:     ifs,
@@ -138,11 +153,16 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap, printBp
 	}, nil
 }
 
-func (o *output) Close() {
-	if o.writer != os.Stdout {
-		_ = o.writer.Sync()
-		_ = o.writer.Close()
+func (o *output) Close() error {
+	if o.closer == nil {
+		return nil
 	}
+	if syncer, ok := o.closer.(WriteSyncer); ok {
+		if err := syncer.Sync(); err != nil {
+			slog.Warn("Failed to sync output file", "error", err)
+		}
+	}
+	return o.closer.Close()
 }
 
 func (o *output) PrintHeader() {

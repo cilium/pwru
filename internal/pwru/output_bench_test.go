@@ -4,19 +4,17 @@
 package pwru
 
 import (
+	"io"
 	"os"
+	"path/filepath"
 	"syscall"
 	"testing"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-func BenchmarkOutputPrint(b *testing.B) {
-	devNull, err := os.OpenFile("/dev/null", os.O_WRONLY, 0)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer devNull.Close()
-
-	output := &output{
+func newBenchmarkOutput(writer io.Writer) *output {
+	return &output{
 		flags: &Flags{
 			OutputTS:       "none",
 			OutputMeta:     true,
@@ -38,7 +36,7 @@ func BenchmarkOutputPrint(b *testing.B) {
 				{addr: 0xffffffff81000000, name: "test_function"},
 			},
 		},
-		writer: devNull,
+		writer: writer,
 		ifaceCache: map[uint64]map[uint32]string{
 			4026531840: {1: "lo", 2: "eth0"},
 		},
@@ -46,8 +44,10 @@ func BenchmarkOutputPrint(b *testing.B) {
 			1234: "test-process:1234",
 		},
 	}
+}
 
-	event := &Event{
+func newBenchmarkEvent() *Event {
+	return &Event{
 		PID:       1234,
 		Type:      eventTypeKprobe,
 		Addr:      0xffffffff81000000,
@@ -72,8 +72,56 @@ func BenchmarkOutputPrint(b *testing.B) {
 			TCPFlag: 0x12,
 		},
 	}
+}
 
-	for b.Loop() {
-		output.Print(event)
-	}
+func BenchmarkOutputPrint(b *testing.B) {
+	event := newBenchmarkEvent()
+
+	b.Run("DevNull", func(b *testing.B) {
+		devNull, err := os.OpenFile("/dev/null", os.O_WRONLY, 0)
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer devNull.Close()
+
+		out := newBenchmarkOutput(devNull)
+		b.ResetTimer()
+		for b.Loop() {
+			out.Print(event)
+		}
+	})
+
+	b.Run("RegularFile", func(b *testing.B) {
+		tmpDir := b.TempDir()
+		file, err := os.Create(filepath.Join(tmpDir, "bench.log"))
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer file.Close()
+
+		out := newBenchmarkOutput(file)
+		b.ResetTimer()
+		for b.Loop() {
+			out.Print(event)
+		}
+	})
+
+	b.Run("Lumberjack", func(b *testing.B) {
+		tmpDir := b.TempDir()
+		lj := &lumberjack.Logger{
+			Filename:   filepath.Join(tmpDir, "bench.log"),
+			MaxSize:    100,
+			MaxBackups: 0,
+			MaxAge:     0,
+			Compress:   false,
+			LocalTime:  true,
+		}
+		defer lj.Close()
+
+		out := newBenchmarkOutput(lj)
+		b.ResetTimer()
+		for b.Loop() {
+			out.Print(event)
+		}
+	})
 }
