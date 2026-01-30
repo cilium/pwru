@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+if [ $# -lt 1 ] ; then
+  echo "usage: $0 <node> [pwru args...]"
+  exit 1
+fi
+
+NODE=$1
+shift
+PWRU_ARGS="$@"
+
+trap "kubectl delete --wait=false pod pwru" EXIT
+
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pwru
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: ${NODE}
+  containers:
+  - image: docker.io/cilium/pwru:latest
+    name: pwru
+    volumeMounts:
+    - mountPath: /sys/kernel/debug
+      name: sys-kernel-debug
+    securityContext:
+      privileged: true
+    command: ["/bin/sh"]
+    args: ["-c", "pwru ${PWRU_ARGS}"]
+  volumes:
+  - name: sys-kernel-debug
+    hostPath:
+      path: /sys/kernel/debug
+      type: DirectoryOrCreate
+  hostNetwork: true
+  hostPID: true
+EOF
+
+kubectl wait pod pwru --for condition=Ready --timeout=90s
+kubectl logs -f pwru
