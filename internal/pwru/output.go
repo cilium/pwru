@@ -338,7 +338,7 @@ func getSkbData(event *Event, o *output) (skbData string) {
 		return ""
 	}
 
-	dataLen := byteorder.Native.Uint32(b[:4])
+	dataLen := binary.NativeEndian.Uint32(b[:4])
 	if dataLen+4 > uint32(len(b)) {
 		dataLen = uint32(len(b)) - 4
 	}
@@ -359,7 +359,7 @@ func getShinfoData(event *Event, o *output) (shinfoData string) {
 		return ""
 	}
 
-	dataLen := byteorder.Native.Uint32(b[:4])
+	dataLen := binary.NativeEndian.Uint32(b[:4])
 	if dataLen+4 > uint32(len(b)) {
 		dataLen = uint32(len(b)) - 4
 	}
@@ -686,7 +686,7 @@ func getBpfMapData(event *Event, o *output) (bpfMapData string) {
 		return ""
 	}
 	bpfmap := printBpfmapValue{}
-	if err = binary.Read(bytes.NewBuffer(b), byteorder.Native, &bpfmap); err != nil {
+	if err = binary.Read(bytes.NewBuffer(b), binary.NativeEndian, &bpfmap); err != nil {
 		return ""
 	}
 	defer o.printBpfmapMap.Delete(&id)
