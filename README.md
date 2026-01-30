@@ -145,6 +145,8 @@ kubectl wait pod pwru --for condition=Ready --timeout=90s
 kubectl logs -f pwru
 ```
 
+Also see [contrib/scripts/pwru-on-k8s-node](contrib/scripts/pwru-on-k8s-node) for a reusable version of this script.
+
 ## Distro packages
 
 `pwru` is available in some distro packages. [GH#89](https://github.com/cilium/pwru/issues/89) tracks any packaging work and progress.
