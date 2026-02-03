@@ -29,6 +29,9 @@ github.com/cilium/ebpf/internal/tracefs
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
 github.com/cilium/ebpf/rlimit
+# github.com/cilium/lumberjack/v2 v2.4.1
+## explicit; go 1.13
+github.com/cilium/lumberjack/v2
 # github.com/cloudflare/cbpfc v0.0.0-20250612131231-1b95965eadb6
 ## explicit; go 1.23.0
 github.com/cloudflare/cbpfc
@@ -94,9 +97,6 @@ golang.org/x/sync/errgroup
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# gopkg.in/natefinch/lumberjack.v2 v2.2.1
-## explicit; go 1.13
-gopkg.in/natefinch/lumberjack.v2
 # rsc.io/c2go v0.0.0-20170620140410-520c22818a08
 ## explicit
 rsc.io/c2go/cc

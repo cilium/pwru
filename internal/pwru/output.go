@@ -23,11 +23,11 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/btf"
+	"github.com/cilium/lumberjack/v2"
 	"github.com/jsimonetti/rtnetlink/v2"
 	"github.com/tklauser/ps"
 	"github.com/vishvananda/netns"
 	"golang.org/x/sys/unix"
-	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/cilium/pwru/internal/byteorder"
 )
