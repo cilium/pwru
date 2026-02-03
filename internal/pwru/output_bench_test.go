@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"testing"
 
-	"gopkg.in/natefinch/lumberjack.v2"
+	"github.com/cilium/lumberjack/v2"
 )
 
 func newBenchmarkOutput(writer io.Writer) *output {

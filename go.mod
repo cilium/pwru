@@ -6,6 +6,7 @@ require (
 	github.com/Asphaltt/mybtf v0.0.0-20250708022622-be6f548674b2
 	github.com/cheggaaa/pb/v3 v3.1.7
 	github.com/cilium/ebpf v0.20.0
+	github.com/cilium/lumberjack/v2 v2.4.1
 	github.com/cloudflare/cbpfc v0.0.0-20250612131231-1b95965eadb6
 	github.com/jsimonetti/rtnetlink/v2 v2.1.0
 	github.com/leonhwangprojects/bice v0.1.3
@@ -16,7 +17,6 @@ require (
 	golang.org/x/net v0.49.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.40.0
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (
