@@ -17,8 +17,8 @@ TEST_TIMEOUT ?= 5s
 .DEFAULT_GOAL := pwru
 
 # renovate: datasource=docker depName=golang
-GO_IMAGE_VERSION = 1.25.6
-GO_IMAGE_SHA = sha256:ce63a16e0f7063787ebb4eb28e72d477b00b4726f79874b3205a965ffd797ab2
+GO_IMAGE_VERSION = 1.25.7
+GO_IMAGE_SHA = sha256:011d6e21edbc198b7aeb06d705f17bc1cc219e102c932156ad61db45005c5d31
 
 ## Build the GO binary
 pwru: libpcap/libpcap.a
