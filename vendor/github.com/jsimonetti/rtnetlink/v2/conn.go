@@ -101,14 +101,16 @@ func (c *Conn) Send(m Message, family uint16, flags netlink.HeaderFlags) (netlin
 }
 
 // Receive receives one or more Messages from netlink.  The netlink.Messages
-// used to wrap each Message are available for later validation.
-func (c *Conn) Receive() ([]Message, []netlink.Message, error) {
-	msgs, err := c.c.Receive()
+// used to wrap each Message are available for later validation.  The two
+// returned slices rtmsgs and msgs have equal length, with rtmsgs containing
+// nils for non-route messages.
+func (c *Conn) Receive() (rtmsgs []Message, msgs []netlink.Message, err error) {
+	msgs, err = c.c.Receive()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	rtmsgs, err := unpackMessages(msgs)
+	rtmsgs, err = unpackMessages(msgs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -168,9 +170,9 @@ func packMessage(m Message, family uint16, flags netlink.HeaderFlags) (netlink.M
 
 // unpackMessages unpacks rtnetlink Messages from a slice of netlink.Messages.
 func unpackMessages(msgs []netlink.Message) ([]Message, error) {
-	lmsgs := make([]Message, 0, len(msgs))
+	lmsgs := make([]Message, len(msgs))
 
-	for _, nm := range msgs {
+	for i, nm := range msgs {
 		var m Message
 		switch nm.Header.Type {
 		case unix.RTM_GETLINK, unix.RTM_NEWLINK, unix.RTM_DELLINK:
@@ -190,7 +192,7 @@ func unpackMessages(msgs []netlink.Message) ([]Message, error) {
 		if err := (m).UnmarshalBinary(nm.Data); err != nil {
 			return nil, err
 		}
-		lmsgs = append(lmsgs, m)
+		lmsgs[i] = m
 	}
 
 	return lmsgs, nil

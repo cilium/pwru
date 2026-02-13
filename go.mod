@@ -8,15 +8,15 @@ require (
 	github.com/cilium/ebpf v0.20.0
 	github.com/cilium/lumberjack/v2 v2.4.1
 	github.com/cloudflare/cbpfc v0.0.0-20250612131231-1b95965eadb6
-	github.com/jsimonetti/rtnetlink/v2 v2.1.0
+	github.com/jsimonetti/rtnetlink/v2 v2.2.0
 	github.com/leonhwangprojects/bice v0.1.3
 	github.com/spf13/pflag v1.0.10
 	github.com/tklauser/ps v0.0.3
 	github.com/vishvananda/netns v0.0.5
-	golang.org/x/arch v0.23.0
-	golang.org/x/net v0.49.0
+	golang.org/x/arch v0.24.0
+	golang.org/x/net v0.50.0
 	golang.org/x/sync v0.19.0
-	golang.org/x/sys v0.40.0
+	golang.org/x/sys v0.41.0
 )
 
 require (

@@ -126,8 +126,10 @@ func (l *LinkService) execute(m Message, family uint16, flags netlink.HeaderFlag
 	msgs, err := l.c.Execute(m, family, flags)
 
 	links := make([]LinkMessage, len(msgs))
-	for i := range msgs {
-		links[i] = *msgs[i].(*LinkMessage)
+	for i, msg := range msgs {
+		if link, ok := msg.(*LinkMessage); ok {
+			links[i] = *link
+		}
 	}
 
 	return links, err
@@ -279,6 +281,19 @@ func (l *LinkService) List() ([]LinkMessage, error) {
 	return l.list("")
 }
 
+// ListWithVFInfo retrieves all interfaces including SR-IOV VF information.
+// This sets the RTEXT_FILTER_VF extended filter mask to request VF details.
+func (l *LinkService) ListWithVFInfo() ([]LinkMessage, error) {
+	extMask := uint32(unix.RTEXT_FILTER_VF)
+	req := &LinkMessage{
+		Attributes: &LinkAttributes{
+			ExtMask: &extMask,
+		},
+	}
+	flags := netlink.Request | netlink.Dump
+	return l.execute(req, unix.RTM_GETLINK, flags)
+}
+
 // LinkAttributes contains all attributes for an interface.
 type LinkAttributes struct {
 	Address          net.HardwareAddr // Interface L2 address
@@ -289,12 +304,14 @@ type LinkAttributes struct {
 	CarrierChanges   *uint32          // Number of times the link has seen a change from UP to DOWN and vice versa
 	CarrierUpCount   *uint32          // Number of times the link has been up
 	CarrierDownCount *uint32          // Number of times the link has been down
+	ExtMask          *uint32          // Extended info mask for queries (RTEXT_FILTER_*)
 	Index            *uint32          // System-wide interface unique index identifier
 	Info             *LinkInfo        // Detailed Interface Information
 	LinkMode         *uint8           // Interface link mode
 	MTU              uint32           // MTU of the device
 	Name             string           // Device name
 	NetDevGroup      *uint32          // Interface network device group
+	NumVF            *uint32          // Number of Virtual Functions (SR-IOV)
 	OperationalState OperationalState // Interface operation state
 	PhysPortID       *string          // Interface unique physical port identifier within the NIC
 	PhysPortName     *string          // Interface physical port name within the NIC
@@ -305,6 +322,7 @@ type LinkAttributes struct {
 	Stats64          *LinkStats64     // Interface Statistics (64 bits version)
 	TxQueueLen       *uint32          // Interface transmit queue len in number of packets
 	Type             uint32           // Link type
+	VFInfoList       []VFInfo         // Virtual Function information list (SR-IOV)
 	XDP              *LinkXDP         // Express Data Patch Information
 	NetNS            *NetNS           // Interface network namespace
 }
@@ -418,6 +436,20 @@ func (a *LinkAttributes) decode(ad *netlink.AttributeDecoder) error {
 					a.AltNames = append(a.AltNames, nad.String())
 				}
 			}
+		case unix.IFLA_NUM_VF:
+			v := ad.Uint32()
+			a.NumVF = &v
+		case unix.IFLA_VFINFO_LIST:
+			nad, err := netlink.NewAttributeDecoder(ad.Bytes())
+			if err != nil {
+				return err
+			}
+			nad.ByteOrder = nativeEndian
+			vfs, err := decodeVFInfoList(nad)
+			if err != nil {
+				return err
+			}
+			a.VFInfoList = vfs
 		}
 	}
 
@@ -495,6 +527,10 @@ func (a *LinkAttributes) encode(ae *netlink.AttributeEncoder) error {
 
 	if a.NetNS != nil {
 		ae.Uint32(a.NetNS.value())
+	}
+
+	if a.ExtMask != nil {
+		ae.Uint32(unix.IFLA_EXT_MASK, *a.ExtMask)
 	}
 
 	return nil
@@ -656,6 +692,209 @@ func (a *LinkStats64) unmarshalBinary(b []byte) error {
 	}
 
 	return nil
+}
+
+// VFLinkState represents the link state of a VF
+type VFLinkState uint32
+
+// Constants for VF link state
+const (
+	VFLinkStateAuto    VFLinkState = iota // link state of the uplink
+	VFLinkStateEnable                     // link always up
+	VFLinkStateDisable                    // link always down
+)
+
+// VFStats contains statistics for a Virtual Function
+type VFStats struct {
+	RxPackets uint64
+	TxPackets uint64
+	RxBytes   uint64
+	TxBytes   uint64
+	Broadcast uint64
+	Multicast uint64
+	RxDropped uint64
+	TxDropped uint64
+}
+
+func (s *VFStats) decode(ad *netlink.AttributeDecoder) error {
+	for ad.Next() {
+		switch ad.Type() {
+		case unix.IFLA_VF_STATS_RX_PACKETS:
+			s.RxPackets = ad.Uint64()
+		case unix.IFLA_VF_STATS_TX_PACKETS:
+			s.TxPackets = ad.Uint64()
+		case unix.IFLA_VF_STATS_RX_BYTES:
+			s.RxBytes = ad.Uint64()
+		case unix.IFLA_VF_STATS_TX_BYTES:
+			s.TxBytes = ad.Uint64()
+		case unix.IFLA_VF_STATS_BROADCAST:
+			s.Broadcast = ad.Uint64()
+		case unix.IFLA_VF_STATS_MULTICAST:
+			s.Multicast = ad.Uint64()
+		case unix.IFLA_VF_STATS_RX_DROPPED:
+			s.RxDropped = ad.Uint64()
+		case unix.IFLA_VF_STATS_TX_DROPPED:
+			s.TxDropped = ad.Uint64()
+		}
+	}
+	return nil
+}
+
+// VFInfo contains information about a Virtual Function
+type VFInfo struct {
+	ID         uint32           // VF index
+	MAC        net.HardwareAddr // VF MAC address
+	Broadcast  net.HardwareAddr // VF broadcast address
+	Vlan       uint32           // VLAN ID
+	Qos        uint32           // VLAN QoS
+	TxRate     uint32           // Max TX bandwidth (deprecated, use MaxTxRate)
+	MinTxRate  uint32           // Min TX bandwidth in Mbps
+	MaxTxRate  uint32           // Max TX bandwidth in Mbps
+	SpoofCheck bool             // Spoof checking enabled
+	LinkState  VFLinkState      // Link state
+	RssQuery   bool             // RSS query enabled
+	Trust      bool             // VF trust setting
+	Stats      *VFStats         // VF statistics
+}
+
+func (vf *VFInfo) decode(ad *netlink.AttributeDecoder) error {
+	var firstVFID *uint32
+
+	for ad.Next() {
+		switch ad.Type() {
+		case unix.IFLA_VF_MAC:
+			b := ad.Bytes()
+			if len(b) < 36 { // struct ifla_vf_mac: 4 bytes vf + 32 bytes mac
+				return errInvalidLinkMessageAttr
+			}
+			vfID := nativeEndian.Uint32(b[0:4])
+			if firstVFID == nil {
+				firstVFID = &vfID
+				vf.ID = vfID
+			} else if *firstVFID != vfID {
+				return fmt.Errorf("inconsistent VF ID: expected %d, got %d", *firstVFID, vfID)
+			}
+			// MAC is typically 6 bytes, but kernel struct has 32 bytes
+			vf.MAC = make(net.HardwareAddr, 6)
+			copy(vf.MAC, b[4:10])
+		case unix.IFLA_VF_BROADCAST:
+			b := ad.Bytes()
+			if len(b) < 32 { // struct ifla_vf_broadcast: 32 bytes
+				return errInvalidLinkMessageAttr
+			}
+			vf.Broadcast = make(net.HardwareAddr, 6)
+			copy(vf.Broadcast, b[0:6])
+		case unix.IFLA_VF_VLAN:
+			b := ad.Bytes()
+			if len(b) < 12 { // struct ifla_vf_vlan: 4 bytes vf + 4 bytes vlan + 4 bytes qos
+				return errInvalidLinkMessageAttr
+			}
+			vfID := nativeEndian.Uint32(b[0:4])
+			if firstVFID == nil {
+				firstVFID = &vfID
+				vf.ID = vfID
+			} else if *firstVFID != vfID {
+				return fmt.Errorf("inconsistent VF ID: expected %d, got %d", *firstVFID, vfID)
+			}
+			vf.Vlan = nativeEndian.Uint32(b[4:8])
+			vf.Qos = nativeEndian.Uint32(b[8:12])
+		case unix.IFLA_VF_TX_RATE:
+			b := ad.Bytes()
+			if len(b) < 8 { // struct ifla_vf_tx_rate: 4 bytes vf + 4 bytes rate
+				return errInvalidLinkMessageAttr
+			}
+			vfID := nativeEndian.Uint32(b[0:4])
+			if firstVFID == nil {
+				firstVFID = &vfID
+				vf.ID = vfID
+			} else if *firstVFID != vfID {
+				return fmt.Errorf("inconsistent VF ID: expected %d, got %d", *firstVFID, vfID)
+			}
+			vf.TxRate = nativeEndian.Uint32(b[4:8])
+		case unix.IFLA_VF_RATE:
+			b := ad.Bytes()
+			if len(b) < 12 { // struct ifla_vf_rate: 4 bytes vf + 4 bytes min + 4 bytes max
+				return errInvalidLinkMessageAttr
+			}
+			vfID := nativeEndian.Uint32(b[0:4])
+			if firstVFID == nil {
+				firstVFID = &vfID
+				vf.ID = vfID
+			} else if *firstVFID != vfID {
+				return fmt.Errorf("inconsistent VF ID: expected %d, got %d", *firstVFID, vfID)
+			}
+			vf.MinTxRate = nativeEndian.Uint32(b[4:8])
+			vf.MaxTxRate = nativeEndian.Uint32(b[8:12])
+		case unix.IFLA_VF_SPOOFCHK:
+			b := ad.Bytes()
+			if len(b) < 8 { // struct ifla_vf_spoofchk: 4 bytes vf + 4 bytes setting
+				return errInvalidLinkMessageAttr
+			}
+			vfID := nativeEndian.Uint32(b[0:4])
+			if firstVFID == nil {
+				firstVFID = &vfID
+				vf.ID = vfID
+			} else if *firstVFID != vfID {
+				return fmt.Errorf("inconsistent VF ID: expected %d, got %d", *firstVFID, vfID)
+			}
+			vf.SpoofCheck = nativeEndian.Uint32(b[4:8]) != 0
+		case unix.IFLA_VF_LINK_STATE:
+			b := ad.Bytes()
+			if len(b) < 8 { // struct ifla_vf_link_state: 4 bytes vf + 4 bytes link_state
+				return errInvalidLinkMessageAttr
+			}
+			vfID := nativeEndian.Uint32(b[0:4])
+			if firstVFID == nil {
+				firstVFID = &vfID
+				vf.ID = vfID
+			} else if *firstVFID != vfID {
+				return fmt.Errorf("inconsistent VF ID: expected %d, got %d", *firstVFID, vfID)
+			}
+			vf.LinkState = VFLinkState(nativeEndian.Uint32(b[4:8]))
+		case unix.IFLA_VF_RSS_QUERY_EN:
+			b := ad.Bytes()
+			if len(b) < 8 { // struct ifla_vf_rss_query_en: 4 bytes vf + 4 bytes setting
+				return errInvalidLinkMessageAttr
+			}
+			vfID := nativeEndian.Uint32(b[0:4])
+			if firstVFID == nil {
+				firstVFID = &vfID
+				vf.ID = vfID
+			} else if *firstVFID != vfID {
+				return fmt.Errorf("inconsistent VF ID: expected %d, got %d", *firstVFID, vfID)
+			}
+			vf.RssQuery = nativeEndian.Uint32(b[4:8]) != 0
+		case unix.IFLA_VF_TRUST:
+			b := ad.Bytes()
+			if len(b) < 8 { // struct ifla_vf_trust: 4 bytes vf + 4 bytes setting
+				return errInvalidLinkMessageAttr
+			}
+			vfID := nativeEndian.Uint32(b[0:4])
+			if firstVFID == nil {
+				firstVFID = &vfID
+				vf.ID = vfID
+			} else if *firstVFID != vfID {
+				return fmt.Errorf("inconsistent VF ID: expected %d, got %d", *firstVFID, vfID)
+			}
+			vf.Trust = nativeEndian.Uint32(b[4:8]) != 0
+		case unix.IFLA_VF_STATS:
+			vf.Stats = &VFStats{}
+			ad.Nested(vf.Stats.decode)
+		}
+	}
+	return nil
+}
+
+func decodeVFInfoList(ad *netlink.AttributeDecoder) ([]VFInfo, error) {
+	var vfs []VFInfo
+	for ad.Next() {
+		if ad.Type() == unix.IFLA_VF_INFO {
+			vf := VFInfo{}
+			ad.Nested(vf.decode)
+			vfs = append(vfs, vf)
+		}
+	}
+	return vfs, ad.Err()
 }
 
 var (

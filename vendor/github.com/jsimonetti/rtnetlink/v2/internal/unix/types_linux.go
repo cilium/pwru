@@ -282,6 +282,31 @@ const (
 	IFLA_XDP_FLAGS                             = linux.IFLA_XDP_FLAGS
 	IFLA_XDP_PROG_ID                           = linux.IFLA_XDP_PROG_ID
 	IFLA_XDP_EXPECTED_FD                       = linux.IFLA_XDP_EXPECTED_FD
+	IFLA_NUM_VF                                = linux.IFLA_NUM_VF
+	IFLA_VFINFO_LIST                           = linux.IFLA_VFINFO_LIST
+	IFLA_VF_INFO                               = linux.IFLA_VF_INFO
+	IFLA_VF_MAC                                = linux.IFLA_VF_MAC
+	IFLA_VF_VLAN                               = linux.IFLA_VF_VLAN
+	IFLA_VF_VLAN_LIST                          = linux.IFLA_VF_VLAN_LIST
+	IFLA_VF_TX_RATE                            = linux.IFLA_VF_TX_RATE
+	IFLA_VF_SPOOFCHK                           = linux.IFLA_VF_SPOOFCHK
+	IFLA_VF_LINK_STATE                         = linux.IFLA_VF_LINK_STATE
+	IFLA_VF_RATE                               = linux.IFLA_VF_RATE
+	IFLA_VF_RSS_QUERY_EN                       = linux.IFLA_VF_RSS_QUERY_EN
+	IFLA_VF_STATS                              = linux.IFLA_VF_STATS
+	IFLA_VF_TRUST                              = linux.IFLA_VF_TRUST
+	IFLA_VF_IB_NODE_GUID                       = linux.IFLA_VF_IB_NODE_GUID
+	IFLA_VF_IB_PORT_GUID                       = linux.IFLA_VF_IB_PORT_GUID
+	IFLA_VF_BROADCAST                          = linux.IFLA_VF_BROADCAST
+	IFLA_VF_STATS_RX_PACKETS                   = linux.IFLA_VF_STATS_RX_PACKETS
+	IFLA_VF_STATS_TX_PACKETS                   = linux.IFLA_VF_STATS_TX_PACKETS
+	IFLA_VF_STATS_RX_BYTES                     = linux.IFLA_VF_STATS_RX_BYTES
+	IFLA_VF_STATS_TX_BYTES                     = linux.IFLA_VF_STATS_TX_BYTES
+	IFLA_VF_STATS_BROADCAST                    = linux.IFLA_VF_STATS_BROADCAST
+	IFLA_VF_STATS_MULTICAST                    = linux.IFLA_VF_STATS_MULTICAST
+	IFLA_VF_STATS_RX_DROPPED                   = linux.IFLA_VF_STATS_RX_DROPPED
+	IFLA_VF_STATS_TX_DROPPED                   = linux.IFLA_VF_STATS_TX_DROPPED
+	IFLA_EXT_MASK                              = linux.IFLA_EXT_MASK
 	XDP_FLAGS_DRV_MODE                         = linux.XDP_FLAGS_DRV_MODE
 	XDP_FLAGS_SKB_MODE                         = linux.XDP_FLAGS_SKB_MODE
 	XDP_FLAGS_HW_MODE                          = linux.XDP_FLAGS_HW_MODE
@@ -363,6 +388,11 @@ const (
 	O_CLOEXEC                                  = linux.O_CLOEXEC
 	NUD_NONE                                   = linux.NUD_NONE
 	NUD_NOARP                                  = linux.NUD_NOARP
+)
+
+const (
+	RTEXT_FILTER_VF         = 1 << iota
+	RTEXT_FILTER_SKIP_STATS = 0x8
 )
 
 var Gettid = linux.Gettid
