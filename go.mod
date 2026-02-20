@@ -1,13 +1,13 @@
 module github.com/cilium/pwru
 
-go 1.24.1
+go 1.25.0
 
 require (
 	github.com/Asphaltt/mybtf v0.0.0-20250708022622-be6f548674b2
 	github.com/cheggaaa/pb/v3 v3.1.7
 	github.com/cilium/ebpf v0.20.0
-	github.com/cilium/lumberjack/v2 v2.4.1
-	github.com/cloudflare/cbpfc v0.0.0-20250612131231-1b95965eadb6
+	github.com/cilium/lumberjack/v2 v2.4.2
+	github.com/cloudflare/cbpfc v0.0.0-20260219140841-0661ad29132c
 	github.com/jsimonetti/rtnetlink/v2 v2.2.0
 	github.com/leonhwangprojects/bice v0.1.3
 	github.com/spf13/pflag v1.0.10

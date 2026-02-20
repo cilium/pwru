@@ -29,11 +29,11 @@ github.com/cilium/ebpf/internal/tracefs
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
 github.com/cilium/ebpf/rlimit
-# github.com/cilium/lumberjack/v2 v2.4.1
+# github.com/cilium/lumberjack/v2 v2.4.2
 ## explicit; go 1.13
 github.com/cilium/lumberjack/v2
-# github.com/cloudflare/cbpfc v0.0.0-20250612131231-1b95965eadb6
-## explicit; go 1.23.0
+# github.com/cloudflare/cbpfc v0.0.0-20260219140841-0661ad29132c
+## explicit; go 1.25.0
 github.com/cloudflare/cbpfc
 # github.com/fatih/color v1.18.0
 ## explicit; go 1.17
