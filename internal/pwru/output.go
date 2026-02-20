@@ -32,7 +32,7 @@ import (
 	"github.com/cilium/pwru/internal/byteorder"
 )
 
-const absoluteTS string = "15:04:05.000"
+const absoluteTS string = "2006-01-02T15:04:05.000"
 
 type WriteSyncer interface {
 	io.Writer
@@ -167,7 +167,7 @@ func (o *output) Close() error {
 
 func (o *output) PrintHeader() {
 	if o.flags.OutputTS == "absolute" {
-		fmt.Fprintf(o.writer, "%-12s ", "TIME")
+		fmt.Fprintf(o.writer, "%-23s ", "TIME")
 	}
 	fmt.Fprintf(o.writer, "%-18s %-3s %-16s", "SKB", "CPU", "PROCESS")
 	if o.flags.OutputTS != "none" {
@@ -459,7 +459,7 @@ func (o *output) Print(event *Event) {
 	sb.Grow(256)
 
 	if o.flags.OutputTS == "absolute" {
-		sb.WriteString(fmt.Sprintf("%-12s ", getAbsoluteTs()))
+		sb.WriteString(fmt.Sprintf("%-23s ", getAbsoluteTs()))
 	}
 
 	execName := o.getExecName(int(event.PID))
