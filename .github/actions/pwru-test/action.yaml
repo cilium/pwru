@@ -61,7 +61,7 @@ runs:
 
     - name: Upload artifacts
       if: ${{ !success() }}
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: logs-${{ inputs.test-name }}
         path: ./logs/${{ inputs.test-name }}/pwru-*
