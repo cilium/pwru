@@ -169,6 +169,7 @@ See [docs/vagrant.md](docs/vagrant.md)
 * LLVM/clang >= 12
 * Bison
 * Lex/Flex >= 2.5.31
+* libpcap(-dev)
 
 ### Building
 
