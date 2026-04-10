@@ -90,6 +90,10 @@ func (t *tracing) traceProg(spec *ebpf.CollectionSpec,
 	}
 	defer coll.Close()
 
+	for _, prog := range coll.Programs {
+		prog.VerifierLog = ""
+	}
+
 	tracing, err := link.AttachTracing(link.TracingOptions{
 		Program: coll.Programs[tracingName],
 	})

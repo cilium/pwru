@@ -287,6 +287,10 @@ func run(flags pwru.Flags) error {
 	}
 	defer coll.Close()
 
+	for _, prog := range coll.Programs {
+		prog.VerifierLog = ""
+	}
+
 	traceTc := false
 	if flags.FilterTraceTc {
 		t, err := pwru.TraceTC(coll, bpfSpecFentryTc, &opts)
@@ -339,6 +343,8 @@ func run(flags pwru.Flags) error {
 		}
 		defer k.DetachKprobes()
 	}
+
+	btf.FlushKernelSpec()
 
 	slog.Info("Listening for events..")
 
