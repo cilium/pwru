@@ -39,8 +39,9 @@ release:
 		--rm \
 		--workdir /pwru \
 		--volume `pwd`:/pwru docker.io/library/golang:$(GO_IMAGE_VERSION)@$(GO_IMAGE_SHA) \
-		sh -c "apt update && apt install -y make git clang-19 llvm curl gcc flex bison gcc-aarch64* libc6-dev-arm64-cross gcc-riscv64* libc6-dev-riscv64-cross && \
-			ln -s /usr/bin/clang-19 /usr/bin/clang && \
+		sh -c "apt update && apt install -y make git wget lsb-release gnupg curl gcc flex bison gcc-aarch64* libc6-dev-arm64-cross gcc-riscv64* libc6-dev-riscv64-cross && \
+			wget https://apt.llvm.org/llvm.sh && chmod +x llvm.sh && ./llvm.sh 20 && rm llvm.sh && \
+			ln -sf /usr/bin/clang-20 /usr/bin/clang && \
 			git config --global --add safe.directory /pwru && \
 			make local-release"
 
