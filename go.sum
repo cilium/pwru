@@ -45,8 +45,8 @@ github.com/rogpeppe/go-internal v1.12.0 h1:exVL4IDcn6na9z1rAb56Vxr+CgyK3nn3O+epU
 github.com/rogpeppe/go-internal v1.12.0/go.mod h1:E+RYuTGaKKdloAfM02xzb0FW3Paa99yedzYV+kq4uf4=
 github.com/spf13/pflag v1.0.10 h1:4EBh2KAYBwaONj6b2Ye1GiHfwjqyROoF4RwYO+vPwFk=
 github.com/spf13/pflag v1.0.10/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=
-github.com/tklauser/ps v0.0.3 h1:mn9T6eaAb0VoWkjFGMhs1LDLiIxIArvDepEQo0CU+zU=
-github.com/tklauser/ps v0.0.3/go.mod h1:Dbtzb3oSPyYLGMPrz2a5mW+CfzEP6aYugfyfvtw5zdU=
+github.com/tklauser/ps v0.0.4 h1:RPqSIVp5DaxTSsrLR73F3ueyPvakoMuAAXJBhcfcRAE=
+github.com/tklauser/ps v0.0.4/go.mod h1:gVernADnTiWoAD61pzuD8KqFDGFSZdi0U8CaUBeATMM=
 github.com/vishvananda/netns v0.0.5 h1:DfiHV+j8bA32MFM7bfEunvT8IAqQ/NzSJHtcmW5zdEY=
 github.com/vishvananda/netns v0.0.5/go.mod h1:SpkAiCQRtJ6TvvxPnOSyH3BMl6unz3xZlaprSwhNNJM=
 golang.org/x/arch v0.27.0 h1:0WNVcR8u9yFz8j5FvdHpgwNp3FS5U4guYdzHwEiGjoU=

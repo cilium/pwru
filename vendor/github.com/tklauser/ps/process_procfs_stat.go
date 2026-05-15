@@ -34,12 +34,17 @@ func newUnixProcess(pid int) (Process, error) {
 		return nil, err
 	}
 
-	// see proc(5) section on /proc/[pid]/stat for the description of the
-	// format
+	// see proc_pid_stat(5) for the description of the format
 	commStart := bytes.IndexByte(b, '(')
-	commEnd := bytes.LastIndexByte(b[commStart:], ')') + commStart
+	if commStart < 0 {
+		return nil, fmt.Errorf("invalid process status format in %s", procStat)
+	}
+	commEnd := bytes.LastIndexByte(b, ')')
+	if commEnd <= commStart {
+		return nil, fmt.Errorf("invalid process status format in %s", procStat)
+	}
 	comm := string(b[commStart+1 : commEnd])
-	fields := bytes.Fields(b[commEnd+2:]) // +2 for '( '
+	fields := bytes.Fields(b[commEnd+2:]) // +2 to skip ') '
 	if len(fields) < 2 {
 		return nil, fmt.Errorf("invalid process status format in %s", procStat)
 	}

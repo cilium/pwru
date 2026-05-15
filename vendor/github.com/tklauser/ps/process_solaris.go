@@ -98,7 +98,7 @@ func newUnixProcess(pid int) (Process, error) {
 	defer f.Close()
 
 	var psi psinfo
-	err = binary.Read(f, binary.LittleEndian, &psi)
+	err = binary.Read(f, binary.NativeEndian, &psi)
 	if err != nil {
 		return nil, err
 	}
