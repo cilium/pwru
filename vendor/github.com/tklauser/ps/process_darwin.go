@@ -60,23 +60,29 @@ func parseProcArgs(procArgs []byte, pid int) (string, []string) {
 		procArgs = procArgs[4:]
 	}
 
-	nulPos := bytes.IndexByte(procArgs, 0)
-	exe := string(procArgs[:nulPos])
+	nul := bytes.IndexByte(procArgs, 0)
+	if nul < 0 {
+		return "", nil
+	}
+	exe := string(procArgs[:nul])
 	if argc == 1 {
 		return exe, []string{exe}
 	}
 
-	nulPos++
-	for nulPos < len(procArgs) && procArgs[nulPos] == 0 {
-		nulPos++
+	nul++
+	for nul < len(procArgs) && procArgs[nul] == 0 {
+		nul++
 	}
 
-	procArgs = procArgs[nulPos:]
+	procArgs = procArgs[nul:]
 	args := make([]string, 0, argc)
 	for i := 0; i < int(argc) && len(procArgs) > 0; i++ {
-		arg := string(bytes.Trim(procArgs[:bytes.IndexByte(procArgs, 0)], "\x00"))
-		args = append(args, arg)
-		procArgs = procArgs[len(arg)+1:]
+		nul = bytes.IndexByte(procArgs, 0)
+		if nul < 0 {
+			break
+		}
+		args = append(args, string(procArgs[:nul]))
+		procArgs = procArgs[nul+1:]
 	}
 	return exe, args
 }

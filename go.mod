@@ -11,7 +11,7 @@ require (
 	github.com/jsimonetti/rtnetlink/v2 v2.2.0
 	github.com/leonhwangprojects/bice v0.1.3
 	github.com/spf13/pflag v1.0.10
-	github.com/tklauser/ps v0.0.3
+	github.com/tklauser/ps v0.0.4
 	github.com/vishvananda/netns v0.0.5
 	golang.org/x/arch v0.27.0
 	golang.org/x/net v0.54.0
