@@ -12,6 +12,8 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -286,6 +288,7 @@ func run(flags pwru.Flags) error {
 		return fmt.Errorf("Failed to load objects: %w", err)
 	}
 	defer coll.Close()
+	defer reportRecursionMisses(coll)
 
 	for _, prog := range coll.Programs {
 		prog.VerifierLog = ""
@@ -414,4 +417,44 @@ func run(flags pwru.Flags) error {
 		}
 	}
 	return nil
+}
+
+func reportRecursionMisses(coll *ebpf.Collection) {
+	type missed struct {
+		name  string
+		count uint64
+	}
+
+	var misses []missed
+	for name, prog := range coll.Programs {
+		stats, err := prog.Stats()
+		if err != nil {
+			slog.Debug("Failed to read program stats", "prog", name, "error", err)
+			continue
+		}
+		if stats.RecursionMisses > 0 {
+			misses = append(misses, missed{name: name, count: stats.RecursionMisses})
+		}
+	}
+
+	if len(misses) == 0 {
+		return
+	}
+
+	sort.Slice(misses, func(i, j int) bool {
+		return misses[i].name < misses[j].name
+	})
+
+	var total uint64
+	var b strings.Builder
+	for i, m := range misses {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		fmt.Fprintf(&b, "%s=%d", m.name, m.count)
+		total += m.count
+	}
+
+	slog.Warn("Some events went untraced due to BPF recursion misses",
+		"total", total, "per_program", b.String())
 }
