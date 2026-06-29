@@ -347,8 +347,6 @@ func run(flags pwru.Flags) error {
 		defer k.DetachKprobes()
 	}
 
-	btf.FlushKernelSpec()
-
 	slog.Info("Listening for events..")
 
 	if flags.ReadyFile != "" {
