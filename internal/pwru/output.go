@@ -243,7 +243,7 @@ func (o *output) PrintJson(event *Event) error {
 		d.Tuple = t
 	}
 
-	if o.flags.OutputTuple {
+	if o.flags.OutputTunnel {
 		t := &jsonTuple{}
 		t.Saddr = addrToStr(event.TunnelTuple.L3Proto, event.TunnelTuple.Saddr)
 		t.Daddr = addrToStr(event.TunnelTuple.L3Proto, event.TunnelTuple.Daddr)
