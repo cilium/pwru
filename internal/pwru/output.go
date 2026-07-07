@@ -239,7 +239,9 @@ func (o *output) PrintJson(event *Event) error {
 		t.Sport = byteorder.NetworkToHost16(event.Tuple.Sport)
 		t.Dport = byteorder.NetworkToHost16(event.Tuple.Dport)
 		t.Proto = event.Tuple.L4Proto
-		t.Flags = event.Tuple.TCPFlag.String()
+		if o.flags.OutputTCPFlags {
+			t.Flags = event.Tuple.TCPFlag.String()
+		}
 		d.Tuple = t
 	}
 
@@ -250,6 +252,9 @@ func (o *output) PrintJson(event *Event) error {
 		t.Sport = byteorder.NetworkToHost16(event.TunnelTuple.Sport)
 		t.Dport = byteorder.NetworkToHost16(event.TunnelTuple.Dport)
 		t.Proto = event.TunnelTuple.L4Proto
+		if o.flags.OutputTCPFlags {
+			t.Flags = event.TunnelTuple.TCPFlag.String()
+		}
 		d.TunnelTuple = t
 	}
 

@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"regexp"
-	"syscall"
 	"testing"
 	"time"
 )
@@ -27,68 +26,79 @@ func TestGetAbsoluteTs(t *testing.T) {
 	}
 }
 
-func TestPrintJSONTunnelTupleOn(t *testing.T) {
-	outBuf := &bytes.Buffer{}
-	out := newBenchmarkOutput(outBuf)
-	out.flags.OutputTuple = false
-	out.flags.OutputTunnel = true
+func TestPrintJSONTupleFields(t *testing.T) {
+	const (
+		tcpFlagSYN tcpFlag = 1 << 1
+		tcpFlagACK tcpFlag = 1 << 4
+		wantFlags          = "SYN|ACK"
+	)
 
-	event := newBenchmarkEvent()
-	event.TunnelTuple = Tuple{
-		Saddr:   [16]byte{10, 0, 0, 1},
-		Daddr:   [16]byte{10, 0, 0, 2},
-		Sport:   4789,
-		Dport:   8472,
-		L3Proto: syscall.ETH_P_IP,
-		L4Proto: syscall.IPPROTO_UDP,
+	tests := []struct {
+		name           string
+		outputTunnel   bool
+		outputTCPFlags bool
+	}{
+		{
+			name:           "tuple flags off",
+			outputTCPFlags: false,
+		},
+		{
+			name:           "tuple flags on",
+			outputTCPFlags: true,
+		},
+		{
+			name:           "tunnel tuple flags off",
+			outputTunnel:   true,
+			outputTCPFlags: false,
+		},
+		{
+			name:           "tunnel tuple flags on",
+			outputTunnel:   true,
+			outputTCPFlags: true,
+		},
 	}
 
-	if err := out.PrintJson(event); err != nil {
-		t.Fatalf("PrintJson() error = %v", err)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			outBuf := &bytes.Buffer{}
+			out := newBenchmarkOutput(outBuf)
+			out.flags.OutputTuple = !tt.outputTunnel
+			out.flags.OutputTunnel = tt.outputTunnel
+			out.flags.OutputTCPFlags = tt.outputTCPFlags
 
-	var got map[string]any
-	if err := json.Unmarshal(outBuf.Bytes(), &got); err != nil {
-		t.Fatalf("failed to unmarshal json output: %v", err)
-	}
+			event := newBenchmarkEvent()
+			event.Tuple.TCPFlag = tcpFlagSYN | tcpFlagACK
+			event.TunnelTuple = event.Tuple
 
-	if _, ok := got["tuple"]; ok {
-		t.Fatalf("unexpected tuple field in json output: %s", outBuf.String())
-	}
-	if _, ok := got["tunnel_tuple"]; !ok {
-		t.Fatalf("missing tunnel_tuple field in json output: %s", outBuf.String())
-	}
-}
+			if err := out.PrintJson(event); err != nil {
+				t.Fatalf("PrintJson() error = %v", err)
+			}
 
-func TestPrintJSONTunnelTupleOff(t *testing.T) {
-	outBuf := &bytes.Buffer{}
-	out := newBenchmarkOutput(outBuf)
-	out.flags.OutputTuple = true
-	out.flags.OutputTunnel = false
+			var got map[string]any
+			if err := json.Unmarshal(outBuf.Bytes(), &got); err != nil {
+				t.Fatalf("failed to unmarshal json output: %v", err)
+			}
 
-	event := newBenchmarkEvent()
-	event.TunnelTuple = Tuple{
-		Saddr:   [16]byte{10, 0, 0, 1},
-		Daddr:   [16]byte{10, 0, 0, 2},
-		Sport:   4789,
-		Dport:   8472,
-		L3Proto: syscall.ETH_P_IP,
-		L4Proto: syscall.IPPROTO_UDP,
-	}
+			tupleField, absentField := "tuple", "tunnel_tuple"
+			if tt.outputTunnel {
+				tupleField, absentField = absentField, tupleField
+			}
 
-	if err := out.PrintJson(event); err != nil {
-		t.Fatalf("PrintJson() error = %v", err)
-	}
+			tuple, ok := got[tupleField].(map[string]any)
+			if !ok {
+				t.Fatalf("missing %s field in json output: %s", tupleField, outBuf.String())
+			}
+			if _, ok := got[absentField]; ok {
+				t.Fatalf("unexpected %s field in json output: %s", absentField, outBuf.String())
+			}
 
-	var got map[string]any
-	if err := json.Unmarshal(outBuf.Bytes(), &got); err != nil {
-		t.Fatalf("failed to unmarshal json output: %v", err)
-	}
-
-	if _, ok := got["tuple"]; !ok {
-		t.Fatalf("missing tuple field in json output: %s", outBuf.String())
-	}
-	if _, ok := got["tunnel_tuple"]; ok {
-		t.Fatalf("unexpected tunnel_tuple field in json output: %s", outBuf.String())
+			flags, flagsPresent := tuple["flags"]
+			if flagsPresent != tt.outputTCPFlags {
+				t.Fatalf("%s.flags presence = %v, want %v: %s", tupleField, flagsPresent, tt.outputTCPFlags, outBuf.String())
+			}
+			if tt.outputTCPFlags && flags != wantFlags {
+				t.Fatalf("%s.flags = %v, want %s: %s", tupleField, flags, wantFlags, outBuf.String())
+			}
+		})
 	}
 }
