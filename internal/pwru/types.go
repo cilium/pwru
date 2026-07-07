@@ -63,6 +63,8 @@ type Flags struct {
 	OutputJson           bool
 	OutputTCPFlags       bool
 	OutputTunnel         bool
+	OutputNetNSNames     bool
+	NetNSNamesMaxLength  uint8
 
 	OutputSkbMetadata []string
 	OutputXdpMetadata []string
@@ -102,6 +104,8 @@ func (f *Flags) SetFlags() {
 	flag.StringVar(&f.FilterXdpExpr, "filter-xdp-expr", "", "filter xdp with simple C expression, like 'xdp->rxq->dev->ifindex == 9'")
 	flag.StringVar(&f.OutputTS, "timestamp", "none", "print timestamp per skb (\"current\", \"relative\", \"absolute\", \"none\")")
 	flag.BoolVar(&f.OutputMeta, "output-meta", true, "print skb metadata")
+	flag.BoolVar(&f.OutputNetNSNames, "output-netns-names", false, "print netns names where possible")
+	flag.Uint8Var(&f.NetNSNamesMaxLength, "netns-names-max-length", 16, "maximum number of chars to print per netns name (when not outputting JSON) (min 10)")
 	flag.BoolVar(&f.OutputTuple, "output-tuple", true, "print L4 tuple")
 	flag.BoolVar(&f.OutputSkb, "output-skb", false, "print skb")
 	flag.BoolVar(&f.OutputShinfo, "output-skb-shared-info", false, "print skb shared info")
@@ -149,6 +153,9 @@ func (f *Flags) Parse() {
 	f.FilterPcap = strings.Join(flag.Args(), " ")
 	if len(f.FilterNonSkbFuncs) > 0 || f.FilterTrackBpfHelpers {
 		f.FilterTrackSkbByStackid = true
+	}
+	if f.NetNSNamesMaxLength < 10 {
+		f.NetNSNamesMaxLength = 10
 	}
 }
 

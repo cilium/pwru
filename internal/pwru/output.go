@@ -47,21 +47,22 @@ const (
 )
 
 type output struct {
-	flags          *Flags
-	lastSeenSkb    map[uint64]uint64 // skb addr => last seen TS
-	printSkbMap    *ebpf.Map
-	printShinfoMap *ebpf.Map
-	printStackMap  *ebpf.Map
-	printBpfmapMap *ebpf.Map
-	addr2name      Addr2Name
-	skbMetadata    []*SkbMetadata
-	xdpMetadata    []*SkbMetadata
-	writer         io.Writer
-	closer         io.Closer
-	kprobeMulti    bool
-	kfreeReasons   map[uint64]string
-	ifaceCache     map[uint64]map[uint32]string
-	procCache      map[int]string
+	flags           *Flags
+	lastSeenSkb     map[uint64]uint64 // skb addr => last seen TS
+	printSkbMap     *ebpf.Map
+	printShinfoMap  *ebpf.Map
+	printStackMap   *ebpf.Map
+	printBpfmapMap  *ebpf.Map
+	addr2name       Addr2Name
+	skbMetadata     []*SkbMetadata
+	xdpMetadata     []*SkbMetadata
+	writer          io.Writer
+	closer          io.Closer
+	kprobeMulti     bool
+	kfreeReasons    map[uint64]string
+	ifaceCache      map[uint64]map[uint32]string
+	netNSNamesCache map[uint64]string
+	procCache       map[int]string
 }
 
 // outputStructured is a struct to hold the data for the json output
@@ -74,6 +75,7 @@ type jsonPrinter struct {
 	CallerFunc  string     `json:"caller_func,omitempty"`
 	Time        any        `json:"time,omitempty"`
 	Netns       uint32     `json:"netns,omitempty"`
+	NetnsName   string     `json:"netns_name,omitempty"`
 	Mark        uint32     `json:"mark,omitempty"`
 	Iface       string     `json:"iface,omitempty"`
 	Proto       uint16     `json:"proto,omitempty"`
@@ -93,6 +95,13 @@ type jsonTuple struct {
 	Dport uint16 `json:"dport,omitempty"`
 	Proto uint8  `json:"proto,omitempty"`
 	Flags string `json:"flags,omitempty"`
+}
+
+func truncateString(s string, maxLength int) string {
+	if len(s) <= maxLength {
+		return s
+	}
+	return s[:maxLength]
 }
 
 func centerAlignString(s string, width int) string {
@@ -134,22 +143,31 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap, printBp
 		}
 	}
 
+	var netNSNames map[uint64]string
+	if flags.OutputNetNSNames {
+		netNSNames, err = getNetNSNames()
+		if err != nil {
+			slog.Warn("Errors encountered while trying to read netns names. Some netns names might be not shown.", "errors", err)
+		}
+	}
+
 	return &output{
-		flags:          flags,
-		lastSeenSkb:    map[uint64]uint64{},
-		printSkbMap:    printSkbMap,
-		printShinfoMap: printShinfoMap,
-		printStackMap:  printStackMap,
-		printBpfmapMap: printBpfmapMap,
-		addr2name:      addr2Name,
-		skbMetadata:    skbMds,
-		xdpMetadata:    xdpMds,
-		writer:         writer,
-		closer:         closer,
-		kprobeMulti:    kprobeMulti,
-		kfreeReasons:   reasons,
-		ifaceCache:     ifs,
-		procCache:      map[int]string{},
+		flags:           flags,
+		lastSeenSkb:     map[uint64]uint64{},
+		printSkbMap:     printSkbMap,
+		printShinfoMap:  printShinfoMap,
+		printStackMap:   printStackMap,
+		printBpfmapMap:  printBpfmapMap,
+		addr2name:       addr2Name,
+		skbMetadata:     skbMds,
+		xdpMetadata:     xdpMds,
+		writer:          writer,
+		closer:          closer,
+		kprobeMulti:     kprobeMulti,
+		kfreeReasons:    reasons,
+		ifaceCache:      ifs,
+		netNSNamesCache: netNSNames,
+		procCache:       map[int]string{},
 	}, nil
 }
 
@@ -178,6 +196,9 @@ func (o *output) PrintHeader() {
 		if o.flags.FilterTraceTc || o.flags.OutputSkbCB {
 			fmt.Fprintf(o.writer, " %-56s", "__sk_buff->cb[]")
 		}
+	}
+	if o.flags.OutputNetNSNames {
+		fmt.Fprintf(o.writer, "%s", centerAlignString("NETNS NAME", int(o.flags.NetNSNamesMaxLength)))
 	}
 	if o.flags.OutputTuple {
 		fmt.Fprintf(o.writer, " %s", "TUPLE")
@@ -229,6 +250,12 @@ func (o *output) PrintJson(event *Event) error {
 		d.Len = event.Meta.Len
 		if o.flags.FilterTraceTc || o.flags.OutputSkbCB {
 			d.Cb = event.Meta.Cb
+		}
+	}
+
+	if o.flags.OutputNetNSNames {
+		if netNSName, found := o.netNSNamesCache[uint64(event.Meta.Netns)]; found {
+			d.NetnsName = netNSName
 		}
 	}
 
@@ -486,6 +513,13 @@ func (o *output) Print(event *Event) {
 			sb.WriteString(getCb(event))
 		}
 	}
+	if o.flags.OutputNetNSNames {
+		if netNSName, found := o.netNSNamesCache[uint64(event.Meta.Netns)]; found {
+			sb.WriteString(centerAlignString(truncateString(netNSName, int(o.flags.NetNSNamesMaxLength)), int(o.flags.NetNSNamesMaxLength)))
+		} else {
+			sb.WriteString(strings.Repeat(" ", int(o.flags.NetNSNamesMaxLength)))
+		}
+	}
 
 	if o.flags.OutputTuple {
 		tupleData := getTupleData(event, o.flags.OutputTCPFlags)
@@ -606,6 +640,41 @@ func getKFreeSKBReasons(spec *btf.Spec) (map[uint64]string, error) {
 	}
 
 	return ret, nil
+}
+
+func getNetNSNames() (map[uint64]string, error) {
+	netnsDir := "/run/netns"
+
+	entries, err := os.ReadDir(netnsDir)
+	if err != nil {
+		return map[uint64]string{}, err
+	}
+
+	lookup := map[uint64]string{}
+	errorsWhileEnriching := []error{}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		fullPath := filepath.Join(netnsDir, entry.Name())
+		info, err := os.Stat(fullPath)
+		if err != nil {
+			errorsWhileEnriching = append(errorsWhileEnriching, err)
+			continue
+		}
+		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+			lookup[uint64(stat.Ino)] = entry.Name()
+			slog.Debug("Enriched a netns name with ID", "name", entry.Name(), "id", stat.Ino)
+		} else {
+			errorsWhileEnriching = append(errorsWhileEnriching, errors.New(fmt.Sprintf("Unable to stat %s", fullPath)))
+			continue
+		}
+	}
+
+	if len(errorsWhileEnriching) > 0 {
+		return lookup, errors.Join(errorsWhileEnriching...)
+	}
+	return lookup, nil
 }
 
 func getIfaces() (map[uint64]map[uint32]string, error) {

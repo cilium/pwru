@@ -67,7 +67,7 @@ func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	if flags.OutputShinfo {
 		cfg.OutputFlags |= OutputShinfoMask
 	}
-	if flags.OutputMeta {
+	if flags.OutputMeta || flags.OutputNetNSNames {
 		cfg.OutputFlags |= OutputMetaMask
 	}
 	if flags.OutputTuple {
