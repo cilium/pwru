@@ -10,13 +10,15 @@ runs:
   steps:
     - name: Fetch PWRU logs
       shell: bash
+      env:
+        TESTNAME: ${{ inputs.testname }}
       run: |
         set -x
 
         pods=$(kubectl get pods --selector name=pwru -o go-template='{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
         for pod in $pods; do
           kubectl logs $pod
-          kubectl cp $pod:/tmp/pwru.log "$pod.${{ inputs.testname }}.log" || true
+          kubectl cp $pod:/tmp/pwru.log "$pod.$TESTNAME.log" || true
         done
 
     - name: Upload PWRU logs
