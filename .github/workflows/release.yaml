@@ -28,13 +28,11 @@ jobs:
 
       - name: Create Release
         if: github.event_name == 'push'
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          name: Release ${{ github.ref_name }}
-          draft: true
-          prerelease: false
-          generate_release_notes: true
-          files: 'release/*'
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            release/* \
+            --title "Release ${{ github.ref_name }}" \
+            --draft \
+            --generate-notes
