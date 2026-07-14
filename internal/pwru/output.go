@@ -289,13 +289,16 @@ func (o *output) PrintJson(event *Event) error {
 		d.Stack = getStackData(event, o)
 	}
 
+	var skbData, shinfoData string
 	if o.flags.OutputSkb {
-		d.SkbMetadata = getSkbData(event, o)
+		skbData = getSkbData(event, o)
 	}
 
 	if o.flags.OutputShinfo {
-		d.SkbMetadata = getShinfoData(event, o)
+		shinfoData = getShinfoData(event, o)
 	}
+
+	setJSONPacketData(d, o.flags, skbData, shinfoData)
 
 	// Create new encoder to write the json to stdout or file depending on the flags
 	encoder := json.NewEncoder(o.writer)
@@ -306,6 +309,15 @@ func (o *output) PrintJson(event *Event) error {
 		return fmt.Errorf("error encoding JSON: %s", err)
 	}
 	return nil
+}
+
+func setJSONPacketData(d *jsonPrinter, flags *Flags, skbData, shinfoData string) {
+	if flags.OutputSkb {
+		d.SkbMetadata = skbData
+	}
+	if flags.OutputShinfo {
+		d.Shinfo = shinfoData
+	}
 }
 
 func getAbsoluteTs() string {

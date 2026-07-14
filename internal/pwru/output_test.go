@@ -102,3 +102,17 @@ func TestPrintJSONTupleFields(t *testing.T) {
 		})
 	}
 }
+
+func TestSetJSONPacketData(t *testing.T) {
+	d := &jsonPrinter{}
+	flags := &Flags{OutputSkb: true, OutputShinfo: true}
+
+	setJSONPacketData(d, flags, "skb", "shared info")
+
+	if d.SkbMetadata != "skb" {
+		t.Fatalf("skb_metadata = %q, want %q", d.SkbMetadata, "skb")
+	}
+	if d.Shinfo != "shared info" {
+		t.Fatalf("skb_shared_info = %q, want %q", d.Shinfo, "shared info")
+	}
+}
