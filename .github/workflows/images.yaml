@@ -38,7 +38,11 @@ jobs:
             tag=${{ github.sha }}
           fi
           echo tag=$tag >> $GITHUB_OUTPUT
-          echo image_tags=${{ github.repository_owner }}/pwru:$tag >> $GITHUB_OUTPUT
+          image_tags=${{ github.repository_owner }}/pwru:$tag
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            image_tags="$image_tags,${{ github.repository_owner }}/pwru:latest"
+          fi
+          echo image_tags=$image_tags >> $GITHUB_OUTPUT
 
       - name: Checkout Source Code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
