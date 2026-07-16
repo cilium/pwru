@@ -227,8 +227,6 @@ func (o *output) PrintJson(event *Event) error {
 		d.CallerFunc = o.addr2name.findNearestSym(event.CallerAddr)
 	}
 
-	o.lastSeenSkb[event.SkbAddr] = event.Timestamp
-
 	// add the timestamp to the struct if it is not set to none
 	if o.flags.OutputTS != "none" {
 		switch o.flags.OutputTS {
@@ -240,6 +238,7 @@ func (o *output) PrintJson(event *Event) error {
 			d.Time = event.Timestamp
 		}
 	}
+	o.lastSeenSkb[event.SkbAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
 		d.Netns = event.Meta.Netns

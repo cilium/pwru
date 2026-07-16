@@ -116,3 +116,30 @@ func TestSetJSONPacketData(t *testing.T) {
 		t.Fatalf("skb_shared_info = %q, want %q", d.Shinfo, "shared info")
 	}
 }
+
+func TestPrintJSONRelativeTimestamp(t *testing.T) {
+	var buf bytes.Buffer
+	out := newBenchmarkOutput(&buf)
+	out.flags.OutputTS = "relative"
+
+	first := newBenchmarkEvent()
+	first.Timestamp = 100
+	if err := out.PrintJson(first); err != nil {
+		t.Fatal(err)
+	}
+
+	second := newBenchmarkEvent()
+	second.Timestamp = 250
+	if err := out.PrintJson(second); err != nil {
+		t.Fatal(err)
+	}
+
+	lines := bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte{'\n'})
+	var got map[string]any
+	if err := json.Unmarshal(lines[1], &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["time"] != float64(150) {
+		t.Fatalf("relative time = %v, want 150", got["time"])
+	}
+}
