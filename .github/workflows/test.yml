@@ -49,6 +49,21 @@ jobs:
         name: test-app
         path: test-app/test-app-*
 
+  unit-test:
+    name: Unit Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+
+    - name: Set up Go
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+      with:
+        go-version: 1.26.5
+
+    - name: Run unit tests
+      run: |
+        make test
+
   test:
     name: Test
     needs: [build]
