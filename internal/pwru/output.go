@@ -723,9 +723,11 @@ func getIfaces() (map[uint64]map[uint32]string, error) {
 		}
 		var stat unix.Stat_t
 		if err0 := unix.Fstat(int(fd.Fd()), &stat); err0 != nil {
+			_ = fd.Close()
 			err = errors.Join(err, err0)
 			continue
 		}
+		_ = fd.Close()
 		inode := stat.Ino
 
 		if _, exists := ifaceCache[inode]; exists {
@@ -750,11 +752,13 @@ func getIfacesInNetNs(path string) (map[uint32]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer current.Close()
 
 	remote, err := netns.GetFromPath(path)
 	if err != nil {
 		return nil, err
 	}
+	defer remote.Close()
 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
