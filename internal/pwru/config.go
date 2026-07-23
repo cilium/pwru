@@ -57,7 +57,7 @@ type FilterCfg struct {
 
 func GetConfig(flags *Flags) (cfg FilterCfg, err error) {
 	cfg = FilterCfg{
-		FilterMark:     flags.FilterMark,
+		FilterMark:     flags.FilterMark & flags.FilterMarkMask,
 		FilterMarkMask: flags.FilterMarkMask,
 	}
 	cfg.FilterFlags |= IsSetMask
