@@ -272,7 +272,7 @@ filter_meta(struct sk_buff *skb) {
 	if (cfg->netns && get_netns(skb) != cfg->netns) {
 			return false;
 	}
-	if (cfg->mark && cfg->mask && (BPF_CORE_READ(skb, mark) & cfg->mask) != cfg->mark) {
+	if (cfg->mask && (BPF_CORE_READ(skb, mark) & cfg->mask) != cfg->mark) {
 		return false;
 	}
 	if (cfg->ifindex != 0 && BPF_CORE_READ(skb, dev, ifindex) != cfg->ifindex) {
