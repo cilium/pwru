@@ -106,8 +106,9 @@ func ToC(filter []bpf.Instruction, opts COpts) (string, error) {
 	}
 
 	fun := cFunction{
-		Name:   opts.FunctionName,
-		Blocks: make([]cBlock, len(blocks)),
+		Name:     opts.FunctionName,
+		NoInline: opts.NoInline,
+		Blocks:   make([]cBlock, len(blocks)),
 	}
 
 	// Compile blocks to C

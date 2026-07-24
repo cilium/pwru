@@ -7,7 +7,7 @@ require (
 	github.com/cheggaaa/pb/v3 v3.2.0
 	github.com/cilium/ebpf v0.22.0
 	github.com/cilium/lumberjack/v2 v2.4.2
-	github.com/cloudflare/cbpfc v0.0.0-20260219140841-0661ad29132c
+	github.com/cloudflare/cbpfc v0.0.0-20260723100431-d17020eb3591
 	github.com/jsimonetti/rtnetlink/v2 v2.2.0
 	github.com/leonhwangprojects/bice v0.1.3
 	github.com/spf13/pflag v1.0.10
