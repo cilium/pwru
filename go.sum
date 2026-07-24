@@ -13,8 +13,8 @@ github.com/cilium/lumberjack/v2 v2.4.2 h1:Wea2z1+ikRhjS5z36I6vgeMlgh7xzvIzqW+t9t
 github.com/cilium/lumberjack/v2 v2.4.2/go.mod h1:yfbtPGmg4i//5oEqzaMxDqSWqgfZFmMoV70Mc2k6v0A=
 github.com/clipperhouse/uax29/v2 v2.2.0 h1:ChwIKnQN3kcZteTXMgb1wztSgaU+ZemkgWdohwgs8tY=
 github.com/clipperhouse/uax29/v2 v2.2.0/go.mod h1:EFJ2TJMRUaplDxHKj1qAEhCtQPW2tJSwu5BF98AuoVM=
-github.com/cloudflare/cbpfc v0.0.0-20260219140841-0661ad29132c h1:ch4A8iTjlHB7XsWU5KxQlyallTaPW4a5JivuHfcCMik=
-github.com/cloudflare/cbpfc v0.0.0-20260219140841-0661ad29132c/go.mod h1:B1RqiHtMYwiA3ppaIGlzolLP76Z2rPvcJ8lhZbdNYc8=
+github.com/cloudflare/cbpfc v0.0.0-20260723100431-d17020eb3591 h1:nELv+ru89Z1CmHv+u4E4SEcsJ9txfBo/ep1pEGgoz2E=
+github.com/cloudflare/cbpfc v0.0.0-20260723100431-d17020eb3591/go.mod h1:Zyvr6fxv2npNK/DlCRKCveS4y5eDGP573bf2NToBQWs=
 github.com/fatih/color v1.19.0 h1:Zp3PiM21/9Ld6FzSKyL5c/BULoe/ONr9KlbYVOfG8+w=
 github.com/fatih/color v1.19.0/go.mod h1:zNk67I0ZUT1bEGsSGyCZYZNrHuTkJJB+r6Q9VuMi0LE=
 github.com/go-quicktest/qt v1.101.1-0.20240301121107-c6c8733fa1e6 h1:teYtXy9B7y5lHTp8V9KPxpYRAVA7dozigQcMiBust1s=
