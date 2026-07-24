@@ -90,7 +90,7 @@ func (f *Flags) SetFlags() {
 	flag.StringVar(&f.FilterFunc, "filter-func", "", "filter kernel functions to be probed by name (exact match, supports RE2 regular expression)")
 	flag.StringSliceVar(&f.FilterNonSkbFuncs, "filter-non-skb-funcs", nil, "filter non-skb kernel functions to be probed (--filter-track-skb-by-stackid will be enabled)")
 	flag.StringVar(&f.FilterNetns, "filter-netns", "", "filter netns (\"/proc/<pid>/ns/net\", \"inode:<inode>\")")
-	flag.Var(newMarkFlagValue(&f.FilterMark, &f.FilterMarkMask), "filter-mark", "filter skb mark (format: mark[/mask], e.g., 0xa00/0xf00)")
+	flag.Var(newMarkFlagValue(&f.FilterMark, &f.FilterMarkMask), "filter-mark", "filter skb mark (format: mark[/mask]; default: 0/0; exact match if mask is omitted, e.g., 0xa00/0xf00)")
 	flag.BoolVar(&f.FilterTrackSkb, "filter-track-skb", false, "trace a packet even if it does not match given filters (e.g., after NAT or tunnel decapsulation)")
 	flag.BoolVar(&f.FilterTrackSkbByStackid, "filter-track-skb-by-stackid", false, "trace a packet even after it is kfreed (e.g., traffic going through bridge)")
 	flag.BoolVar(&f.FilterTraceTc, "filter-trace-tc", false, "trace TC bpf progs")
@@ -237,9 +237,6 @@ func newMarkFlagValue(mark, mask *uint32) *markFlagValue {
 }
 
 func (f *markFlagValue) String() string {
-	if *f.mask == 0 {
-		return fmt.Sprintf("0x%x", *f.mark)
-	}
 	return fmt.Sprintf("0x%x/0x%x", *f.mark, *f.mask)
 }
 
