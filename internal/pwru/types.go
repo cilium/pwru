@@ -289,8 +289,8 @@ type printBpfmapValue struct {
 }
 
 func (i *printBpfmapValue) String() string {
-	key := fmt.Sprintf("%s", hex.Dump(i.Key[:i.KeySize]))
-	value := fmt.Sprintf("%s", hex.Dump(i.Value[:i.ValueSize]))
+	key := fmt.Sprintf("%s", hex.Dump(i.Key[:min(i.KeySize, uint32(len(i.Key)))]))
+	value := fmt.Sprintf("%s", hex.Dump(i.Value[:min(i.ValueSize, uint32(len(i.Value)))]))
 	return fmt.Sprintf("map_id: %d\nmap_name: %s\nkey(%d):\n%svalue(%d):\n%s",
 		i.Id, i.Name, i.KeySize, key, i.ValueSize, value)
 }
