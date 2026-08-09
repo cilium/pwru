@@ -13,12 +13,13 @@ for ARCH in ${ARCHS}; do
         CC=riscv64-linux-gnu-gcc
     else
         LIBPCAP_ARCH=x86_64-unknown-linux-gnu
-        CC=x86_64-linux-gnu-gcc
+        # Use clang for native amd64 libpcap/CGO (matches BPF compilation).
+        CC=clang
     fi
 
     make clean
     echo "Building release binary for ${OS}/${ARCH}..."
-    make pwru TARGET_GOARCH=${ARCH} LIBPCAP_ARCH=${LIBPCAP_ARCH} CC=${CC} 
+    make pwru TARGET_GOARCH=${ARCH} LIBPCAP_ARCH=${LIBPCAP_ARCH} CC=${CC} LIBPCAP_CC=${CC}
 
     test -d release/${OS}/${ARCH} || mkdir -p release/${OS}/${ARCH}
     tar -czf release/pwru-${OS}-${ARCH}.tar.gz pwru

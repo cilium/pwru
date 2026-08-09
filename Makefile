@@ -9,8 +9,9 @@ INSTALL = $(QUIET)install
 BINDIR ?= /usr/local/bin
 VERSION=$(shell git describe --tags --always)
 LIBPCAP_ARCH ?= x86_64-unknown-linux-gnu
-# For compiling libpcap and CGO
-CC ?= gcc
+# For compiling libpcap and CGO (match BPF builds which already use clang)
+CC ?= clang
+LIBPCAP_CC ?= $(CC)
 ARCHS ?= amd64 arm64 riscv64
 
 TEST_TIMEOUT ?= 5s
