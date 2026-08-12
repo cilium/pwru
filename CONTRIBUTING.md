@@ -15,6 +15,10 @@ The Cilium project has a well-defined [contributor ladder](https://github.com/ci
 
 Becoming a [Cilium organization member](https://github.com/cilium/community/blob/main/CONTRIBUTOR-LADDER.md#organization-member) grants you additional privileges across the project ecosystem, such as the ability to leave reviews on a PR or trigger CI runs. If you're contributing regularly to `pwru`, consider joining the [pwru team](https://github.com/cilium/community/blob/main/ladder/teams/pwru.yaml) to help review code and accelerate development. Your contributions play a vital role in improving the project, and we'd love to have you more involved!
 
+## AI Policy
+
+Each contribution must follow the [Cilium Generative AI Policy](https://github.com/cilium/community/blob/main/AI-POLICY.md).
+
 ## Community
 
 Join the Cilium community for discussions:
