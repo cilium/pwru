@@ -32,6 +32,10 @@ func TestMarkFlagValue(t *testing.T) {
 	if mark != 0xaf || mask != 0x0f {
 		t.Fatalf("Set() = mark %#x, mask %#x; want mark %#x, mask %#x", mark, mask, uint32(0xaf), uint32(0x0f))
 	}
+
+	if err := f.Set("1/2/3"); err == nil {
+		t.Fatal("Set() succeeded for a mark with too many components")
+	}
 }
 
 func TestPrintBpfmapValueStringTruncatesOversizedFields(t *testing.T) {
