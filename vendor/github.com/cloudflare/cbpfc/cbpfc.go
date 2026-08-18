@@ -11,6 +11,13 @@
 //   - Division by zero is guarded by runtime checks
 //
 // The generated C / eBPF is intended to be embedded into a larger C / eBPF program.
+//
+// Footguns / limitations:
+//   - The maximum absolute offset of a packet that can be read is 0xFFFF, any accesses
+//     past that will be treated as out of bounds cBPF packet accesses, and the filter will
+//     return 0. That includes offsets added directly to the packet pointer passed in.
+//   - If the packet pointer passed in has an offset (eg because you've skipped past the
+//     ethernet header), the maximum possible offset must be passed in via EBPFOpts or COpts.
 package cbpfc
 
 import (
@@ -175,7 +182,7 @@ func (p packetGuardAbsolute) Assemble() (bpf.RawInstruction, error) {
 //
 // So instead we check:
 //   - RegX + start >= 0
-//   - RegX + start < maxPacketOffset - length
+//   - RegX + start < maxPacketOffset - packetStartMaxOffset - length
 //   - packet_start + RegX + start + length < packet_end
 //
 // This lets us reuse packet_start + RegX + start as the packet pointer for LoadIndirect,
@@ -186,9 +193,12 @@ type packetGuardIndirect struct {
 	// Last byte read (exclusive).
 	// int64 to avoid overflows with INT32_MAX + size
 	end int64
+
+	// packetStartMaxOffset is the maximum offset the packet start / data is at, in bytes.
+	packetStartMaxOffset uint16
 }
 
-func newPacketGuardIndirect(off uint32, size int) packetGuardIndirect {
+func newPacketGuardIndirect(off uint32, size int, opts compileOpts) packetGuardIndirect {
 	// cBPF offsets are uint32, but are signed in reality
 	// LoadIndirect offsets are encoded as uint32 by x/net/bpf, but are signed in reality.
 	// Unlike LoadAbsolute, restrictions only apply to RegX + Offset and not Offset alone,
@@ -196,6 +206,8 @@ func newPacketGuardIndirect(off uint32, size int) packetGuardIndirect {
 	return packetGuardIndirect{
 		start: int32(off),
 		end:   int64(int32(off)) + int64(size),
+
+		packetStartMaxOffset: opts.packetStartMaxOffset,
 	}
 }
 
@@ -246,16 +258,16 @@ func (a packetGuardIndirect) restrict(o packetGuard) packetGuard {
 // This checks that it is positive, and int32(RegX) + p.end doesn't exceed maxPacketOffset.
 // Returns 0 (check will always be false) if there is no way for the start and end of the guard to be < maxPacketOffset.
 func (p packetGuardIndirect) maxStartOffset() int32 {
-	length := p.end - int64(p.start)
-	// If length exceeds maxPacketOffset, there's no way for RegX + start >= 0 and RegX + end < maxPacketOffset.
+	m := maxPacketOffset - int64(p.packetStartMaxOffset) - (p.end - int64(p.start))
+	// If m is negative, (packetStartMaxOffset + length) exceeds maxPacketOffset, there's no way for RegX + start >= 0 and RegX + end < maxPacketOffset.
 	// Return 0 so the check fails, and we return noMatch.
-	if length > maxPacketOffset {
+	if m < 0 {
 		return 0
 	}
 
 	// +1 as it needs to be strictly less than.
 	// This lets us return 0 above to get noMatch.
-	return int32(maxPacketOffset) - int32(length) + 1
+	return int32(m) + 1
 }
 
 // packet_start + (int32(x) + p.start) + p.length() must be <= packet_end.
@@ -295,11 +307,16 @@ func (c checkXNotZero) Assemble() (bpf.RawInstruction, error) {
 	return bpf.RawInstruction{}, errors.Errorf("unsupported")
 }
 
+type compileOpts struct {
+	// packetStartMaxOffset is the maximum offset the packet start / data is at, in bytes.
+	packetStartMaxOffset uint16
+}
+
 // compile compiles a cBPF program to an ordered slice of blocks, with:
 // - Registers zero initialized as required
 // - Required packet access guards added
 // - JumpIf and JumpIfX instructions normalized (see normalizeJumps)
-func compile(insns []bpf.Instruction) ([]*block, error) {
+func compile(insns []bpf.Instruction, opts compileOpts) ([]*block, error) {
 	err := validateInstructions(insns)
 	if err != nil {
 		return nil, err
@@ -327,11 +344,11 @@ func compile(insns []bpf.Instruction) ([]*block, error) {
 		return nil, err
 	}
 
-	rewriteLargePacketOffsets(&blocks)
+	rewriteLargePacketOffsets(&blocks, opts)
 
 	// Guard packet loads
 	addAbsolutePacketGuards(blocks)
-	addIndirectPacketGuards(blocks)
+	addIndirectPacketGuards(blocks, opts)
 
 	return blocks, nil
 }
@@ -586,7 +603,7 @@ func addDivideByZeroGuards(blocks []*block) error {
 // While cBPF allows bigger offsets, in practice they cannot match a packet.
 // This doesn't work for LoadIndirect as the actual offset is LoadIndirect.Off + RegX,
 // we instead rely on runtime checks (see packetGuardIndirect).
-func rewriteLargePacketOffsets(blocks *[]*block) {
+func rewriteLargePacketOffsets(blocks *[]*block, opts compileOpts) {
 	// All blocks are reachable when we start.
 	// But some blocks can become unreachable once we've rewritten load instructions to returns.
 	// The verifier rejects unreachable instructions, track how many other blocks go to a given block
@@ -604,25 +621,24 @@ func rewriteLargePacketOffsets(blocks *[]*block) {
 
 		for _, insn := range block.insns {
 			var (
-				offset uint32
-				size   int
+				offset uint64
+				size   uint64
 			)
 
 			// LoadIndirect is handled by runtime checks as only RegX + offset is subject to maxPacketOffset.
 			switch i := insn.Instruction.(type) {
 			case bpf.LoadAbsolute:
-				offset = i.Off
-				size = i.Size
+				offset = uint64(i.Off)
+				size = uint64(i.Size)
 			case bpf.LoadMemShift:
-				offset = i.Off
+				offset = uint64(i.Off)
 				size = 1
 			default:
 				continue
 			}
 
 			// A packetGuard will have to add size to the packet pointer, so it counts towards the limit.
-			// We've already validate offset isn't signed, so this can't overflow.
-			if offset+uint32(size) > maxPacketOffset {
+			if offset+size+uint64(opts.packetStartMaxOffset) > maxPacketOffset {
 				// Mimick an out of bounds load in cBPF, returning 0 / no match.
 				// The block now unconditionally returns, the other instructions in it don't matter.
 				block.insns = []instruction{
@@ -674,7 +690,7 @@ func addAbsolutePacketGuards(blocks []*block) {
 }
 
 // addIndirectPacketGuard adds required packet guards for indirect packet accesses to blocks.
-func addIndirectPacketGuards(blocks []*block) {
+func addIndirectPacketGuards(blocks []*block, opts compileOpts) {
 	addPacketGuards(blocks, packetGuardOpts{
 		requiredGuard: func(insns []instruction) requiredGuard {
 			var (
@@ -687,7 +703,7 @@ func addIndirectPacketGuards(blocks []*block) {
 
 				switch i := insn.Instruction.(type) {
 				case bpf.LoadIndirect:
-					biggestGuard = biggestGuard.extend(newPacketGuardIndirect(i.Off, i.Size))
+					biggestGuard = biggestGuard.extend(newPacketGuardIndirect(i.Off, i.Size, opts))
 				}
 
 				// Check if we clobbered x - this invalidates the guard

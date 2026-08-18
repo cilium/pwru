@@ -86,11 +86,17 @@ type COpts struct {
 	// a BPF to BPF call.
 	// Requires at least kernel 5.10 (for x86, later for other architectures) if used with tail-calls.
 	NoInline bool
+
+	// PacketStartMaxOffset is the maximum offset the packet start / data is at, in bytes.
+	PacketStartMaxOffset uint16
 }
 
 // ToC compiles a cBPF filter to a C function with a signature of:
 //
 //	uint32_t opts.FunctionName(const uint8_t *const data, const uint8_t *const data_end)
+//
+// If the data pointer is offset from the original BPF context pointer,
+// the maximum value of this offset must be set as COpts.PacketStartMaxOffset.
 //
 // The function returns the filter's return value:
 // 0 if the packet does not match the cBPF filter,
@@ -100,7 +106,9 @@ func ToC(filter []bpf.Instruction, opts COpts) (string, error) {
 		return "", errors.Errorf("invalid FunctionName %q", opts.FunctionName)
 	}
 
-	blocks, err := compile(filter)
+	blocks, err := compile(filter, compileOpts{
+		packetStartMaxOffset: opts.PacketStartMaxOffset,
+	})
 	if err != nil {
 		return "", err
 	}
