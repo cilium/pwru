@@ -242,6 +242,9 @@ func (f *markFlagValue) String() string {
 
 func (f *markFlagValue) Set(value string) error {
 	parts := strings.Split(value, "/")
+	if len(parts) > 2 {
+		return fmt.Errorf("invalid mark value %q: expected mark[/mask]", value)
+	}
 
 	mark, err := parseUint32HexOrDecimal(parts[0])
 	if err != nil {
