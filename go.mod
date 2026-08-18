@@ -7,14 +7,14 @@ require (
 	github.com/cheggaaa/pb/v3 v3.2.0
 	github.com/cilium/ebpf v0.22.0
 	github.com/cilium/lumberjack/v2 v2.4.2
-	github.com/cloudflare/cbpfc v0.0.0-20260723100431-d17020eb3591
+	github.com/cloudflare/cbpfc v0.0.0-20260805072904-7ac485fd93e1
 	github.com/jsimonetti/rtnetlink/v2 v2.2.0
 	github.com/leonhwangprojects/bice v0.1.3
 	github.com/spf13/pflag v1.0.10
 	github.com/tklauser/ps v0.0.4
 	github.com/vishvananda/netns v0.0.5
-	golang.org/x/arch v0.29.0
-	golang.org/x/net v0.57.0
+	golang.org/x/arch v0.30.0
+	golang.org/x/net v0.58.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
 )
