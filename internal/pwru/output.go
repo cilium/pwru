@@ -81,7 +81,7 @@ type jsonPrinter struct {
 	Proto       uint16     `json:"proto,omitempty"`
 	Mtu         uint32     `json:"mtu,omitempty"`
 	Len         uint32     `json:"len,omitempty"`
-	Cb          [5]uint32  `json:"cb,omitempty"`
+	Cb          *[5]uint32 `json:"cb,omitempty"`
 	Tuple       *jsonTuple `json:"tuple,omitempty"`
 	TunnelTuple *jsonTuple `json:"tunnel_tuple,omitempty"`
 	Stack       any        `json:"stack,omitempty"`
@@ -248,7 +248,7 @@ func (o *output) PrintJson(event *Event) error {
 		d.Mtu = event.Meta.MTU
 		d.Len = event.Meta.Len
 		if o.flags.FilterTraceTc || o.flags.OutputSkbCB {
-			d.Cb = event.Meta.Cb
+			d.Cb = &event.Meta.Cb
 		}
 	}
 
