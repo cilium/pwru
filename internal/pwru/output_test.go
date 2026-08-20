@@ -103,6 +103,43 @@ func TestPrintJSONTupleFields(t *testing.T) {
 	}
 }
 
+func TestPrintJSONCB(t *testing.T) {
+	tests := []struct {
+		name          string
+		outputSkbCB   bool
+		filterTraceTC bool
+		wantCB        bool
+	}{
+		{name: "disabled"},
+		{name: "output skb cb", outputSkbCB: true, wantCB: true},
+		{name: "trace tc", filterTraceTC: true, wantCB: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			out := newBenchmarkOutput(&buf)
+			out.flags.OutputSkbCB = tt.outputSkbCB
+			out.flags.FilterTraceTc = tt.filterTraceTC
+
+			event := newBenchmarkEvent()
+			event.Meta.Cb = [5]uint32{1, 2, 3, 4, 5}
+			if err := out.PrintJson(event); err != nil {
+				t.Fatal(err)
+			}
+
+			var got map[string]any
+			if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+				t.Fatal(err)
+			}
+			_, gotCB := got["cb"]
+			if gotCB != tt.wantCB {
+				t.Fatalf("cb presence = %v, want %v: %s", gotCB, tt.wantCB, buf.String())
+			}
+		})
+	}
+}
+
 func TestSetJSONPacketData(t *testing.T) {
 	d := &jsonPrinter{}
 	flags := &Flags{OutputSkb: true, OutputShinfo: true}
