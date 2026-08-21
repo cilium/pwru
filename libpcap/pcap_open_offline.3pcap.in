@@ -17,7 +17,7 @@
 .\" WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 .\" MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 .\"
-.TH PCAP_OPEN_OFFLINE 3PCAP "23 August 2018"
+.TH PCAP_OPEN_OFFLINE 3PCAP "12 October 2024"
 .SH NAME
 pcap_open_offline, pcap_open_offline_with_tstamp_precision,
 pcap_fopen_offline, pcap_fopen_offline_with_tstamp_precision \- open a saved capture file for reading
@@ -80,12 +80,21 @@ Alternatively, you may call
 or
 .BR pcap_fopen_offline_with_tstamp_precision ()
 to read dumped data from an existing open stream
-.IR fp .
+.IR fp ;
+this stream will be closed by a subsequent call to
+.BR pcap_close (3PCAP)
+unless it is
+.BR stdin .
 .BR pcap_fopen_offline_with_tstamp_precision ()
 takes an additional
 .I precision
 argument as described above.
 Note that on Windows, that stream should be opened in binary mode.
+.PP
+.I errbuf
+is a buffer large enough to hold at least
+.B PCAP_ERRBUF_SIZE
+chars.
 .SH RETURN VALUE
 .BR pcap_open_offline (),
 .BR pcap_open_offline_with_tstamp_precision (),
@@ -93,7 +102,7 @@ Note that on Windows, that stream should be opened in binary mode.
 and
 .BR pcap_fopen_offline_with_tstamp_precision ()
 return a
-.I pcap_t *
+.B pcap_t *
 on success and
 .B NULL
 on failure.
@@ -102,10 +111,6 @@ If
 is returned,
 .I errbuf
 is filled in with an appropriate error message.
-.I errbuf
-is assumed to be able to hold at least
-.B PCAP_ERRBUF_SIZE
-chars.
 .SH BACKWARD COMPATIBILITY
 .BR pcap_open_offline_with_tstamp_precision ()
 and
