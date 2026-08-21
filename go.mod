@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/Asphaltt/mybtf v0.0.0-20250708022622-be6f548674b2
-	github.com/cheggaaa/pb/v3 v3.2.0
+	github.com/cheggaaa/pb/v3 v3.2.1
 	github.com/cilium/ebpf v0.22.0
 	github.com/cilium/lumberjack/v2 v2.4.2
 	github.com/cloudflare/cbpfc v0.0.0-20260805072904-7ac485fd93e1
@@ -25,8 +25,8 @@ require (
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
-	github.com/mattn/go-isatty v0.0.22 // indirect
-	github.com/mattn/go-runewidth v0.0.24 // indirect
+	github.com/mattn/go-isatty v0.0.24 // indirect
+	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/mdlayher/netlink v1.8.0 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
