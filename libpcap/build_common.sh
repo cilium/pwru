@@ -45,6 +45,7 @@ mktempdir() {
     *)
         # At least Haiku, Linux and OpenBSD implementations require explicit
         # trailing X'es in the template, so make it the same suffix as above.
+        # XXX - is MSYS2 GNU-based, so that it would be like Linux?
         mktemp -d -t "${mktempdir_prefix}.XXXXXXXX"
         ;;
     esac
@@ -62,7 +63,7 @@ print_sysinfo() {
 cc_version_nocache() {
     : "${CC:?}"
     case `basename "$CC"` in
-    gcc*|egcc*|clang*)
+    gcc*|egcc*|clang*|tcc*)
         # GCC and Clang recognize --version, print to stdout and exit with 0.
         "$CC" --version
         ;;
@@ -93,6 +94,16 @@ cc_version_nocache() {
             "$CC" --version
             ;;
         esac
+        ;;
+    cl)
+        # Visual Studio's compiler doesn't have a "print the compiler
+        # version" option, but we can get version information by
+        # running it with no options, sending its standard error to
+        # the standard output, and throwing out the usage message;
+        # as we have MSYS2, we can just "head" it out.
+        #
+        # XXX - does it exit with an error?
+        "$CC" 2>&1 | head -2
         ;;
     *)
         "$CC" --version || "$CC" -V || :
@@ -134,6 +145,23 @@ cc_id_nocache() {
         return
     fi
 
+    cc_id_guessed=`echo "$cc_id_firstline" | sed 's/^Microsoft (R) C\/C++ Optimizing Compiler Version \([0-9\.]*\) .*$/msvc-\1/'`
+    if [ "$cc_id_firstline" != "$cc_id_guessed" ]; then
+        echo "$cc_id_guessed"
+        return
+    fi
+
+    # Examples of installed packages:
+    # "tcc version 0.9.27 (x86_64 Linux)"
+    # "tcc version 0.9.27 2023-07-05 mob@5b28165 (x86_64 OpenBSD)"
+    # Example of a development version:
+    # "tcc version 0.9.28rc 2024-04-28 mob@0aca8611 (x86_64 Linux)"
+    cc_id_guessed=`echo "$cc_id_firstline" | sed 's/^.*tcc version \([0-9\.rc]*\).*$/tcc-\1/'`
+    if [ "$cc_id_firstline" != "$cc_id_guessed" ]; then
+        echo "$cc_id_guessed"
+        return
+    fi
+
     # OpenBSD default GCC:
     # "gcc (GCC) 4.2.1 20070719"
     # RedHat GCC:
@@ -170,7 +198,7 @@ discard_cc_cache() {
 # warnings as errors.
 cc_werr_cflags() {
     case `cc_id` in
-    gcc-*|clang-*)
+    gcc-*|clang-*|tcc-*)
         echo '-Werror'
         ;;
     xlc-*)
@@ -179,7 +207,14 @@ cc_werr_cflags() {
         echo '-qhalt=w'
         ;;
     suncc-*)
-        echo '-errwarn=%all'
+        # GCC and Clang print an identification for every warning, which is
+        # useful for root cause analysis and bug fixing.  Sun C does not do it
+        # by default, but an additional option makes the style more consistent.
+        echo '-errwarn=%all -errtags=yes'
+        ;;
+    msvc-*)
+        # XXX - what?
+        echo ''
         ;;
     esac
 }
@@ -205,19 +240,34 @@ os_id() {
         : "${os_id_version:=`uname -v`}"
         echo "${os_id_version}.${os_id_release}"
         ;;
-    Darwin|NetBSD|OpenBSD|SunOS)
+    Darwin|GNU|OpenBSD|SunOS)
         echo "$os_id_release"
         ;;
-    FreeBSD|Linux)
+    FreeBSD|NetBSD|Linux)
         # Meaningful version is usually the substring before the first dash.
+        # Or the first underscore.
         echo "$os_id_release" | sed 's/^\([0-9\.]*\).*$/\1/'
         ;;
     Haiku)
-        # Meaningful version is the substring before the plus sign.
-        # "hrev55181" stands for "R1/beta3".
-        # "hrev54154" stands for "R1/beta2".
+        # The complete version is a substring before the first space, e.g.:
+        # * "hrevNNNNN" for a release without updates, e.g. hrev56578 for
+        #   R1/beta4, also for a clean build of master branch;
+        # * "hrevNNNNN+MM" for a release with updates;
+        # * "hrevNNNNN-MM" for a build of a branch that is ahead of the master
+        #   branch;
+        # * "hrevNNNNN_MMMM_KK" for a CI build of a Gerrit review;
+        # * something else for a build of a working copy with the changes not
+        #   yet committed.
+        # With this system it is not clear which version components would be
+        # meaningful to relate with the build result, so let's return the
+        # complete version and leave any interpretation to the user.
         : "${os_id_version:=`uname -v`}"
-        echo "$os_id_version" | sed 's/^\(hrev.*\)+.*$/\1/'
+        echo "$os_id_version" | sed -E 's/^(hrev[^ ]+).+$/\1/'
+        ;;
+    MSYS*)
+        # uname -s produces "MSYS_NT-{NT version?}-{build?}
+        # uname -r produces MSYS2 version?
+        echo "$os_id_version", MSYS "$os_id_release"
         ;;
     *)
         echo 'UNKNOWN'
@@ -227,7 +277,8 @@ os_id() {
 
 increment() {
     # No arithmetic expansion in Solaris /bin/sh before 11.
-    echo "${1:?} + 1" | bc
+    # shellcheck disable=SC2003
+    expr "${1:?}" + 1
 }
 
 # Display text in magenta.
@@ -247,6 +298,12 @@ print_so_deps() {
     case `os_id` in
     Darwin-*)
         run_after_echo otool -L "${1:?}"
+        ;;
+    Haiku-*)
+        run_after_echo objdump -p "${1:?}"
+        ;;
+    MSYS*)
+        run_after_echo dumpbin /dependents "${1:?}"
         ;;
     *)
         run_after_echo ldd "${1:?}"

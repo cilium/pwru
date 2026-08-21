@@ -1,3 +1,4 @@
+message(STATUS "Running rpcapd/CMakeLists.txt")
 if(UNIX)
   check_function_exists(crypt HAVE_CRYPT_IN_SYSTEM_LIBRARIES)
   if(HAVE_CRYPT_IN_SYSTEM_LIBRARIES)
@@ -47,26 +48,30 @@ if(WIN32 OR ((CMAKE_USE_PTHREADS_INIT OR PTHREADS_FOUND) AND HAVE_CRYPT))
     endif(NOT STDLIBS_HAVE_GETADDRINFO)
   endif(UNIX)
 
-  if(WIN32)
-    set(RPCAPD_EXTRA_SOURCES
-        win32-svc.c
-        ${pcap_SOURCE_DIR}/charconv.c
-        ${pcap_SOURCE_DIR}/missing/getopt.c
-        rpcapd.rc)
-    include_directories(${pcap_SOURCE_DIR}/rpcapd ${pcap_SOURCE_DIR}/missing)
-  endif(WIN32)
-
-  add_executable(rpcapd
+  set(RPCAPD_SOURCES
     daemon.c
     fileconf.c
     log.c
     rpcapd.c
     ${pcap_SOURCE_DIR}/rpcap-protocol.c
     ${pcap_SOURCE_DIR}/sockutils.c
-    ${pcap_SOURCE_DIR}/sslutils.c
     ${pcap_SOURCE_DIR}/fmtutils.c
-    ${RPCAPD_EXTRA_SOURCES}
   )
+  if(OPENSSL_FOUND)
+    set(RPCAPD_SOURCES ${RPCAPD_SOURCES}
+      ${pcap_SOURCE_DIR}/sslutils.c)
+  endif(OPENSSL_FOUND)
+  if(WIN32)
+    set(RPCAPD_SOURCES ${RPCAPD_SOURCES}
+      win32-svc.c
+      ${pcap_SOURCE_DIR}/charconv.c
+      ${pcap_SOURCE_DIR}/missing/getopt.c
+      rpcapd.rc
+    )
+    include_directories(${pcap_SOURCE_DIR}/rpcapd ${pcap_SOURCE_DIR}/missing)
+  endif(WIN32)
+
+  add_executable(rpcapd ${RPCAPD_SOURCES})
 
   if(NOT C_ADDITIONAL_FLAGS STREQUAL "")
     set_target_properties(rpcapd PROPERTIES COMPILE_FLAGS ${C_ADDITIONAL_FLAGS})
@@ -82,34 +87,8 @@ if(WIN32 OR ((CMAKE_USE_PTHREADS_INIT OR PTHREADS_FOUND) AND HAVE_CRYPT))
   # architectures for the OS on which we're doing the build.
   #
   if(APPLE AND "${CMAKE_OSX_ARCHITECTURES}" STREQUAL "")
-    #
-    # Get the major version of Darwin.
-    #
-    string(REGEX MATCH "^([0-9]+)" SYSTEM_VERSION_MAJOR "${CMAKE_SYSTEM_VERSION}")
-
-    if(SYSTEM_VERSION_MAJOR EQUAL 9)
-      #
-      # Leopard.  Build for 32-bit x86 and 32-bit PowerPC, with
-      # 32-bit x86 first.
-      #
-      set(OSX_PROGRAM_ARCHITECTURES "i386;ppc")
-    elseif(SYSTEM_VERSION_MAJOR EQUAL 10)
-      #
-      # Snow Leopard.  Build for x86-64 and 32-bit x86, with
-      # x86-64 first.
-      #
-      set(OSX_PROGRAM_ARCHITECTURES "x86_64;i386")
-    else()
-      #
-      # Post-Snow Leopard.  Build only for x86-64.
-      # XXX - update if and when Apple adds ARM-based Macs.
-      # (You're on your own for iOS etc.)
-      #
-      set(OSX_PROGRAM_ARCHITECTURES "x86_64")
-    endif()
-
     set_target_properties(rpcapd PROPERTIES
-      OSX_ARCHITECTURES "${OSX_PROGRAM_ARCHITECTURES}")
+      OSX_ARCHITECTURES "${OSX_EXECUTABLE_ARCHITECTURES}")
   endif()
 
   if(WIN32)
