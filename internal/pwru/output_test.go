@@ -6,10 +6,42 @@ package pwru
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"io"
 	"regexp"
 	"testing"
 	"time"
 )
+
+type testWriter struct {
+	n   int
+	err error
+}
+
+func (w testWriter) Write([]byte) (int, error) {
+	return w.n, w.err
+}
+
+func TestPrintError(t *testing.T) {
+	sinkErr := errors.New("sink failed")
+	tests := []struct {
+		name    string
+		writer  io.Writer
+		wantErr error
+	}{
+		{name: "writer error", writer: testWriter{err: sinkErr}, wantErr: sinkErr},
+		{name: "short write", writer: testWriter{}, wantErr: io.ErrShortWrite},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := newBenchmarkOutput(tt.writer)
+			if err := out.Print(newBenchmarkEvent()); !errors.Is(err, tt.wantErr) {
+				t.Fatalf("Print() error = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
 
 func TestGetAbsoluteTs(t *testing.T) {
 	ts := getAbsoluteTs()

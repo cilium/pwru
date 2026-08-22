@@ -405,7 +405,9 @@ func run(flags pwru.Flags) error {
 				return fmt.Errorf("Error encoding JSON: %w", err)
 			}
 		} else {
-			output.Print(&event)
+			if err := output.Print(&event); err != nil {
+				return fmt.Errorf("Error writing output: %w", err)
+			}
 		}
 
 		select {

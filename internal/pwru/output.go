@@ -497,7 +497,7 @@ func fprintWithPadding(writer *os.File, data string, maxLenSeen *int) {
 	fmt.Fprintf(writer, formatter, data)
 }
 
-func (o *output) Print(event *Event) {
+func (o *output) Print(event *Event) error {
 	var sb strings.Builder
 	sb.Grow(256)
 
@@ -589,7 +589,15 @@ func (o *output) Print(event *Event) {
 	}
 
 	sb.WriteString("\n")
-	o.writer.Write([]byte(sb.String()))
+	line := []byte(sb.String())
+	n, err := o.writer.Write(line)
+	if err != nil {
+		return err
+	}
+	if n != len(line) {
+		return io.ErrShortWrite
+	}
+	return nil
 }
 
 func (o *output) getIfaceName(netnsInode, ifindex uint32) string {
