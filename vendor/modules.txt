@@ -38,7 +38,7 @@ github.com/cilium/lumberjack/v2
 ## explicit; go 1.18
 github.com/clipperhouse/uax29/v2/graphemes
 github.com/clipperhouse/uax29/v2/internal/iterators
-# github.com/cloudflare/cbpfc v0.0.0-20260805072904-7ac485fd93e1
+# github.com/cloudflare/cbpfc v0.0.0-20260827155121-4866675d37f6
 ## explicit; go 1.25.0
 github.com/cloudflare/cbpfc
 # github.com/fatih/color v1.19.0
