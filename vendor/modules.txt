@@ -38,7 +38,7 @@ github.com/cilium/lumberjack/v2
 ## explicit; go 1.18
 github.com/clipperhouse/uax29/v2/graphemes
 github.com/clipperhouse/uax29/v2/internal/iterators
-# github.com/cloudflare/cbpfc v0.0.0-20260827155121-4866675d37f6
+# github.com/cloudflare/cbpfc v0.0.0-20260828090748-3992b6ec3c9c
 ## explicit; go 1.25.0
 github.com/cloudflare/cbpfc
 # github.com/fatih/color v1.19.0
@@ -74,9 +74,6 @@ github.com/mdlayher/netlink/nlenc
 # github.com/mdlayher/socket v0.5.1
 ## explicit; go 1.20
 github.com/mdlayher/socket
-# github.com/pkg/errors v0.9.1
-## explicit
-github.com/pkg/errors
 # github.com/spf13/pflag v1.0.10
 ## explicit; go 1.12
 github.com/spf13/pflag
