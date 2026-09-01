@@ -1,0 +1,17 @@
+name: pwru
+arch: "${ARCH}"
+platform: linux
+version: "${VERSION}"
+section: utils
+priority: optional
+maintainer: Cilium Authors <cilium@linuxfoundation.org>
+description: eBPF-based tool for tracing network packets in the Linux kernel
+homepage: https://github.com/cilium/pwru
+license: Apache-2.0
+contents:
+  - src: release/pwru-linux-${ARCH}
+    dst: /usr/bin/pwru
+    file_info:
+      mode: 0755
+  - src: README.md
+    dst: /usr/share/doc/pwru/README.md
