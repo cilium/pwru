@@ -58,116 +58,147 @@ func TestGetAbsoluteTs(t *testing.T) {
 	}
 }
 
-func TestPrintJSONTupleFields(t *testing.T) {
+func TestJSONOutput(t *testing.T) {
 	const (
 		tcpFlagSYN tcpFlag = 1 << 1
 		tcpFlagACK tcpFlag = 1 << 4
 		wantFlags          = "SYN|ACK"
 	)
 
-	tests := []struct {
-		name           string
-		outputTunnel   bool
-		outputTCPFlags bool
-	}{
-		{
-			name:           "tuple flags off",
-			outputTCPFlags: false,
-		},
-		{
-			name:           "tuple flags on",
-			outputTCPFlags: true,
-		},
-		{
-			name:           "tunnel tuple flags off",
-			outputTunnel:   true,
-			outputTCPFlags: false,
-		},
-		{
-			name:           "tunnel tuple flags on",
-			outputTunnel:   true,
-			outputTCPFlags: true,
-		},
+	tupleEvent := func() []*Event {
+		event := newBenchmarkEvent()
+		event.Tuple.TCPFlag = tcpFlagSYN | tcpFlagACK
+		event.TunnelTuple = event.Tuple
+		return []*Event{event}
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			outBuf := &bytes.Buffer{}
-			out := newBenchmarkOutput(outBuf)
-			out.flags.OutputTuple = !tt.outputTunnel
-			out.flags.OutputTunnel = tt.outputTunnel
-			out.flags.OutputTCPFlags = tt.outputTCPFlags
-
-			event := newBenchmarkEvent()
-			event.Tuple.TCPFlag = tcpFlagSYN | tcpFlagACK
-			event.TunnelTuple = event.Tuple
-
-			if err := out.PrintJson(event); err != nil {
-				t.Fatalf("PrintJson() error = %v", err)
-			}
-
-			var got map[string]any
-			if err := json.Unmarshal(outBuf.Bytes(), &got); err != nil {
-				t.Fatalf("failed to unmarshal json output: %v", err)
-			}
-
-			tupleField, absentField := "tuple", "tunnel_tuple"
-			if tt.outputTunnel {
-				tupleField, absentField = absentField, tupleField
-			}
-
-			tuple, ok := got[tupleField].(map[string]any)
+	tupleFlags := func(outputTunnel, outputTCPFlags bool) func(*Flags) {
+		return func(f *Flags) {
+			f.OutputTuple = !outputTunnel
+			f.OutputTunnel = outputTunnel
+			f.OutputTCPFlags = outputTCPFlags
+		}
+	}
+	checkTuple := func(field, absentField string, wantFlagsPresent bool) func(t *testing.T, got map[string]any, raw string) {
+		return func(t *testing.T, got map[string]any, raw string) {
+			tuple, ok := got[field].(map[string]any)
 			if !ok {
-				t.Fatalf("missing %s field in json output: %s", tupleField, outBuf.String())
+				t.Fatalf("missing %s field in json output: %s", field, raw)
 			}
 			if _, ok := got[absentField]; ok {
-				t.Fatalf("unexpected %s field in json output: %s", absentField, outBuf.String())
+				t.Fatalf("unexpected %s field in json output: %s", absentField, raw)
 			}
-
 			flags, flagsPresent := tuple["flags"]
-			if flagsPresent != tt.outputTCPFlags {
-				t.Fatalf("%s.flags presence = %v, want %v: %s", tupleField, flagsPresent, tt.outputTCPFlags, outBuf.String())
+			if flagsPresent != wantFlagsPresent {
+				t.Fatalf("%s.flags presence = %v, want %v: %s", field, flagsPresent, wantFlagsPresent, raw)
 			}
-			if tt.outputTCPFlags && flags != wantFlags {
-				t.Fatalf("%s.flags = %v, want %s: %s", tupleField, flags, wantFlags, outBuf.String())
+			if wantFlagsPresent && flags != wantFlags {
+				t.Fatalf("%s.flags = %v, want %s: %s", field, flags, wantFlags, raw)
 			}
-		})
+		}
 	}
-}
 
-func TestPrintJSONCB(t *testing.T) {
+	cbEvent := func() []*Event {
+		event := newBenchmarkEvent()
+		event.Meta.Cb = [5]uint32{1, 2, 3, 4, 5}
+		return []*Event{event}
+	}
+	checkCB := func(wantPresent bool) func(t *testing.T, got map[string]any, raw string) {
+		return func(t *testing.T, got map[string]any, raw string) {
+			if _, ok := got["cb"]; ok != wantPresent {
+				t.Fatalf("cb presence = %v, want %v: %s", ok, wantPresent, raw)
+			}
+		}
+	}
+
 	tests := []struct {
-		name          string
-		outputSkbCB   bool
-		filterTraceTC bool
-		wantCB        bool
+		name   string
+		flags  func(f *Flags)  // nil keeps newBenchmarkOutput's defaults
+		events func() []*Event // nil sends a single unmodified benchmark event
+		check  func(t *testing.T, got map[string]any, raw string)
 	}{
-		{name: "disabled"},
-		{name: "output skb cb", outputSkbCB: true, wantCB: true},
-		{name: "trace tc", filterTraceTC: true, wantCB: true},
+		{
+			name:   "tuple flags off",
+			flags:  tupleFlags(false, false),
+			events: tupleEvent,
+			check:  checkTuple("tuple", "tunnel_tuple", false),
+		},
+		{
+			name:   "tuple flags on",
+			flags:  tupleFlags(false, true),
+			events: tupleEvent,
+			check:  checkTuple("tuple", "tunnel_tuple", true),
+		},
+		{
+			name:   "tunnel tuple flags off",
+			flags:  tupleFlags(true, false),
+			events: tupleEvent,
+			check:  checkTuple("tunnel_tuple", "tuple", false),
+		},
+		{
+			name:   "tunnel tuple flags on",
+			flags:  tupleFlags(true, true),
+			events: tupleEvent,
+			check:  checkTuple("tunnel_tuple", "tuple", true),
+		},
+		{
+			name:   "cb disabled",
+			events: cbEvent,
+			check:  checkCB(false),
+		},
+		{
+			name:   "cb output skb cb",
+			flags:  func(f *Flags) { f.OutputSkbCB = true },
+			events: cbEvent,
+			check:  checkCB(true),
+		},
+		{
+			name:   "cb trace tc",
+			flags:  func(f *Flags) { f.FilterTraceTc = true },
+			events: cbEvent,
+			check:  checkCB(true),
+		},
+		{
+			name:  "relative timestamp",
+			flags: func(f *Flags) { f.OutputTS = "relative" },
+			events: func() []*Event {
+				first := newBenchmarkEvent()
+				first.Timestamp = 100
+				second := newBenchmarkEvent()
+				second.Timestamp = 250
+				return []*Event{first, second}
+			},
+			check: func(t *testing.T, got map[string]any, raw string) {
+				if got["time"] != float64(150) {
+					t.Fatalf("relative time = %v, want 150: %s", got["time"], raw)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			out := newBenchmarkOutput(&buf)
-			out.flags.OutputSkbCB = tt.outputSkbCB
-			out.flags.FilterTraceTc = tt.filterTraceTC
-
-			event := newBenchmarkEvent()
-			event.Meta.Cb = [5]uint32{1, 2, 3, 4, 5}
-			if err := out.PrintJson(event); err != nil {
-				t.Fatal(err)
+			if tt.flags != nil {
+				tt.flags(out.flags)
 			}
 
+			events := []*Event{newBenchmarkEvent()}
+			if tt.events != nil {
+				events = tt.events()
+			}
+			for _, event := range events {
+				if err := out.PrintJson(event); err != nil {
+					t.Fatalf("PrintJson() error = %v", err)
+				}
+			}
+
+			lines := bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte{'\n'})
 			var got map[string]any
-			if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
-				t.Fatal(err)
+			if err := json.Unmarshal(lines[len(lines)-1], &got); err != nil {
+				t.Fatalf("failed to unmarshal json output: %v", err)
 			}
-			_, gotCB := got["cb"]
-			if gotCB != tt.wantCB {
-				t.Fatalf("cb presence = %v, want %v: %s", gotCB, tt.wantCB, buf.String())
-			}
+			tt.check(t, got, buf.String())
 		})
 	}
 }
@@ -183,32 +214,5 @@ func TestSetJSONPacketData(t *testing.T) {
 	}
 	if d.Shinfo != "shared info" {
 		t.Fatalf("skb_shared_info = %q, want %q", d.Shinfo, "shared info")
-	}
-}
-
-func TestPrintJSONRelativeTimestamp(t *testing.T) {
-	var buf bytes.Buffer
-	out := newBenchmarkOutput(&buf)
-	out.flags.OutputTS = "relative"
-
-	first := newBenchmarkEvent()
-	first.Timestamp = 100
-	if err := out.PrintJson(first); err != nil {
-		t.Fatal(err)
-	}
-
-	second := newBenchmarkEvent()
-	second.Timestamp = 250
-	if err := out.PrintJson(second); err != nil {
-		t.Fatal(err)
-	}
-
-	lines := bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte{'\n'})
-	var got map[string]any
-	if err := json.Unmarshal(lines[1], &got); err != nil {
-		t.Fatal(err)
-	}
-	if got["time"] != float64(150) {
-		t.Fatalf("relative time = %v, want 150", got["time"])
 	}
 }
