@@ -69,7 +69,7 @@ type output struct {
 type jsonPrinter struct {
 	Skb         string     `json:"skb,omitempty"`
 	Shinfo      string     `json:"skb_shared_info,omitempty"`
-	Cpu         uint32     `json:"cpu,omitempty"`
+	Cpu         uint32     `json:"cpu"`
 	Process     string     `json:"process,omitempty"`
 	Func        string     `json:"func,omitempty"`
 	CallerFunc  string     `json:"caller_func,omitempty"`

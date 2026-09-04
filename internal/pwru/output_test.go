@@ -158,6 +158,19 @@ func TestJSONOutput(t *testing.T) {
 			check:  checkCB(true),
 		},
 		{
+			name: "cpu zero",
+			events: func() []*Event {
+				event := newBenchmarkEvent()
+				event.CPU = 0
+				return []*Event{event}
+			},
+			check: func(t *testing.T, got map[string]any, raw string) {
+				if cpu, ok := got["cpu"]; !ok || cpu != float64(0) {
+					t.Fatalf("cpu = %v, present = %v; want 0, true: %s", cpu, ok, raw)
+				}
+			},
+		},
+		{
 			name:  "relative timestamp",
 			flags: func(f *Flags) { f.OutputTS = "relative" },
 			events: func() []*Event {
