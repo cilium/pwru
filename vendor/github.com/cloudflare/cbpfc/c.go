@@ -187,6 +187,11 @@ func insnToC(insn instruction, blk *block) ([]string, error) {
 	case bpf.ALUOpConstant:
 		return stat("a %s= %d;", aluToCOp[i.Op], i.Val)
 	case bpf.ALUOpX:
+		// Shifts >=32 are undefined behavior in C.
+		// https://elixir.bootlin.com/linux/v7.2/source/kernel/bpf/core.c#L1899
+		if i.Op == bpf.ALUOpShiftLeft || i.Op == bpf.ALUOpShiftRight {
+			return stat("a %s= (x & 31);", aluToCOp[i.Op])
+		}
 		return stat("a %s= x;", aluToCOp[i.Op])
 	case bpf.NegateA:
 		return stat("a = -a;")

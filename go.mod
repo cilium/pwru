@@ -1,22 +1,22 @@
 module github.com/cilium/pwru
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/Asphaltt/mybtf v0.0.0-20250708022622-be6f548674b2
 	github.com/cheggaaa/pb/v3 v3.2.1
 	github.com/cilium/ebpf v0.22.0
 	github.com/cilium/lumberjack/v2 v2.4.2
-	github.com/cloudflare/cbpfc v0.0.0-20260828090748-3992b6ec3c9c
+	github.com/cloudflare/cbpfc v0.0.0-20260901110337-083e74b275b0
 	github.com/jsimonetti/rtnetlink/v2 v2.2.0
 	github.com/leonhwangprojects/bice v0.1.3
 	github.com/spf13/pflag v1.0.10
 	github.com/tklauser/ps v0.0.4
 	github.com/vishvananda/netns v0.0.5
-	golang.org/x/arch v0.30.0
+	golang.org/x/arch v0.31.0
 	golang.org/x/net v0.58.0
-	golang.org/x/sync v0.22.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/sync v0.23.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
