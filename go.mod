@@ -14,7 +14,7 @@ require (
 	github.com/tklauser/ps v0.0.4
 	github.com/vishvananda/netns v0.0.5
 	golang.org/x/arch v0.31.0
-	golang.org/x/net v0.58.0
+	golang.org/x/net v0.59.0
 	golang.org/x/sync v0.23.0
 	golang.org/x/sys v0.48.0
 )
