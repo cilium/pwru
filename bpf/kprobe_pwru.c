@@ -127,14 +127,14 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, __u64);
-	__type(value, struct skb *);
+	__type(value, struct skb_buff *);
 	__uint(max_entries, MAX_TRACK_SIZE);
 } stackid_skb SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, __u64);
-	__type(value, struct skb *);
+	__type(value, struct skb_buff *);
 	__uint(max_entries, MAX_TRACK_SIZE);
 } xdp_dhs_skb_heads SEC(".maps");
 
