@@ -31,6 +31,10 @@
 const static bool TRUE = true;
 const static u32 ZERO = 0;
 
+u64 print_skb_id = 0;
+u64 print_shinfo_id = 0;
+u64 print_bpfmap_id = 0;
+
 const volatile u32 ENDBR_INSN_SIZE = 0;
 
 enum {
@@ -209,35 +213,17 @@ struct print_bpfmap_value {
 	u8 value[256];
 } __attribute__((packed));
 struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, u32);
-	__type(value, u32);
-} print_skb_id_map SEC(".maps");
-struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 256);
 	__type(key, u64);
 	__type(value, struct print_skb_value);
 } print_skb_map SEC(".maps");
 struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, u32);
-	__type(value, u32);
-} print_shinfo_id_map SEC(".maps");
-struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 256);
 	__type(key, u64);
 	__type(value, struct print_shinfo_value);
 } print_shinfo_map SEC(".maps");
-struct {
-	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
-	__uint(max_entries, 1);
-	__type(key, u32);
-	__type(value, u32);
-} print_bpfmap_id_map SEC(".maps");
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 1024);
@@ -455,14 +441,6 @@ set_tunnel(struct sk_buff *skb, struct tuple *tpl, struct tuple *tunnel_tpl) {
 	__set_tuple(tunnel_tpl, skb_head, tunnel_l3_off, is_ipv4);
 }
 
-static __always_inline u64
-sync_fetch_and_add(void *id_map) {
-	u32 *id = bpf_map_lookup_elem(id_map, &ZERO);
-	if (id)
-		return ((*id)++) | ((u64)(bpf_get_smp_processor_id() + 1) << 32);
-	return 0;
-}
-
 static __always_inline void
 set_skb_btf(struct sk_buff *skb, u64 *event_id) {
 	struct btf_ptr p = {};
@@ -474,7 +452,7 @@ set_skb_btf(struct sk_buff *skb, u64 *event_id) {
 
 	p.type_id = cfg->skb_btf_id;
 	p.ptr = skb;
-	*event_id = sync_fetch_and_add(&print_skb_id_map);
+	*event_id = __sync_fetch_and_add(&print_skb_id, 1);
 
 	v->len = bpf_snprintf_btf(v->str, PRINT_SKB_STR_SIZE, &p, sizeof(p), 0);
 	if (v->len < 0) {
@@ -509,7 +487,7 @@ set_shinfo_btf(struct sk_buff *skb, u64 *event_id) {
 	p.type_id = cfg->shinfo_btf_id;
 	p.ptr = shinfo;
 
-	*event_id = sync_fetch_and_add(&print_shinfo_id_map);
+	*event_id = __sync_fetch_and_add(&print_shinfo_id, 1);
 
 	v->len = bpf_snprintf_btf(v->str, PRINT_SHINFO_STR_SIZE, &p, sizeof(p), 0);
 	if (v->len < 0) {
@@ -1070,7 +1048,7 @@ set_common_bpfmap_info(struct pt_regs *ctx, u64 *event_id,
 		       struct print_bpfmap_value *bpfmap) {
 	struct bpf_map *map = (struct bpf_map *)PT_REGS_PARM1(ctx);
 
-	*event_id = sync_fetch_and_add(&print_bpfmap_id_map);
+	*event_id = __sync_fetch_and_add(&print_bpfmap_id, 1);
 	BPF_CORE_READ_INTO(&bpfmap->id, map, id);
 	BPF_CORE_READ_STR_INTO(&bpfmap->name, map, name);
 	BPF_CORE_READ_INTO(&bpfmap->key_size, map, key_size);
