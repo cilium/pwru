@@ -2,7 +2,7 @@
 /* Copyright Authors of Cilium */
 
 //go:generate sh -c "echo Generating for $TARGET_GOARCH"
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target $TARGET_GOARCH -cc clang -no-strip bpf bpf.c -- -I../bpf/headers
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target $TARGET_GOARCH -cc clang -no-strip bpf bpf.c -- -I../bpf/headers -mcpu=v3
 package main
 
 import (
