@@ -107,7 +107,13 @@ runs:
         kubectl apply -f ./workload.yaml
 
         if [[ -z "${{ inputs.nodename }}" ]]; then
-          kubectl rollout status daemonset pwru --timeout=90s || (kubectl describe ds pwru; true)
+          if ! kubectl rollout status daemonset pwru --timeout=90s; then
+            kubectl describe ds pwru || true
+            exit 1
+          fi
         else
-          kubectl wait pod pwru --for condition=Ready --timeout=90s || (kubectl describe po pwru; true)
+          if ! kubectl wait pod pwru --for condition=Ready --timeout=90s; then
+            kubectl describe po pwru || true
+            exit 1
+          fi
         fi

@@ -49,6 +49,15 @@ jobs:
         name: test-app
         path: test-app/test-app-*
 
+  # Keep the pwru-run action's Kubernetes readiness checks from silently
+  # succeeding on rollout/wait timeout (regression test for #713).
+  lint-actions:
+    runs-on: ubuntu-latest
+    steps:
+     - uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
+     - name: pwru-run readiness regression test
+       run: bash actions/pwru-run/test_ready.sh
+
   test:
     name: Test
     needs: [build]
