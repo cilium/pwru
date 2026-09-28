@@ -7,8 +7,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 )
@@ -227,5 +230,201 @@ func TestSetJSONPacketData(t *testing.T) {
 	}
 	if d.Shinfo != "shared info" {
 		t.Fatalf("skb_shared_info = %q, want %q", d.Shinfo, "shared info")
+	}
+}
+
+// newCacheOutput returns a benchmark output with every cache cap/refresh knob
+// zeroed so individual tests can set only the knobs they exercise.
+func newCacheOutput(writer *bytes.Buffer) *output {
+	o := newBenchmarkOutput(writer)
+	o.lastSeenSkbCap = 0
+	o.procCacheCap = 0
+	o.procCacheRefresh = 0
+	return o
+}
+
+// TestLastSeenSkbOnlyWhenRelative is regression test #1 from issue #708:
+// non-relative timestamp modes must not grow the lastSeenSkb cache.
+func TestLastSeenSkbOnlyWhenRelative(t *testing.T) {
+	for _, mode := range []string{"none", "absolute", "current"} {
+		t.Run("gated/"+mode, func(t *testing.T) {
+			o := newCacheOutput(&bytes.Buffer{})
+			o.flags.OutputTS = mode
+			for i := 0; i < 100; i++ {
+				e := newBenchmarkEvent()
+				e.SkbAddr = uint64(0x1000 + i)
+				if err := o.Print(e); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got := len(o.lastSeenSkb); got != 0 {
+				t.Fatalf("OutputTS=%q grew lastSeenSkb to %d, want 0", mode, got)
+			}
+		})
+	}
+}
+
+// TestLastSeenSkbBounded is regression test #2 from issue #708: an insertion
+// count above the configured capacity must not retain every entry.
+func TestLastSeenSkbBounded(t *testing.T) {
+	cases := []struct {
+		name      string
+		cap       int
+		inserts   int
+		unbounded bool
+	}{
+		{name: "unbounded", cap: 0, inserts: 100, unbounded: true},
+		{name: "bounded-5", cap: 5, inserts: 100},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			o := newCacheOutput(&bytes.Buffer{})
+			o.flags.OutputTS = "relative"
+			o.lastSeenSkbCap = tc.cap
+			for i := 0; i < tc.inserts; i++ {
+				e := newBenchmarkEvent()
+				e.SkbAddr = uint64(0x2000 + i)
+				if err := o.Print(e); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got := len(o.lastSeenSkb)
+			if tc.unbounded && got != tc.inserts {
+				t.Fatalf("unbounded lastSeenSkb len = %d, want %d", got, tc.inserts)
+			}
+			if !tc.unbounded && got > tc.cap {
+				t.Fatalf("lastSeenSkb grew to %d, want <= %d", got, tc.cap)
+			}
+			if got == 0 {
+				t.Fatalf("relative mode recorded no last-seen timestamps")
+			}
+		})
+	}
+}
+
+// TestProcCacheBounded verifies procCache stops growing once it hits its cap,
+// instead of retaining every PID encountered (half of issue #708).
+func TestProcCacheBounded(t *testing.T) {
+	const cap = 32
+	o := newCacheOutput(&bytes.Buffer{})
+	o.procCacheCap = cap
+
+	orig := processNameResolver
+	defer func() { processNameResolver = orig }()
+	seen := 0
+	processNameResolver = func(pid int) string {
+		seen++
+		return fmt.Sprintf("p:%d", pid)
+	}
+
+	const inserts = 1000
+	for i := 0; i < inserts; i++ {
+		_ = o.getExecName(10_000 + i)
+	}
+	if got := len(o.procCache); got > cap {
+		t.Fatalf("procCache grew to %d, want <= %d", got, cap)
+	}
+	if seen == 0 {
+		t.Fatal("resolver was never called")
+	}
+	t.Logf("procCache bounded to %d after %d PIDs (resolver called %d times)",
+		len(o.procCache), inserts, seen)
+}
+
+// TestGetExecNameRefreshesOnReuse is the core regression for the "stale PID
+// attribution" half of issue #708: when a PID is reused by a new process its
+// cached name must be refreshed rather than returned forever.
+func TestGetExecNameRefreshesOnReuse(t *testing.T) {
+	o := newCacheOutput(&bytes.Buffer{})
+	// A very short refresh window so a reused PID is re-resolved promptly.
+	o.procCacheRefresh = 4
+
+	orig := processNameResolver
+	defer func() { processNameResolver = orig }()
+
+	// A PID that outlives the refresh window must be re-resolved and can pick up
+	// a new owner's name.
+	owner := 0
+	processNameResolver = func(pid int) string {
+		owner++
+		return fmt.Sprintf("owner%d:%d", owner, pid)
+	}
+
+	// Warm the cache: the first call resolves, the next few hits.
+	first := o.getExecName(9876)
+	_ = o.getExecName(9876)
+	_ = o.getExecName(9876)
+
+	// Simulate PID reuse by the next incarnation of the process.
+	const reuseOwner = 100
+	owner = reuseOwner
+	// Force the refresh window to elapse without resolving other PIDs.
+	o.procGetSeq += int64(o.procCacheRefresh) + 1
+	second := o.getExecName(9876)
+
+	if first == second {
+		t.Fatalf("reused PID 9876 still resolved to stale name %q after refresh", first)
+	}
+	t.Logf("PID reused: %q -> %q", first, second)
+}
+
+// TestGetExecNameCacheHit verifies the fast path stays cache-only (no resolver
+// call) while a pid is the same and the refresh window hasn't elapsed.
+func TestGetExecNameCacheHit(t *testing.T) {
+	o := newCacheOutput(&bytes.Buffer{})
+	o.procCacheRefresh = 1000
+
+	orig := processNameResolver
+	defer func() { processNameResolver = orig }()
+	calls := 0
+	processNameResolver = func(pid int) string {
+		calls++
+		return fmt.Sprintf("resolved:%d", pid)
+	}
+
+	// First call populates the cache.
+	first := o.getExecName(4321)
+	if calls != 1 {
+		t.Fatalf("resolver called %d times, want 1 on first lookup", calls)
+	}
+	got := o.getExecName(4321) // within the refresh window -> cache hit
+	if got != first {
+		t.Fatalf("cache hit returned %q, want %q", got, first)
+	}
+	if calls != 1 {
+		t.Fatalf("resolver called %d times on a cache hit, want 1", calls)
+	}
+}
+
+// TestOutputCacheEvictionLogs verifies eviction is observable: the cache-bounding
+// path emits a log line, so the behavior is testable and debuggable while we
+// exercise the fix.
+func TestOutputCacheEvictionLogs(t *testing.T) {
+	var logBuf bytes.Buffer
+	origLog := slog.Default()
+	defer slog.SetDefault(origLog)
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+
+	o := newCacheOutput(&bytes.Buffer{})
+	o.flags.OutputTS = "relative"
+	o.lastSeenSkbCap = 4
+
+	orig := processNameResolver
+	defer func() { processNameResolver = orig }()
+	processNameResolver = func(pid int) string { return "p:" + fmt.Sprint(pid) }
+
+	// 100 distinct SKB addresses against a 4-entry cap forces lastSeenSkb evictions.
+	for i := 0; i < 100; i++ {
+		e := newBenchmarkEvent()
+		e.SkbAddr = uint64(30_000 + i)
+		if err := o.Print(e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := len(o.lastSeenSkb); got > 4 {
+		t.Fatalf("lastSeenSkb grew to %d, want <= 4", got)
+	}
+	if !strings.Contains(logBuf.String(), "evicted lastSeenSkb entries") {
+		t.Fatalf("expected a lastSeenSkb eviction log, got:\n%s", logBuf.String())
 	}
 }

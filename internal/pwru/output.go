@@ -34,6 +34,17 @@ import (
 
 const absoluteTS string = "2006-01-02T15:04:05.000"
 
+const (
+	// defaultLastSkbCacheCap bounds the per-skb-address last-seen timestamp cache
+	// so a long, high-cardinality capture can't grow it without bound.
+	defaultLastSkbCacheCap = 1 << 20 // ~1M entries
+	// defaultProcCacheCap bounds the PID->name cache.
+	defaultProcCacheCap = 1 << 12 // 4096 PIDs
+	// defaultProcCacheRefresh is the lookup interval after which a PID entry is
+	// re-resolved, bounding how long a reused PID can keep a previous owner's name.
+	defaultProcCacheRefresh = 1 << 16
+)
+
 type WriteSyncer interface {
 	io.Writer
 	Sync() error
@@ -47,22 +58,31 @@ const (
 )
 
 type output struct {
-	flags           *Flags
-	lastSeenSkb     map[uint64]uint64 // skb addr => last seen TS
-	printSkbMap     *ebpf.Map
-	printShinfoMap  *ebpf.Map
-	printStackMap   *ebpf.Map
-	printBpfmapMap  *ebpf.Map
-	addr2name       Addr2Name
-	skbMetadata     []*SkbMetadata
-	xdpMetadata     []*SkbMetadata
-	writer          io.Writer
-	closer          io.Closer
-	kprobeMulti     bool
-	kfreeReasons    map[uint64]string
-	ifaceCache      map[uint64]map[uint32]string
-	netNSNamesCache map[uint64]string
-	procCache       map[int]string
+	flags            *Flags
+	lastSeenSkb      map[uint64]uint64 // skb addr => last seen TS (relative timestamps only)
+	lastSeenSkbCap   int               // 0 => unbounded
+	printSkbMap      *ebpf.Map
+	printShinfoMap   *ebpf.Map
+	printStackMap    *ebpf.Map
+	printBpfmapMap   *ebpf.Map
+	addr2name        Addr2Name
+	skbMetadata      []*SkbMetadata
+	xdpMetadata      []*SkbMetadata
+	writer           io.Writer
+	closer           io.Closer
+	kprobeMulti      bool
+	kfreeReasons     map[uint64]string
+	ifaceCache       map[uint64]map[uint32]string
+	netNSNamesCache  map[uint64]string
+	procCache        map[int]procCacheEntry
+	procCacheCap     int
+	procCacheRefresh int
+	procGetSeq       int64
+}
+
+type procCacheEntry struct {
+	name   string
+	stored int64 // procGetSeq at which the entry was last resolved (TTL anchor)
 }
 
 // outputStructured is a struct to hold the data for the json output
@@ -152,22 +172,25 @@ func NewOutput(flags *Flags, printSkbMap, printShinfoMap, printStackMap, printBp
 	}
 
 	return &output{
-		flags:           flags,
-		lastSeenSkb:     map[uint64]uint64{},
-		printSkbMap:     printSkbMap,
-		printShinfoMap:  printShinfoMap,
-		printStackMap:   printStackMap,
-		printBpfmapMap:  printBpfmapMap,
-		addr2name:       addr2Name,
-		skbMetadata:     skbMds,
-		xdpMetadata:     xdpMds,
-		writer:          writer,
-		closer:          closer,
-		kprobeMulti:     kprobeMulti,
-		kfreeReasons:    reasons,
-		ifaceCache:      ifs,
-		netNSNamesCache: netNSNames,
-		procCache:       map[int]string{},
+		flags:            flags,
+		lastSeenSkb:      map[uint64]uint64{},
+		lastSeenSkbCap:   defaultLastSkbCacheCap,
+		printSkbMap:      printSkbMap,
+		printShinfoMap:   printShinfoMap,
+		printStackMap:    printStackMap,
+		printBpfmapMap:   printBpfmapMap,
+		addr2name:        addr2Name,
+		skbMetadata:      skbMds,
+		xdpMetadata:      xdpMds,
+		writer:           writer,
+		closer:           closer,
+		kprobeMulti:      kprobeMulti,
+		kfreeReasons:     reasons,
+		ifaceCache:       ifs,
+		netNSNamesCache:  netNSNames,
+		procCache:        map[int]procCacheEntry{},
+		procCacheCap:     defaultProcCacheCap,
+		procCacheRefresh: defaultProcCacheRefresh,
 	}, nil
 }
 
@@ -234,12 +257,11 @@ func (o *output) PrintJson(event *Event) error {
 			d.Time = getAbsoluteTs()
 		case "relative":
 			d.Time = getRelativeTs(event, o)
+			o.setLastSeenSkb(event.SkbAddr, event.Timestamp)
 		case "current":
 			d.Time = event.Timestamp
 		}
 	}
-	o.lastSeenSkb[event.SkbAddr] = event.Timestamp
-
 	if o.flags.OutputMeta {
 		d.Netns = event.Meta.Netns
 		d.Mark = event.Meta.Mark
@@ -333,25 +355,74 @@ func getRelativeTs(event *Event, o *output) uint64 {
 	return ts
 }
 
-func (o *output) getExecName(pid int) string {
-	if name, ok := o.procCache[pid]; ok {
-		return name
+// setLastSeenSkb records the last-seen timestamp for an skb address for
+// relative-timestamp output. It is capped so a long, high-cardinality capture
+// can't grow the cache without bound.
+// ponytail: eviction order is arbitrary, so a still-in-flight skb whose entry
+// was evicted prints a one-sample relative-TS glitch (0) until it is seen again;
+// acceptable for a diagnostic tracer. Swap in an LRU if that matters.
+func (o *output) setLastSeenSkb(addr, ts uint64) {
+	o.lastSeenSkb[addr] = ts
+	if maxLen := o.lastSeenSkbCap; maxLen > 0 && len(o.lastSeenSkb) > maxLen {
+		evictMap(o.lastSeenSkb, maxLen)
+		slog.Debug("evicted lastSeenSkb entries", "target", maxLen, "remaining", len(o.lastSeenSkb))
 	}
+}
 
-	p, err := ps.FindProcess(pid)
-	execName := fmt.Sprintf("<empty>:%d", pid)
-	if err == nil && p != nil {
-		execName = fmt.Sprintf("%s:%d", p.ExecutablePath(), pid)
-		if len(execName) > 16 {
-			execName = execName[len(execName)-16:]
-			bexecName := []byte(execName)
-			bexecName[0] = '~'
-			execName = string(bexecName)
+// evictMap shrinks m to at most maxLen entries by deleting arbitrary keys only when
+// the map is over capacity, keeping the per-event cost amortized O(1).
+func evictMap[K comparable, V any](m map[K]V, maxLen int) {
+	if maxLen <= 0 || len(m) <= maxLen {
+		return
+	}
+	for k := range m {
+		delete(m, k)
+		if len(m) <= maxLen {
+			return
 		}
 	}
+}
 
-	o.procCache[pid] = execName
+// processNameResolver returns a (column-trimmed) name for pid, or an
+// "<empty>:pid" placeholder when pid does not exist. It is a package var so
+// tests can simulate PID reuse without touching /proc.
+var processNameResolver = defaultProcessName
+
+func defaultProcessName(pid int) string {
+	p, err := ps.FindProcess(pid)
+	if err != nil || p == nil {
+		return fmt.Sprintf("<empty>:%d", pid)
+	}
+	execName := fmt.Sprintf("%s:%d", p.ExecutablePath(), pid)
+	if len(execName) > 16 {
+		execName = execName[len(execName)-16:]
+		bexecName := []byte(execName)
+		bexecName[0] = '~'
+		execName = string(bexecName)
+	}
 	return execName
+}
+
+// getExecName returns the cached name for pid. The cache is refreshed every
+// procCacheRefresh lookups so a reused PID cannot keep a stale name forever, and
+// entries are evicted above procCacheCap to bound memory.
+// ponytail: the refresh cadence is by lookup count, not by PID-generation,
+// so a reused PID keeps its previous owner's name for up to
+// procCacheRefresh lookups. Key the cache on process creation time to shrink
+// that window if it matters.
+func (o *output) getExecName(pid int) string {
+	o.procGetSeq++
+	if entry, ok := o.procCache[pid]; ok && o.procGetSeq-entry.stored <= int64(o.procCacheRefresh) {
+		return entry.name
+	}
+	name := processNameResolver(pid)
+	o.procCache[pid] = procCacheEntry{name: name, stored: o.procGetSeq}
+	if maxLen := o.procCacheCap; maxLen > 0 && len(o.procCache) > maxLen {
+		evictMap(o.procCache, maxLen)
+		slog.Debug("evicted procCache entries", "target", maxLen, "remaining", len(o.procCache))
+	}
+	slog.Debug("refreshed process name", "pid", pid, "name", name, "cacheSize", len(o.procCache))
+	return name
 }
 
 func getTuple(tpl Tuple, outputTCPFlags bool) (tupleData string) {
@@ -510,6 +581,7 @@ func (o *output) Print(event *Event) error {
 	ts := event.Timestamp
 	if o.flags.OutputTS == "relative" {
 		ts = getRelativeTs(event, o)
+		o.setLastSeenSkb(event.SkbAddr, event.Timestamp)
 	}
 
 	outFuncName := getOutFuncName(o, event, event.Addr)
@@ -519,7 +591,6 @@ func (o *output) Print(event *Event) error {
 	if o.flags.OutputTS != "none" {
 		sb.WriteString(fmt.Sprintf(" %-16d", ts))
 	}
-	o.lastSeenSkb[event.SkbAddr] = event.Timestamp
 
 	if o.flags.OutputMeta {
 		sb.WriteString(" ")

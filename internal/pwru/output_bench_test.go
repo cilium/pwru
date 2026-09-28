@@ -27,7 +27,8 @@ func newBenchmarkOutput(writer io.Writer) *output {
 			OutputBpfmap:   false,
 			OutputTCPFlags: true,
 		},
-		lastSeenSkb: make(map[uint64]uint64),
+		lastSeenSkbCap: defaultLastSkbCacheCap,
+		lastSeenSkb:    make(map[uint64]uint64),
 		addr2name: Addr2Name{
 			Addr2NameMap: map[uint64]*ksym{
 				0xffffffff81000000: {addr: 0xffffffff81000000, name: "test_function"},
@@ -40,9 +41,11 @@ func newBenchmarkOutput(writer io.Writer) *output {
 		ifaceCache: map[uint64]map[uint32]string{
 			4026531840: {1: "lo", 2: "eth0"},
 		},
-		procCache: map[int]string{
-			1234: "test-process:1234",
+		procCache: map[int]procCacheEntry{
+			1234: {name: "test-process:1234", stored: 0},
 		},
+		procCacheCap:     defaultProcCacheCap,
+		procCacheRefresh: defaultProcCacheRefresh,
 	}
 }
 
