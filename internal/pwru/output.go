@@ -262,7 +262,7 @@ func (o *output) PrintJson(event *Event) error {
 	}
 
 	if o.flags.OutputShinfo {
-		d.SkbMetadata = getShinfoData(event, o)
+		d.Shinfo = getShinfoData(event, o)
 	}
 
 	// Create new encoder to write the json to stdout or file depending on the flags
