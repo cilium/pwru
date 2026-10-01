@@ -16,6 +16,13 @@
 #define ETH_P_IP              0x800
 #define ETH_P_IPV6            0x86dd
 #define ETH_P_8021Q           0x8100
+#define ETH_P_8021AD          0x88a8
+#define MAX_VLAN_DEPTH        2
+
+static __always_inline bool
+is_vlan_proto(__be16 proto) {
+	return proto == bpf_htons(ETH_P_8021Q) || proto == bpf_htons(ETH_P_8021AD);
+}
 
 #define RTAX_MTU              2
 #define SKB_DST_NOREF         1UL
@@ -428,9 +435,17 @@ static __always_inline void
 set_tuple(struct sk_buff *skb, struct tuple *tpl) {
 	void *skb_head = BPF_CORE_READ(skb, head);
 	u16 l3_off = BPF_CORE_READ(skb, network_header);
+	__be16 proto = BPF_CORE_READ(skb, protocol);
 
-	if (BPF_CORE_READ(skb, protocol) == bpf_ntohs(ETH_P_8021Q))
+	#pragma unroll
+	for (int i = 0; i < MAX_VLAN_DEPTH; i++) {
+		if (!is_vlan_proto(proto))
+			break;
+
+		struct vlan_hdr *vlan = (struct vlan_hdr *) (skb_head + l3_off);
+		proto = BPF_CORE_READ(vlan, h_vlan_encapsulated_proto);
 		l3_off += sizeof(struct vlan_hdr);
+	}
 
 	struct iphdr *l3_hdr = (struct iphdr *) (skb_head + l3_off);
 	u8 ip_vsn = BPF_CORE_READ_BITFIELD_PROBED(l3_hdr, version);
@@ -958,8 +973,12 @@ set_xdp_tuple(struct xdp_buff *xdp, struct tuple *tpl) {
 	u16 l4_off;
 
 	__be16 proto = BPF_CORE_READ(eth, h_proto);
-	if (proto == bpf_htons(ETH_P_8021Q)) {
-		struct vlan_hdr *vlan = (struct vlan_hdr *) (eth + 1);
+	#pragma unroll
+	for (int i = 0; i < MAX_VLAN_DEPTH; i++) {
+		if (!is_vlan_proto(proto))
+			break;
+
+		struct vlan_hdr *vlan = (struct vlan_hdr *) (data + l3_off);
 		proto = BPF_CORE_READ(vlan, h_vlan_encapsulated_proto);
 		l3_off += sizeof(*vlan);
 	}

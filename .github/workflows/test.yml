@@ -223,6 +223,40 @@ jobs:
             ping -W1 -c1 10.0.0.1 || true
           expected-output-pattern: 'arp_rcv'
 
+      - name: Test QinQ (802.1ad + 802.1Q) output tuple
+        uses: ./.github/actions/pwru-test
+        with:
+          test-name: ${{ matrix.kernel }}-qinq-tuple
+          pwru-flags: --filter-func skb_vlan_untag
+          setup: |
+            ip netns del qinq-a 2>/dev/null || true
+            ip netns del qinq-b 2>/dev/null || true
+            ip netns add qinq-a
+            ip netns add qinq-b
+            ip link add veth-a type veth peer name veth-b
+            ip link set veth-a netns qinq-a
+            ip link set veth-b netns qinq-b
+            ip netns exec qinq-a ip link set lo up
+            ip netns exec qinq-b ip link set lo up
+            ip netns exec qinq-a ip link set veth-a up
+            ip netns exec qinq-b ip link set veth-b up
+            ip netns exec qinq-a ethtool -K veth-a rxvlan off txvlan off rx-vlan-stag-hw-parse off tx-vlan-stag-hw-insert off 2>/dev/null || true
+            ip netns exec qinq-b ethtool -K veth-b rxvlan off txvlan off rx-vlan-stag-hw-parse off tx-vlan-stag-hw-insert off 2>/dev/null || true
+            ip netns exec qinq-a ip link add link veth-a name s100 type vlan proto 802.1ad id 100
+            ip netns exec qinq-b ip link add link veth-b name s100 type vlan proto 802.1ad id 100
+            ip netns exec qinq-a ip link add link s100 name c200 type vlan proto 802.1Q id 200
+            ip netns exec qinq-b ip link add link s100 name c200 type vlan proto 802.1Q id 200
+            ip netns exec qinq-a ip link set s100 up
+            ip netns exec qinq-b ip link set s100 up
+            ip netns exec qinq-a ip link set c200 up
+            ip netns exec qinq-b ip link set c200 up
+            ip netns exec qinq-a ip addr add 10.10.10.1/24 dev c200
+            ip netns exec qinq-b ip addr add 10.10.10.2/24 dev c200
+            ip netns exec qinq-a ping -c 1 -W 1 10.10.10.2 >/dev/null 2>&1 || true
+          gen-traffic: |
+            ip netns exec qinq-a ping -c 3 10.10.10.2 || true
+          expected-output-pattern: '0x88a8.*10.10.10.1:0->10.10.10.2:0\(icmp\).*skb_vlan_untag'
+
       - name: Derive ifindex for next test [1/2]
         uses: cilium/little-vm-helper@f86d344aca812dda5aef167867a9a0a90ca6cca5 # v0.0.31
         with:
