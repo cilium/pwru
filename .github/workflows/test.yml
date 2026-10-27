@@ -40,7 +40,7 @@ jobs:
       run: |
         cd test-app
         for arch in amd64 arm64; do
-          GOARCH=${arch} go build -o test-app-${arch} .
+          CGO_ENABLED=0 GOARCH=${arch} go build -o test-app-${arch} .
         done
 
     - name: Store test-app
