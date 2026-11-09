@@ -313,6 +313,7 @@ type LinkAttributes struct {
 	NetDevGroup      *uint32          // Interface network device group
 	NumVF            *uint32          // Number of Virtual Functions (SR-IOV)
 	OperationalState OperationalState // Interface operation state
+	PermAddress      net.HardwareAddr // Permanent hardware address of the interface
 	PhysPortID       *string          // Interface unique physical port identifier within the NIC
 	PhysPortName     *string          // Interface physical port name within the NIC
 	PhysSwitchID     *string          // Unique physical switch identifier of a switch this port belongs to
@@ -396,6 +397,12 @@ func (a *LinkAttributes) decode(ad *netlink.AttributeDecoder) error {
 			a.Master = &v
 		case unix.IFLA_OPERSTATE:
 			a.OperationalState = OperationalState(ad.Uint8())
+		case unix.IFLA_PERM_ADDRESS:
+			l := len(ad.Bytes())
+			if l < 4 || l > 32 {
+				return errInvalidLinkMessageAttr
+			}
+			a.PermAddress = ad.Bytes()
 		case unix.IFLA_PHYS_PORT_ID:
 			v := ad.String()
 			a.PhysPortID = &v

@@ -210,6 +210,7 @@ const (
 	IFLA_CARRIER_CHANGES                       = linux.IFLA_CARRIER_CHANGES
 	IFLA_CARRIER_UP_COUNT                      = linux.IFLA_CARRIER_UP_COUNT
 	IFLA_CARRIER_DOWN_COUNT                    = linux.IFLA_CARRIER_DOWN_COUNT
+	IFLA_PERM_ADDRESS                          = linux.IFLA_PERM_ADDRESS
 	IFLA_PHYS_PORT_ID                          = linux.IFLA_PHYS_PORT_ID
 	IFLA_PHYS_SWITCH_ID                        = linux.IFLA_PHYS_SWITCH_ID
 	IFLA_PHYS_PORT_NAME                        = linux.IFLA_PHYS_PORT_NAME
@@ -335,6 +336,7 @@ const (
 	RTA_EXPIRES                                = linux.RTA_EXPIRES
 	RTA_METRICS                                = linux.RTA_METRICS
 	RTA_MULTIPATH                              = linux.RTA_MULTIPATH
+	RTA_VIA                                    = linux.RTA_VIA
 	RTA_PREF                                   = linux.RTA_PREF
 	RTAX_ADVMSS                                = linux.RTAX_ADVMSS
 	RTAX_FEATURES                              = linux.RTAX_FEATURES

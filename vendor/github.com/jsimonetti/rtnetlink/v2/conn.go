@@ -29,6 +29,8 @@ type conn interface {
 	Receive() ([]netlink.Message, error)
 	Execute(m netlink.Message) ([]netlink.Message, error)
 	SetOption(option netlink.ConnOption, enable bool) error
+	JoinGroup(group uint32) error
+	LeaveGroup(group uint32) error
 	SetReadDeadline(t time.Time) error
 }
 
@@ -68,6 +70,16 @@ func (c *Conn) Close() error {
 // SetOption enables or disables a netlink socket option for the Conn.
 func (c *Conn) SetOption(option netlink.ConnOption, enable bool) error {
 	return c.c.SetOption(option, enable)
+}
+
+// JoinGroup joins a netlink group for the Conn, which allows the Conn to receive messages sent to that group.
+func (c *Conn) JoinGroup(group uint32) error {
+	return c.c.JoinGroup(group)
+}
+
+// LeaveGroup leaves a netlink group for the Conn, which prevents the Conn from receiving messages sent to that group.
+func (c *Conn) LeaveGroup(group uint32) error {
+	return c.c.LeaveGroup(group)
 }
 
 // SetReadDeadline sets the read deadline associated with the connection.
