@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 1.9.0
+
+**This is the first release of package netlink that only supports Go 1.24+.**
+
+- [Improvement]: updated dependencies and Go version to 1.24; tests now run on
+  Go 1.24-1.26.
+- [New API]: [#236](https://github.com/mdlayher/netlink/pull/236) introduced
+  `Sequence` field to `OpError` for better error correlation.
+- [New API]: [#237](https://github.com/mdlayher/netlink/pull/237) added
+  `netlink.Conn.PID` method to retrieve the connection's PID, also known as port
+  ID.
+- [Improvement]: [#228](https://github.com/mdlayher/netlink/pull/228) fixed
+  skipping of specific tests on big-endian hosts.
+
 ## 1.8.0
 
 - [Improvement]: Updated dependencies, test with Go 1.23 to 1.25.
@@ -35,7 +49,7 @@ Users on older versions of Go must use v1.6.2.**
 
 ## v1.6.1
 
-- [Deprecation] [commit](https://github.com/mdlayher/netlink/commit/d1b69ea8697d721415c259ef8513ab699c6d3e96): 
+- [Deprecation] [commit](https://github.com/mdlayher/netlink/commit/d1b69ea8697d721415c259ef8513ab699c6d3e96):
   the `netlink.Socket` interface has been marked as deprecated. The abstraction
   is awkward to use properly and disables much of the functionality of the Conn
   type when the basic interface is implemented. Do not use.

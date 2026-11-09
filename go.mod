@@ -8,15 +8,15 @@ require (
 	github.com/cilium/ebpf v0.22.0
 	github.com/cilium/lumberjack/v2 v2.4.2
 	github.com/cloudflare/cbpfc v0.0.0-20260901110337-083e74b275b0
-	github.com/jsimonetti/rtnetlink/v2 v2.2.0
+	github.com/jsimonetti/rtnetlink/v2 v2.3.0
 	github.com/leonhwangprojects/bice v0.1.3
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	github.com/tklauser/ps v0.0.4
 	github.com/vishvananda/netns v0.0.5
-	golang.org/x/arch v0.32.0
+	golang.org/x/arch v0.33.0
 	golang.org/x/net v0.62.0
-	golang.org/x/sync v0.24.0
-	golang.org/x/sys v0.49.0
+	golang.org/x/sync v0.25.0
+	golang.org/x/sys v0.50.0
 )
 
 require (
@@ -27,7 +27,7 @@ require (
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
-	github.com/mdlayher/netlink v1.8.0 // indirect
+	github.com/mdlayher/netlink v1.9.0 // indirect
 	github.com/mdlayher/socket v0.5.1 // indirect
 	rsc.io/c2go v0.0.0-20170620140410-520c22818a08 // indirect
 )

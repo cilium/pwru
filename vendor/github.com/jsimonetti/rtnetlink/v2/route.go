@@ -164,6 +164,7 @@ type RouteAttributes struct {
 	Dst       net.IP
 	Src       net.IP
 	Gateway   net.IP
+	Via       *RouteVia
 	OutIface  uint32
 	Priority  uint32
 	Table     uint32
@@ -172,6 +173,34 @@ type RouteAttributes struct {
 	Expires   *uint32
 	Metrics   *RouteMetrics
 	Multipath []NextHop
+}
+
+// RouteVia is the RTA_VIA attribute: a next-hop whose address family differs from the route's
+// (e.g. an IPv4 destination reachable via an IPv6 next-hop, RFC 5549). It is mutually exclusive
+// with Gateway.
+type RouteVia struct {
+	Family uint16 // address family of Addr (e.g. AF_INET6)
+	Addr   net.IP
+}
+
+func (v *RouteVia) encode() ([]byte, error) {
+	b := make([]byte, 2+len(v.Addr))
+	nativeEndian.PutUint16(b[:2], v.Family)
+	copy(b[2:], v.Addr)
+
+	return b, nil
+}
+
+func (v *RouteVia) decode(b []byte) error {
+	if len(b) < 2 {
+		return errInvalidRouteMessageAttr
+	}
+
+	v.Family = nativeEndian.Uint16(b[:2])
+	v.Addr = make(net.IP, len(b)-2)
+	copy(v.Addr, b[2:])
+
+	return nil
 }
 
 func (a *RouteAttributes) decode(ad *netlink.AttributeDecoder) error {
@@ -185,6 +214,9 @@ func (a *RouteAttributes) decode(ad *netlink.AttributeDecoder) error {
 			ad.Do(decodeIP(&a.Src))
 		case unix.RTA_GATEWAY:
 			ad.Do(decodeIP(&a.Gateway))
+		case unix.RTA_VIA:
+			a.Via = &RouteVia{}
+			ad.Do(a.Via.decode)
 		case unix.RTA_OIF:
 			a.OutIface = ad.Uint32()
 		case unix.RTA_PRIORITY:
@@ -221,6 +253,10 @@ func (a *RouteAttributes) encode(ae *netlink.AttributeEncoder) error {
 
 	if a.Gateway != nil {
 		ae.Do(unix.RTA_GATEWAY, encodeIP(a.Gateway))
+	}
+
+	if a.Via != nil {
+		ae.Do(unix.RTA_VIA, a.Via.encode)
 	}
 
 	if a.OutIface != 0 {
@@ -326,6 +362,7 @@ type RTNextHop struct {
 type NextHop struct {
 	Hop     RTNextHop     // a rtnexthop struct
 	Gateway net.IP        // that struct's nested Gateway attribute
+	Via     *RouteVia     // cross-family next-hop (RTA_VIA), mutually exclusive with Gateway
 	MPLS    []MPLSNextHop // Any MPLS next hops for a route.
 }
 
@@ -338,6 +375,10 @@ func (a *RouteAttributes) encodeMultipath() ([]byte, error) {
 
 		if nh.Gateway != nil {
 			ae.Do(unix.RTA_GATEWAY, encodeIP(nh.Gateway))
+		}
+
+		if nh.Via != nil {
+			ae.Do(unix.RTA_VIA, nh.Via.encode)
 		}
 
 		if len(nh.MPLS) > 0 {
@@ -422,6 +463,9 @@ func (nh *NextHop) decode(ad *netlink.AttributeDecoder) error {
 			encapType = ad.Uint16()
 		case unix.RTA_GATEWAY:
 			ad.Do(decodeIP(&nh.Gateway))
+		case unix.RTA_VIA:
+			nh.Via = &RouteVia{}
+			ad.Do(nh.Via.decode)
 		}
 	}
 

@@ -293,7 +293,8 @@ func checkMessage(m Message) error {
 		// Error code is a negative integer, convert it into an OS-specific raw
 		// system call error, but do not wrap with os.NewSyscallError to signify
 		// that this error was produced by a netlink message; not a system call.
-		Err: newError(-1 * int(c)),
+		Err:      newError(-1 * int(c)),
+		Sequence: m.Header.Sequence,
 	}
 
 	// TODO(mdlayher): investigate the Capped flag.

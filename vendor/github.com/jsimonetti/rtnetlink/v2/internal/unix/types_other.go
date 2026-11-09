@@ -206,6 +206,7 @@ const (
 	IFLA_CARRIER_CHANGES                       = 0x23
 	IFLA_CARRIER_UP_COUNT                      = 0x2f
 	IFLA_CARRIER_DOWN_COUNT                    = 0x30
+	IFLA_PERM_ADDRESS                          = 0x36
 	IFLA_PHYS_PORT_ID                          = 0x22
 	IFLA_PHYS_SWITCH_ID                        = 0x24
 	IFLA_PHYS_PORT_NAME                        = 0x26
@@ -333,6 +334,7 @@ const (
 	RTA_EXPIRES                                = 0x17
 	RTA_METRICS                                = 0x8
 	RTA_MULTIPATH                              = 0x9
+	RTA_VIA                                    = 0x12
 	RTA_PREF                                   = 0x14
 	RTAX_ADVMSS                                = 0x8
 	RTAX_FEATURES                              = 0xc
