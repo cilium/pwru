@@ -86,7 +86,7 @@ github.com/vishvananda/netns
 # golang.org/x/arch v0.33.0
 ## explicit; go 1.26.0
 golang.org/x/arch/x86/x86asm
-# golang.org/x/net v0.62.0
+# golang.org/x/net v0.63.0
 ## explicit; go 1.26.0
 golang.org/x/net/bpf
 # golang.org/x/sync v0.25.0
