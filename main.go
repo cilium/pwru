@@ -51,6 +51,10 @@ func main() {
 }
 
 func run(flags pwru.Flags) error {
+	if flags.ShirudoUpatch != "" {
+		return exportShirudo(flags)
+	}
+
 	if flags.FilterTrackBpfHelpers {
 		if runtime.GOARCH != "amd64" {
 			return errors.New("BPF helpers tracking is only supported on amd64")

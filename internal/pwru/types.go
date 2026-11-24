@@ -78,6 +78,11 @@ type Flags struct {
 
 	SetPerCPUBuf uint32
 
+	ShirudoUpatch  string
+	ShirudoKeysDir string
+	ShirudoName    string
+	ShirudoFuncs   string
+
 	Debug bool
 }
 
@@ -133,6 +138,11 @@ func (f *Flags) SetFlags() {
 		fmt.Sprintf("Tracing backend('%s', '%s'). Will auto-detect if not specified.", BackendKprobe, BackendKprobeMulti))
 
 	flag.Uint32Var(&f.SetPerCPUBuf, "set-percpu-buf", 4096, "set the size of buffers to print skb data (used by --output-skb and --output-skb-shared-info)")
+
+	flag.StringVar(&f.ShirudoUpatch, "shirudo-upatch", "", "instead of tracing, write to the given file a shirudo upatch that records the matching packets on its target")
+	flag.StringVar(&f.ShirudoKeysDir, "shirudo-keys-dir", "", "the shirudo operator's keys directory, with signing_key.pem and cert.der, to sign the upatch with")
+	flag.StringVar(&f.ShirudoName, "shirudo-name", "pwru", "the name of the shirudo upatch")
+	flag.StringVar(&f.ShirudoFuncs, "shirudo-available-funcs", "", "the target's available_filter_functions (default: this host's), as --kernel-btf is its BTF")
 
 	flag.BoolVar(&f.Debug, "debug", false, "enable debug logging")
 

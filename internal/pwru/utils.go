@@ -25,11 +25,8 @@ type Funcs map[string]int
 // getAvailableFilterFunctions return list of functions to which it is possible
 // to attach kprobes.
 func getAvailableFilterFunctions() (map[string]struct{}, error) {
-	availableFuncs := make(map[string]struct{})
-	var f *os.File
-    var err error
 	// Linux v6.17+ enforce this new path for the tracing functionality
-	f, err = os.Open("/sys/kernel/tracing/available_filter_functions")
+	f, err := os.Open("/sys/kernel/tracing/available_filter_functions")
 	if err != nil {
 		f, err = os.Open("/sys/kernel/debug/tracing/available_filter_functions")
 		if err != nil {
@@ -37,6 +34,22 @@ func getAvailableFilterFunctions() (map[string]struct{}, error) {
 		}
 	}
 	defer f.Close()
+	return readAvailableFilterFunctions(f)
+}
+
+// ReadAvailableFilterFunctions reads a copy of another host's
+// available_filter_functions.
+func ReadAvailableFilterFunctions(path string) (map[string]struct{}, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return readAvailableFilterFunctions(f)
+}
+
+func readAvailableFilterFunctions(f *os.File) (map[string]struct{}, error) {
+	availableFuncs := make(map[string]struct{})
 
 	scanner := bufio.NewScanner(f)
 	scanner.Split(bufio.ScanLines)
@@ -51,6 +64,15 @@ func getAvailableFilterFunctions() (map[string]struct{}, error) {
 }
 
 func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti, bpfmap bool) (Funcs, map[string]*btf.FuncProto, error) {
+	availableFuncs, err := getAvailableFilterFunctions()
+	if err != nil {
+		slog.Warn("Failed to retrieve available ftrace functions (is /sys/kernel/tracing or /sys/kernel/debug/tracing mounted?)", "error", err)
+	}
+	return GetFuncsFrom(pattern, spec, kmods, kprobeMulti, bpfmap, availableFuncs)
+}
+
+// GetFuncsFrom is GetFuncs for the functions availableFuncs lists.
+func GetFuncsFrom(pattern string, spec *btf.Spec, kmods []string, kprobeMulti, bpfmap bool, availableFuncs map[string]struct{}) (Funcs, map[string]*btf.FuncProto, error) {
 	funcs := Funcs{}
 	bpfmapFuncs := map[string]*btf.FuncProto{}
 
@@ -62,12 +84,6 @@ func GetFuncs(pattern string, spec *btf.Spec, kmods []string, kprobeMulti, bpfma
 	reg, err := regexp.Compile(pattern)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to compile regular expression %v", err)
-	}
-
-	var availableFuncs map[string]struct{}
-	availableFuncs, err = getAvailableFilterFunctions()
-	if err != nil {
-		slog.Warn("Failed to retrieve available ftrace functions (is /sys/kernel/tracing or /sys/kernel/debug/tracing mounted?)", "error", err)
 	}
 
 	iters := []iterator{{"", spec.All()}}
