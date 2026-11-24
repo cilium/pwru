@@ -1,11 +1,11 @@
 module github.com/cilium/pwru
 
-go 1.26.0
+go 1.27
 
 require (
 	github.com/Asphaltt/mybtf v0.0.0-20250708022622-be6f548674b2
 	github.com/cheggaaa/pb/v3 v3.3.0
-	github.com/cilium/ebpf v0.22.0
+	github.com/cilium/ebpf v0.22.1-0.20260813092409-78669a7ae6fe
 	github.com/cilium/lumberjack/v2 v2.4.2
 	github.com/cloudflare/cbpfc v0.0.0-20260901110337-083e74b275b0
 	github.com/jsimonetti/rtnetlink/v2 v2.3.0

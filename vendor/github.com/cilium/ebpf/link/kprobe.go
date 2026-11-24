@@ -13,9 +13,9 @@ import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/internal"
 	"github.com/cilium/ebpf/internal/linux"
-	"github.com/cilium/ebpf/internal/sys"
 	"github.com/cilium/ebpf/internal/tracefs"
 	"github.com/cilium/ebpf/internal/unix"
+	"github.com/cilium/ebpf/sys"
 )
 
 // KprobeOptions defines additional parameters that will be used
@@ -48,6 +48,20 @@ func (ko *KprobeOptions) cookie() uint64 {
 		return 0
 	}
 	return ko.Cookie
+}
+
+// SyscallWrapper returns the platform-specific kernel wrapper symbol for
+// syscall. If syscall already has the current platform's prefix, it's returned
+// unchanged.
+//
+// For example, on amd64, an input of "sys_open" will return "__x64_sys_open".
+func SyscallWrapper(syscall string) string {
+	prefix := linux.PlatformPrefix()
+	if prefix == "" || strings.HasPrefix(syscall, prefix) {
+		return syscall
+	}
+
+	return prefix + syscall
 }
 
 // Kprobe attaches the given eBPF program to a perf event that fires when the

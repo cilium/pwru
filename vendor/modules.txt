@@ -8,7 +8,7 @@ github.com/VividCortex/ewma
 ## explicit; go 1.26.0
 github.com/cheggaaa/pb/v3
 github.com/cheggaaa/pb/v3/termutil
-# github.com/cilium/ebpf v0.22.0
+# github.com/cilium/ebpf v0.22.1-0.20260813092409-78669a7ae6fe
 ## explicit; go 1.25.0
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
@@ -24,13 +24,13 @@ github.com/cilium/ebpf/internal/kconfig
 github.com/cilium/ebpf/internal/linux
 github.com/cilium/ebpf/internal/mountinfo
 github.com/cilium/ebpf/internal/platform
-github.com/cilium/ebpf/internal/sys
 github.com/cilium/ebpf/internal/sysenc
 github.com/cilium/ebpf/internal/testutils/testmain
 github.com/cilium/ebpf/internal/tracefs
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
 github.com/cilium/ebpf/rlimit
+github.com/cilium/ebpf/sys
 # github.com/cilium/lumberjack/v2 v2.4.2
 ## explicit; go 1.13
 github.com/cilium/lumberjack/v2
