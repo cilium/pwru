@@ -8,7 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/cilium/ebpf"
-	"github.com/cilium/ebpf/internal/sys"
+	"github.com/cilium/ebpf/sys"
 )
 
 type IterOptions struct {
@@ -62,6 +62,20 @@ func AttachIter(opts IterOptions) (*Iter, error) {
 // Iter represents an attached bpf_iter.
 type Iter struct {
 	RawLink
+}
+
+func (it *Iter) Info() (*Info, error) {
+	var info sys.IterLinkInfo
+	name, err := queryInfoWithString(it.fd, &info, &info.TargetName, &info.TargetNameLen)
+	if err != nil {
+		return nil, err
+	}
+	return &Info{
+		info.Type,
+		info.Id,
+		ebpf.ProgramID(info.ProgId),
+		&IterInfo{TargetName: name},
+	}, nil
 }
 
 // Open creates a new instance of the iterator.
